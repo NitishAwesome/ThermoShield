@@ -3,8 +3,8 @@ backend/thermal_stress/calculator.py
 
 Core biometeorological mathematical calculations for Human Thermal Stress.
 Implements standardized formulations for:
-  1. Wet-Bulb Globe Temperature (WBGT) — Primary index (ISO 7243 / Stull 2011 approximation)
-  2. NOAA Heat Index (HI) — Secondary index (Rothfusz polynomial)
+  1. Estimated Wet-Bulb Globe Temperature (WBGT) — Primary index (meteorological approximation)
+  2. NOAA Heat Index (HI) — Secondary index (Rothfusz polynomial with domain validation)
   3. Apparent Temperature (AT) — Supporting index (Australian BOM / Steadman)
 """
 
@@ -30,7 +30,7 @@ def calculate_vapor_pressure(temperature_c: float, relative_humidity_pct: float)
 
 def calculate_stull_wet_bulb(temperature_c: float, relative_humidity_pct: float) -> float:
     """
-    Calculates natural wet-bulb temperature (Tw) in °C using Stull's empirical equation (2011).
+    Calculates estimated natural wet-bulb temperature (Tw) in °C using Stull's empirical equation (2011).
     Valid for relative humidity 5%–99% and temperatures -20°C to 50°C (accuracy within ~0.3°C).
     
     Reference:
@@ -57,52 +57,58 @@ def calculate_wbgt(
     solar_radiation_wm2: Optional[float] = None,
 ) -> float:
     """
-    Calculates Wet-Bulb Globe Temperature (WBGT) in °C.
+    Calculates Estimated Wet-Bulb Globe Temperature (WBGT) in °C from meteorological data.
     
-    Assumptions & Scientific Basis:
-      - Indoor / Shade (solar_radiation <= 0 or None):
-          WBGT = 0.7 * Tw + 0.3 * Ta  (ISO 7243 standard)
-      - Outdoor / Direct Sun (solar_radiation > 0):
-          Approximates Black Globe Temperature (Tg) using direct/diffuse solar irradiance
-          and convective wind cooling:
-            Tg = Ta + (Solar / 100.0) * (1.0 / sqrt(max(v, 0.5)))
-          Then applies the standard 3-parameter outdoor WBGT formula:
-            WBGT = 0.7 * Tw + 0.2 * Tg + 0.1 * Ta
+    Scientific Basis & Important Assumptions:
+      - True physical WBGT requires direct measurements from specialized instruments:
+        a natural wet-bulb thermometer, a 150mm black globe thermometer, and a dry-bulb thermometer.
+      - This prototype estimates these physical components from standard ambient weather data:
+        1. Natural wet-bulb (Tw) is estimated via Stull's empirical formulation (2011).
+        2. Black globe temperature (Tg) under direct sunlight is approximated using incident
+           solar irradiance (W/m²) and convective wind cooling (m/s).
+        3. Indoor / Shade: WBGT = 0.7 * Tw + 0.3 * Ta
+        4. Outdoor / Sun:   WBGT = 0.7 * Tw + 0.2 * Tg + 0.1 * Ta
+      - Purpose: Suitable for high-level prototype screening and early warning,
+        not a replacement for a physical calibrated WBGT instrument.
     """
     tw = calculate_stull_wet_bulb(temperature_c, relative_humidity_pct)
     ta = temperature_c
 
-    # Indoor / Shaded Condition
+    # Indoor / Shaded Condition (no direct solar radiation load)
     if solar_radiation_wm2 is None or solar_radiation_wm2 <= 0.0:
         wbgt = 0.7 * tw + 0.3 * ta
         return wbgt
 
-    # Outdoor / Solar Radiation Condition
-    # Wind speed minimum clamp to avoid division by zero or unrealistic calm stagnation
+    # Outdoor / Direct Solar Radiation Condition
+    # Wind speed minimum clamped to 0.5 m/s to prevent division by zero or unrealistic air stagnation
     effective_wind = max(wind_speed_mps, 0.5)
-    # Radiative heat absorption model for black globe temperature
+    # Radiative heat absorption model estimating black globe temperature from solar load & wind
     tg = ta + (solar_radiation_wm2 / 100.0) * (1.0 / math.sqrt(effective_wind))
 
     wbgt = 0.7 * tw + 0.2 * tg + 0.1 * ta
     return wbgt
 
 
-def calculate_heat_index(temperature_c: float, relative_humidity_pct: float) -> float:
+def calculate_heat_index(temperature_c: float, relative_humidity_pct: float) -> Optional[float]:
     """
-    Calculates NOAA/NWS Heat Index in °C.
+    Calculates NOAA/NWS Heat Index in °C with scientific domain validation.
     
-    Scientific Basis:
-      Uses the standard National Weather Service Rothfusz polynomial regression equation
-      derived from Steadman's human biometeorological model.
-      
-    Assumptions & Valid Range:
-      - Heat Index is scientifically designed for warm/hot conditions (T >= 20°C / 68°F).
-      - If T < 20°C, heat stress is inactive and ambient temperature is returned.
-      - Includes low-humidity and high-humidity boundary adjustments recommended by NOAA.
+    Scientific Basis & Domain Validity:
+      - Uses the standard National Weather Service Rothfusz polynomial regression equation
+        derived from Steadman's human biometeorological model.
+      - Domain Constraints:
+        1. Heat Index is only defined for warm/hot conditions (Ta >= 20°C / 68°F).
+           If Ta < 20°C, heat stress is inactive and None is returned.
+        2. The Rothfusz regression polynomial is only valid up to roughly HI ~ 55°C (~131°F)
+           and Ta <= 50°C. When extrapolated to extreme heat and humidity co-occurrences
+           (e.g., 45°C + 58% RH), the polynomial mathematically diverges to unphysical
+           values (such as ~83°C).
+        3. When conditions fall outside this validated domain, this function safely returns
+           None instead of an unphysical mathematical artifact.
     """
-    # If air temperature is cool, heat index does not apply
-    if temperature_c < 20.0:
-        return temperature_c
+    # 1. Low temperature cutoff (Heat Index not applicable in cool weather)
+    if temperature_c < 20.0 or temperature_c > 50.0:
+        return None
 
     # Convert Celsius to Fahrenheit for NOAA polynomial
     tf = (temperature_c * 1.8) + 32.0
@@ -137,6 +143,11 @@ def calculate_heat_index(temperature_c: float, relative_humidity_pct: float) -> 
 
     # Convert back to Celsius
     hi_c = (hi_f - 32.0) / 1.8
+
+    # 2. Upper validity cutoff: If polynomial extrapolation produces unphysical runaway (> 55°C)
+    if hi_c > 55.0:
+        return None
+
     return hi_c
 
 

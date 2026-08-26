@@ -49,7 +49,7 @@ DEMO_SCENARIOS = [
         "solar": 600.0,
     },
     {
-        "title": "Scenario 4: Severe Heatwave Emergency (Extreme Red Alert)",
+        "title": "Scenario 4: Severe Heatwave Emergency (Extreme Thermal Stress)",
         "location": "Delhi NCR / Vidarbha Region",
         "temp": 45.0,
         "humidity": 58.0,
@@ -66,11 +66,13 @@ def print_scenario_card(scenario: Dict[str, Any], result: ThermalStressResult) -
     summary = result.input_summary
 
     alert_badges = {
-        "GREEN": "[GREEN ALERT - NORMAL]",
-        "YELLOW": "[YELLOW ALERT - CAUTION]",
-        "ORANGE": "[ORANGE ALERT - SEVERE]",
-        "RED": "[RED ALERT - EXTREME CRISIS]",
+        "GREEN": "[GREEN - LOW RISK]",
+        "YELLOW": "[YELLOW - MODERATE RISK]",
+        "ORANGE": "[ORANGE - HIGH RISK]",
+        "RED": "[RED - EXTREME RISK]",
     }
+
+    hi_display = f"{idx.heat_index_c:.1f} C" if idx.heat_index_c is not None else "N/A (outside validated range)"
 
     print("\n" + "=" * 68)
     print("  THERMOSHIELD -- HUMAN THERMAL STRESS ENGINE (SIH 2026)")
@@ -86,19 +88,19 @@ def print_scenario_card(scenario: Dict[str, Any], result: ThermalStressResult) -
     print(f"   * Solar Radiation     : {solar_str}")
     print("-" * 68)
     print("  COMPUTED BIOMETEOROLOGICAL INDICES:")
-    print(f"   * WBGT (Wet-Bulb Globe Temp) : {idx.wbgt_c:.1f} C  [Primary Gold Standard]")
-    print(f"   * NOAA Heat Index (HI)       : {idx.heat_index_c:.1f} C")
+    print(f"   * Estimated WBGT (weather)   : {idx.wbgt_c:.1f} C  [PRIMARY THERMAL-STRESS INDEX]")
+    print(f"   * NOAA Heat Index (HI)       : {hi_display}")
     print(f"   * Australian Apparent Temp   : {idx.apparent_temperature_c:.1f} C")
     print(f"   * Stull Natural Wet-Bulb (Tw): {idx.wet_bulb_temp_c:.1f} C")
     print("-" * 68)
-    print("  RISK ASSESSMENT & CLASSIFICATION:")
-    print(f"   * Status              : {alert_badges.get(risk.alert_category, risk.level)}")
+    print("  PROTOTYPE RISK CLASSIFICATION:")
+    print(f"   * Severity Badge      : {alert_badges.get(risk.alert_category, risk.level)}")
     print(f"   * Risk Level          : {risk.level}")
     print(f"   * Risk Score          : {risk.score:.2f} / 1.00")
     print(f"   * Primary Signal      : {risk.primary_index}")
     print(f"   * Diagnostic Reason   : {risk.reason}")
     print("-" * 68)
-    print("  ACTIONABLE CIVIC & HEALTH ADVISORIES:")
+    print("  ACTIONABLE CIVIC & OCCUPATIONAL ADVISORIES:")
     for advisory in result.advisories[:4]:
         print(f"   - {advisory}")
     print("=" * 68)

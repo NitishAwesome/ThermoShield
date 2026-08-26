@@ -4,8 +4,8 @@ tests/test_thermal_stress.py
 Unit test suite for the ThermoShield Human Thermal Stress Module (Nitish).
 Covers:
   - Input validation & boundary constraints (humidity, wind speed, temperature bounds)
-  - Mathematical index calculations (WBGT, Heat Index, Apparent Temp, Stull Wet-Bulb)
-  - Risk classification tiers (LOW, MODERATE, HIGH, EXTREME)
+  - Mathematical index calculations (WBGT, Heat Index with domain validation, Apparent Temp, Stull Wet-Bulb)
+  - Prototype Risk classification tiers (LOW, MODERATE, HIGH, EXTREME) when HI is present or None
   - Advisory generation logic
   - Serialization contracts for Ronit's backend
 """
@@ -80,7 +80,7 @@ class TestThermalStressModule(unittest.TestCase):
         self.assertIsNone(result.input_summary["solar_radiation_wm2"])
 
     # -------------------------------------------------------------
-    # 2. Biometeorological Index Calculations
+    # 2. Biometeorological Index Calculations & Domain Validity
     # -------------------------------------------------------------
     def test_08_stull_wet_bulb_calculation(self):
         """Test Stull wet-bulb formula against known meteorological baseline."""
@@ -89,23 +89,29 @@ class TestThermalStressModule(unittest.TestCase):
         self.assertTrue(21.5 <= tw <= 23.5, f"Tw {tw} out of expected range")
 
     def test_09_wbgt_outdoor_vs_indoor(self):
-        """Test that outdoor WBGT with solar load is higher than shaded WBGT."""
+        """Test that outdoor estimated WBGT with solar load is higher than shaded WBGT."""
         wbgt_indoor = calculate_wbgt(temperature_c=35.0, relative_humidity_pct=60.0, solar_radiation_wm2=None)
         wbgt_outdoor = calculate_wbgt(temperature_c=35.0, relative_humidity_pct=60.0, wind_speed_mps=1.0, solar_radiation_wm2=800.0)
-        self.assertGreater(wbgt_outdoor, wbgt_indoor, "Solar load should increase WBGT")
+        self.assertGreater(wbgt_outdoor, wbgt_indoor, "Solar load should increase estimated WBGT")
 
-    def test_10_heat_index_calculation_moderate(self):
-        """Test NOAA Heat Index for standard hot/humid condition."""
-        # At 35°C (95°F) and 60% RH, NOAA Heat Index is approx 45°C - 48°C (114°F - 118°F)
+    def test_10_heat_index_calculation_valid_moderate(self):
+        """Test NOAA Heat Index within valid domain produces accurate metric."""
+        # At 35°C (95°F) and 60% RH, NOAA Heat Index is approx 45°C - 49°C
         hi = calculate_heat_index(temperature_c=35.0, relative_humidity_pct=60.0)
-        self.assertTrue(44.0 <= hi <= 49.0, f"HI {hi} out of expected range")
+        self.assertIsNotNone(hi)
+        self.assertTrue(45.0 <= hi <= 49.0, f"HI {hi} out of expected range")
 
-    def test_11_heat_index_cool_temperature_fallback(self):
-        """Test that Heat Index safely falls back to ambient temp when T < 20°C."""
+    def test_11_heat_index_cool_temperature_returns_none(self):
+        """Test that Heat Index returns None when T < 20°C (inactive domain)."""
         hi = calculate_heat_index(temperature_c=16.0, relative_humidity_pct=80.0)
-        self.assertEqual(hi, 16.0)
+        self.assertIsNone(hi)
 
-    def test_12_apparent_temperature_wind_cooling(self):
+    def test_12_heat_index_extreme_out_of_domain_returns_none(self):
+        """Test that extreme co-occurrences (e.g. 45°C + 58% RH) return None rather than misleading runaway values."""
+        hi = calculate_heat_index(temperature_c=45.0, relative_humidity_pct=58.0)
+        self.assertIsNone(hi)
+
+    def test_13_apparent_temperature_wind_cooling(self):
         """Test that higher wind speed reduces Apparent Temperature."""
         at_low_wind = calculate_apparent_temperature(temperature_c=32.0, relative_humidity_pct=50.0, wind_speed_mps=0.5)
         at_high_wind = calculate_apparent_temperature(temperature_c=32.0, relative_humidity_pct=50.0, wind_speed_mps=5.0)
@@ -114,44 +120,45 @@ class TestThermalStressModule(unittest.TestCase):
     # -------------------------------------------------------------
     # 3. Risk Classification & Tiers
     # -------------------------------------------------------------
-    def test_13_risk_classification_low(self):
+    def test_14_risk_classification_low(self):
         """Test LOW risk tier for comfortable weather."""
         result = analyze_thermal_stress(temperature=24.0, relative_humidity=40.0, wind_speed=2.0, solar_radiation=200.0)
         self.assertEqual(result.risk_assessment.level, ThermalRiskLevel.LOW.value)
         self.assertEqual(result.risk_assessment.alert_category, "GREEN")
         self.assertLess(result.risk_assessment.score, 0.40)
 
-    def test_14_risk_classification_moderate(self):
+    def test_15_risk_classification_moderate(self):
         """Test MODERATE risk tier for warm condition."""
-        result = analyze_thermal_stress(temperature=33.0, relative_humidity=45.0, wind_speed=2.0, solar_radiation=500.0)
+        result = analyze_thermal_stress(temperature=34.0, relative_humidity=35.0, wind_speed=2.2, solar_radiation=550.0)
         self.assertEqual(result.risk_assessment.level, ThermalRiskLevel.MODERATE.value)
         self.assertEqual(result.risk_assessment.alert_category, "YELLOW")
 
-    def test_15_risk_classification_high(self):
-        """Test HIGH risk tier for muggy hot condition."""
+    def test_16_risk_classification_high(self):
+        """Test HIGH risk tier for humid hot condition."""
         result = analyze_thermal_stress(temperature=36.0, relative_humidity=60.0, wind_speed=2.0, solar_radiation=600.0)
         self.assertEqual(result.risk_assessment.level, ThermalRiskLevel.HIGH.value)
         self.assertEqual(result.risk_assessment.alert_category, "ORANGE")
 
-    def test_16_risk_classification_extreme(self):
-        """Test EXTREME risk tier for severe heatwave emergency."""
-        result = analyze_thermal_stress(temperature=45.0, relative_humidity=65.0, wind_speed=0.8, solar_radiation=900.0)
+    def test_17_risk_classification_extreme_with_none_heat_index(self):
+        """Test EXTREME risk tier functions reliably when Heat Index is None (driven by WBGT and ambient temp)."""
+        result = analyze_thermal_stress(temperature=45.0, relative_humidity=58.0, wind_speed=0.9, solar_radiation=950.0)
         self.assertEqual(result.risk_assessment.level, ThermalRiskLevel.EXTREME.value)
         self.assertEqual(result.risk_assessment.alert_category, "RED")
+        self.assertIsNone(result.indices.heat_index_c)
         self.assertGreaterEqual(result.risk_assessment.score, 0.85)
 
     # -------------------------------------------------------------
-    # 4. Advisories & Data Contracts
+    # 4. Advisories & Data Serialization
     # -------------------------------------------------------------
-    def test_17_advisory_generation_exists(self):
+    def test_18_advisory_generation_exists(self):
         """Test that advisories are non-empty and relevant."""
         result = analyze_thermal_stress(temperature=42.0, relative_humidity=60.0, wind_speed=1.0, solar_radiation=850.0)
         self.assertIsInstance(result.advisories, list)
         self.assertGreaterEqual(len(result.advisories), 3)
 
-    def test_18_serialization_to_dict(self):
-        """Test that to_dict produces valid dictionary structure for Ronit's API."""
-        result = analyze_thermal_stress(temperature=38.0, relative_humidity=55.0, wind_speed=2.0, solar_radiation=700.0)
+    def test_19_serialization_to_dict_handles_none(self):
+        """Test that to_dict produces valid dictionary structure with null heat_index_c when out of domain."""
+        result = analyze_thermal_stress(temperature=45.0, relative_humidity=60.0, wind_speed=1.0, solar_radiation=800.0)
         d = result.to_dict()
         self.assertIn("indices", d)
         self.assertIn("risk_assessment", d)
@@ -159,6 +166,7 @@ class TestThermalStressModule(unittest.TestCase):
         self.assertIn("input_summary", d)
         self.assertIn("wbgt_c", d["indices"])
         self.assertIn("heat_index_c", d["indices"])
+        self.assertIsNone(d["indices"]["heat_index_c"])
         self.assertIn("score", d["risk_assessment"])
 
 

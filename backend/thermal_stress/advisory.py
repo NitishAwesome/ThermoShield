@@ -15,7 +15,7 @@ def generate_advisories(
     weather: WeatherInput
 ) -> List[str]:
     """
-    Generates actionable safety recommendations based on thermal risk level
+    Generates actionable safety recommendations based on prototype thermal risk level
     and environmental parameters.
     
     Disclaimer:
@@ -26,33 +26,33 @@ def generate_advisories(
     advisories: List[str] = []
 
     if level == ThermalRiskLevel.EXTREME.value:
-        advisories.append("[CRITICAL WARNING] Avoid non-essential outdoor exposure, especially between 11:00 AM and 4:30 PM.")
-        advisories.append("[WORK SAFETY] Immediate suspension or mandatory shaded rest cycles recommended for outdoor and construction workers.")
-        advisories.append("[HYDRATION & COOLING] Consume water and oral rehydration solutions (ORS/electrolytes) frequently; do not wait until thirsty.")
-        advisories.append("[VULNERABLE POPULATIONS] Actively check on elderly individuals, children, pregnant women, and pets in non-air-conditioned spaces.")
-        advisories.append("[EMERGENCY CARE] Watch for red-flag symptoms (dizziness, nausea, rapid pulse, lack of sweating) and seek urgent medical aid.")
+        advisories.append("[CRITICAL ADVISORY] Avoid prolonged outdoor exposure, especially during peak afternoon hours.")
+        advisories.append("[WORK SAFETY] Schedule heavy outdoor work during cooler periods and utilize shaded cooling areas.")
+        advisories.append("[HYDRATION] Maintain frequent hydration with water and electrolyte solutions; do not wait until thirsty.")
+        advisories.append("[VULNERABLE GROUPS] Pay special attention to vulnerable populations (elderly, children, outdoor workers).")
+        advisories.append("[HEALTH MONITORING] Monitor for signs of severe heat distress and seek medical assistance if needed.")
 
     elif level == ThermalRiskLevel.HIGH.value:
-        advisories.append("[HIGH HEAT STRESS] Reschedule intense outdoor sports and heavy physical labor to early morning or late evening.")
-        advisories.append("[HYDRATION] Drink at least 250-300 ml of water every 30 minutes during outdoor activities.")
-        advisories.append("[PROTECTION] Wear lightweight, loose, light-colored clothing, wide-brimmed hats, and UV sunglasses.")
-        advisories.append("[REST CYCLES] Ensure access to shaded cooling zones and adequate ventilation at workplaces.")
-        advisories.append("[VULNERABLE CARE] Ensure infants and elderly individuals stay in cool, shaded indoor rooms.")
+        advisories.append("[HIGH HEAT STRESS] Reduce prolonged strenuous outdoor activity during peak sun hours.")
+        advisories.append("[HYDRATION] Maintain frequent hydration and take regular fluid breaks.")
+        advisories.append("[PROTECTION] Wear lightweight, light-colored clothing and use sun protection.")
+        advisories.append("[REST & SHADE] Utilize shaded or well-ventilated cooling areas during rest breaks.")
+        advisories.append("[VULNERABLE CARE] Monitor infants, the elderly, and outdoor laborers for heat fatigue.")
 
     elif level == ThermalRiskLevel.MODERATE.value:
-        advisories.append("[MODERATE CAUTION] Take regular hydration breaks if engaging in continuous physical work outdoors.")
-        advisories.append("[SUN PROTECTION] Limit direct sunlight exposure during peak solar intensity hours.")
-        advisories.append("[FLUID INTAKE] Maintain steady fluid intake; limit excessive consumption of caffeinated or sugary drinks.")
+        advisories.append("[MODERATE CAUTION] Maintain regular hydration if engaging in continuous physical work outdoors.")
+        advisories.append("[SUN EXPOSURE] Limit direct sunlight exposure during peak solar intensity periods.")
+        advisories.append("[FLUID INTAKE] Ensure steady fluid intake throughout the day.")
 
     else:  # LOW
         advisories.append("[NORMAL CONDITIONS] Standard environmental thermal conditions. Normal daily activities may proceed.")
-        advisories.append("[HYDRATION] Maintain baseline healthy hydration during routine outdoor physical exercise.")
+        advisories.append("[HYDRATION] Maintain routine healthy hydration during outdoor physical activity.")
 
     # Contextual weather-specific advisories
     if weather.relative_humidity >= 75.0 and risk.level in (ThermalRiskLevel.HIGH.value, ThermalRiskLevel.EXTREME.value):
-        advisories.append("[HIGH HUMIDITY ALERT] Sweat evaporation is severely impaired; convective cooling via electric fans or airflow is essential.")
+        advisories.append("[HIGH HUMIDITY] Impaired sweat evaporation; ensure active air circulation and ventilation.")
 
     if weather.solar_radiation is not None and weather.solar_radiation >= 800.0:
-        advisories.append("[INTENSE SOLAR LOAD] Direct solar irradiance is very high; seek shaded pathways when commuting.")
+        advisories.append("[INTENSE SOLAR LOAD] High solar irradiance; prefer shaded routes when outdoors.")
 
     return advisories

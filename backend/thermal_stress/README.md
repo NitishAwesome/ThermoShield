@@ -8,7 +8,7 @@
 
 ## 1. Overview & Architecture
 
-The **Human Thermal Stress Module** converts raw meteorological observations and AI forecasts into actionable, biometeorologically accurate human heat-strain indices, IMD-aligned risk assessments, and targeted civic advisories.
+The **Human Thermal Stress Module** converts raw meteorological observations and AI forecasts into actionable human thermal strain indices, prototype risk classifications, and civic heat advisories.
 
 ```text
   [ Zuhaib (Data Pipeline) ]        [ Sumit (AI Predictions) ]
@@ -19,10 +19,10 @@ The **Human Thermal Stress Module** converts raw meteorological observations and
             ┌──────────────────────────────────────┐
             │   Nitish: Thermal Stress Engine      │
             │   backend/thermal_stress/            │
-            │   - WBGT (ISO 7243 / Stull Model)    │
-            │   - NOAA Heat Index (Rothfusz Poly)  │
+            │   - Estimated WBGT (Weather Model)   │
+            │   - NOAA Heat Index (Domain Valid)   │
             │   - Apparent Temp (Steadman Formula) │
-            │   - 4-Tier Risk Categorization       │
+            │   - 4-Tier Prototype Risk Engine     │
             │   - Contextual Advisory Generator    │
             └──────────────────┬───────────────────┘
                                ▼
@@ -45,7 +45,7 @@ The module accepts standard Python variables or a dictionary:
 | `temperature` | `float` | °C | `[-40.0, 70.0]` | **Yes** | Dry-bulb ambient air temperature |
 | `relative_humidity` | `float` | % | `[0.0, 100.0]` | **Yes** | Relative humidity percentage |
 | `wind_speed` | `float` | m/s | `[0.0, ∞)` | Optional (Default: `1.0`) | Surface wind speed (at 2m/10m) |
-| `solar_radiation` | `float` | W/m² | `[0.0, ∞)` | Optional (Default: `None`) | Global solar irradiance. If `None` or `0`, indoor/shaded conditions are modeled. |
+| `solar_radiation` | `float` | W/m² | `[0.0, ∞)` | Optional (Default: `None`) | Global solar irradiance. If `None` or `0`, indoor/shaded conditions are assumed for WBGT. |
 
 ---
 
@@ -65,14 +65,15 @@ Unified JSON/Dictionary response:
     "level": "HIGH",
     "score": 0.81,
     "primary_index": "WBGT",
-    "reason": "Severe thermal stress (WBGT: 32.2°C, HI: 48.1°C). Elevated risk of heat cramps, exhaustion, and dehydration.",
+    "reason": "Severe thermal stress (Estimated WBGT: 32.2°C, HI: 48.1°C). Elevated risk of heat cramps, exhaustion, and dehydration.",
     "color_code": "#E67E22",
     "alert_category": "ORANGE"
   },
   "advisories": [
-    "[HIGH HEAT STRESS] Reschedule intense outdoor sports and heavy physical labor to early morning or late evening.",
-    "[HYDRATION] Drink at least 250-300 ml of water every 30 minutes during outdoor activities.",
-    "[PROTECTION] Wear lightweight, loose, light-colored clothing, wide-brimmed hats, and UV sunglasses."
+    "[HIGH HEAT STRESS] Reduce prolonged strenuous outdoor activity during peak sun hours.",
+    "[HYDRATION] Maintain frequent hydration and take regular fluid breaks.",
+    "[PROTECTION] Wear lightweight, light-colored clothing and use sun protection.",
+    "[REST & SHADE] Utilize shaded or well-ventilated cooling areas during rest breaks."
   ],
   "input_summary": {
     "temperature_c": 36.0,
@@ -82,6 +83,8 @@ Unified JSON/Dictionary response:
   }
 }
 ```
+
+*Note:* `heat_index_c` is `null` if meteorological conditions are outside the validated domain of the NOAA Rothfusz regression (e.g., $T < 20^\circ\text{C}$ or extreme combinations like $45^\circ\text{C} + 58\%\text{ RH}$).
 
 ---
 
@@ -132,14 +135,21 @@ df["heat_index"] = df.apply(lambda row: calculate_heat_index(row["temp"], row["r
 
 ## 5. Scientific Formulations & Assumptions
 
-1. **Wet-Bulb Globe Temperature (WBGT) [Primary Gold Standard]**:
-   * Wet-bulb temperature ($T_w$) calculated using **Stull (2011)** empirical formulation.
-   * Shaded / Indoor: $WBGT = 0.7 \cdot T_w + 0.3 \cdot T_a$ (ISO 7243).
-   * Direct Sun: $T_g = T_a + \frac{S}{100 \cdot \sqrt{\max(v, 0.5)}}$, $WBGT = 0.7 \cdot T_w + 0.2 \cdot T_g + 0.1 \cdot T_a$.
+1. **Estimated Wet-Bulb Globe Temperature (WBGT) [Primary Index]**:
+   * *Methodology:* True physical WBGT requires direct measurements from calibrated wet-bulb and black-globe thermometer instruments. This prototype estimates these physical components from standard meteorological observations.
+   * *Wet-bulb:* Natural wet-bulb ($T_w$) estimated via **Stull (2011)** continuous empirical formulation.
+   * *Globe temperature:* Direct sun black-globe temperature ($T_g$) estimated using solar irradiance ($S$) and convective wind cooling ($v$).
+   * *Indoor/Shaded:* $WBGT = 0.7 \cdot T_w + 0.3 \cdot T_a$.
+   * *Outdoor/Sun:* $WBGT = 0.7 \cdot T_w + 0.2 \cdot T_g + 0.1 \cdot T_a$.
+   * *Scope:* Intended for prototype screening and early warning.
 2. **NOAA Heat Index (HI)**:
-   * Standard 9-term **Rothfusz polynomial regression** with low/high humidity boundary corrections.
+   * Standard 9-term **Rothfusz polynomial regression** with NOAA boundary corrections.
+   * Includes domain validation to return `null` instead of unphysical mathematical artifacts when conditions fall outside the reliable domain.
 3. **Australian Apparent Temperature (AT)**:
    * Steadman (1994) formula: $AT = T_a + 0.33 \cdot e - 0.70 \cdot v - 4.00$, where $e$ is vapor pressure in hPa.
+4. **Prototype Risk Classification**:
+   * 4-tier screening levels: `LOW`, `MODERATE`, `HIGH`, `EXTREME`.
+   * These are simplified prototype screening bands (not official IMD heatwave alert levels, which are based on climatological normal deviations).
 
 ---
 

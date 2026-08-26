@@ -5,13 +5,16 @@ Data contracts and validation models for the Human Thermal Stress module.
 Designed for zero-dependency compatibility across the ThermoShield architecture.
 """
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional, List, Dict, Any
 
 
 class ThermalRiskLevel(str, Enum):
-    """Four-tier risk classification aligned with IMD heatwave alert levels."""
+    """
+    Four-tier prototype thermal stress classification.
+    Used for screening and early warning categorization.
+    """
     LOW = "LOW"
     MODERATE = "MODERATE"
     HIGH = "HIGH"
@@ -70,17 +73,22 @@ class WeatherInput:
 class ThermalIndices:
     """
     Computed biometeorological thermal stress indices.
-    All values rounded to 1 decimal place for presentation consistency.
+    
+    Attributes:
+        wbgt_c: Estimated Wet-Bulb Globe Temperature (°C) from meteorological data.
+        heat_index_c: NOAA Heat Index (°C), or None if outside the validated domain.
+        apparent_temperature_c: Australian Apparent Temperature (°C).
+        wet_bulb_temp_c: Estimated Natural Wet-Bulb Temperature (°C) via Stull formula.
     """
     wbgt_c: float
-    heat_index_c: float
+    heat_index_c: Optional[float]
     apparent_temperature_c: float
     wet_bulb_temp_c: float
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "wbgt_c": round(self.wbgt_c, 1),
-            "heat_index_c": round(self.heat_index_c, 1),
+            "heat_index_c": round(self.heat_index_c, 1) if self.heat_index_c is not None else None,
             "apparent_temperature_c": round(self.apparent_temperature_c, 1),
             "wet_bulb_temp_c": round(self.wet_bulb_temp_c, 1),
         }
@@ -89,7 +97,15 @@ class ThermalIndices:
 @dataclass
 class RiskAssessment:
     """
-    Standardized human thermal risk assessment.
+    Standardized prototype thermal risk assessment.
+    
+    Attributes:
+        level: Prototype classification tier (LOW, MODERATE, HIGH, EXTREME).
+        score: Continuous thermal strain score normalized to [0.00, 1.00].
+        primary_index: Primary signal used for assessment ("WBGT").
+        reason: Diagnostic explanation of thermal stress drivers.
+        color_code: Hex color code for UI visual severity representation.
+        alert_category: Visual severity tier (GREEN, YELLOW, ORANGE, RED).
     """
     level: str  # LOW, MODERATE, HIGH, EXTREME
     score: float  # Continuous index normalized to [0.00, 1.00]
