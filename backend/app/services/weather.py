@@ -19,6 +19,7 @@ async def get_weather(latitude: float, longitude: float):
             "temperature_2m_min"
         ),
         "forecast_days": 5,
+        "wind_speed_unit": "ms",
         "timezone": "auto"
     }
 
