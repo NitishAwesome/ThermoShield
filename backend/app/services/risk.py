@@ -21,9 +21,9 @@ FEATURES = [
 def predict_risk(
     temperature_c: float,
     thermal_stress: float,
-    vulnerability_index: float,
-    historical_health_events: int,
-    lag_health_events: int,
+    vulnerability_index: float = 30.0,
+    historical_health_events: int = 17,
+    lag_health_events: int = 15,
 ):
     input_data = pd.DataFrame([
         {
