@@ -1,23 +1,36 @@
 from fastapi import FastAPI, Query
-from app.services.location import search_location
-from app.services.weather import get_weather
-from app.services.thermal import calculate_heat_index, classify_heat_stress
-from app.services.risk import predict_risk
-from app.services.map_services import get_location_risk
-from app.services.intervention import generate_interventions
-from app.services.simulator import simulate_intervention
-from fastapi import Body
+
+from backend.app.services.location import search_location
+from backend.app.services.weather import get_weather
+from backend.app.services.thermal import (
+    calculate_heat_index,
+    classify_heat_stress,
+    calculate_thermal_stress,
+)
+from backend.app.services.risk import predict_risk
+from backend.app.services.map_services import get_location_risk
+from backend.app.services.intervention import generate_interventions
+from backend.app.services.simulator import simulate_intervention
+
+
 app = FastAPI(
     title="SIH26083 Heat Health API",
     version="1.0.0"
 )
 
-@app.get('/')
+
+@app.get("/")
 def home():
-    return {"message": "Welcome to the SIH26083 Heat Health API"}
+    return {
+        "message": "Welcome to the SIH26083 Heat Health API"
+    }
+
+
 @app.get("/health")
 def health():
-    return {"status": "healthy"}
+    return {
+        "status": "healthy"
+    }
 
 
 @app.get("/location/search")
@@ -30,12 +43,16 @@ async def location_search(
         "count": len(locations),
         "locations": locations
     }
+
+
 @app.get("/weather")
 async def weather(
     lat: float,
     lon: float
 ):
     return await get_weather(lat, lon)
+
+
 @app.get("/thermal")
 async def thermal(
     lat: float,
@@ -45,52 +62,88 @@ async def thermal(
 
     weather = weather_data["weather"]
 
-    heat_index = calculate_heat_index(
-        weather["temperature"],
-        weather["humidity"]
+    thermal_result = calculate_thermal_stress(
+        temperature=weather["temperature"],
+        humidity=weather["humidity"],
+        wind_speed=weather.get("wind_speed", 1.0),
+        solar_radiation=weather.get("solar_radiation")
     )
-
-    stress = classify_heat_stress(heat_index)
 
     return {
         "location": weather_data["location"],
         "weather": weather,
-        "thermal": {
-            "heat_index": heat_index,
-            "stress_level": stress
-        }
+        "thermal": thermal_result
     }
+
+
 @app.get("/risk")
 async def risk(
     lat: float,
-    lon: float
+    lon: float,
+    vulnerability_index: float = 30.0,
+    historical_health_events: int = 17,
+    lag_health_events: int = 15
 ):
+    # Get current weather
     weather_data = await get_weather(lat, lon)
 
     weather = weather_data["weather"]
 
-    heat_index = calculate_heat_index(
-        weather["temperature"],
-        weather["humidity"]
-    )
-
-    risk_score, risk_level = predict_risk(
+    # Run Nitish's actual thermal stress engine
+    thermal_result = calculate_thermal_stress(
         temperature=weather["temperature"],
         humidity=weather["humidity"],
-        wind_speed=weather["wind_speed"],
-        heat_index=heat_index
+        wind_speed=weather.get("wind_speed", 1.0),
+        solar_radiation=weather.get("solar_radiation")
+    )
+
+    # Extract thermal indices
+    heat_index = thermal_result["indices"]["heat_index_c"]
+
+    wbgt = thermal_result["indices"]["wbgt_c"]
+
+    apparent_temperature = (
+        thermal_result["indices"]["apparent_temperature_c"]
+    )
+
+    wet_bulb_temperature = (
+        thermal_result["indices"]["wet_bulb_temp_c"]
+    )
+
+    # Thermal engine score is 0-1.
+    # ML training feature thermal_stress is approximately 0-100.
+    thermal_stress = round(
+        thermal_result["risk_assessment"]["score"] * 100,
+        2
+    )
+
+    # Run ML risk model
+    risk_result = predict_risk(
+        temperature_c=weather["temperature"],
+        thermal_stress=thermal_stress,
+        vulnerability_index=vulnerability_index,
+        historical_health_events=historical_health_events,
+        lag_health_events=lag_health_events
     )
 
     return {
         "location": weather_data["location"],
-        "risk": {
-            "score": risk_score,
-            "level": risk_level
-        },
+
+        "risk": risk_result,
+
         "thermal": {
-            "heat_index": heat_index
+            "heat_index": heat_index,
+            "thermal_stress": thermal_stress,
+            "thermal_risk_level": (
+                thermal_result["risk_assessment"]["level"]
+            ),
+            "wbgt": wbgt,
+            "apparent_temperature": apparent_temperature,
+            "wet_bulb_temperature": wet_bulb_temperature,
         }
     }
+
+
 @app.get("/map/risk")
 async def map_risk(
     locations: list[str] = Query(...)
@@ -109,6 +162,7 @@ async def map_risk(
         "locations": results
     }
 
+
 @app.get("/forecast")
 async def forecast(
     lat: float,
@@ -120,6 +174,8 @@ async def forecast(
         "location": data["location"],
         "forecast": data["forecast"]
     }
+
+
 @app.get("/intervention")
 async def intervention(
     risk_score: float,
@@ -135,6 +191,8 @@ async def intervention(
         hour=hour,
         vulnerable_population=vulnerable_population
     )
+
+
 @app.post("/intervention/simulate")
 async def intervention_simulation(
     risk_score: float,
