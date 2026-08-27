@@ -4,13 +4,17 @@ from app.services.weather import get_weather
 from app.services.thermal import calculate_heat_index, classify_heat_stress
 from app.services.risk import predict_risk
 from app.services.map_services import get_location_risk
-
+from app.services.intervention import generate_interventions
+from app.services.simulator import simulate_intervention
+from fastapi import Body
 app = FastAPI(
     title="SIH26083 Heat Health API",
     version="1.0.0"
 )
 
-
+@app.get('/')
+def home():
+    return {"message": "Welcome to the SIH26083 Heat Health API"}
 @app.get("/health")
 def health():
     return {"status": "healthy"}
@@ -116,3 +120,31 @@ async def forecast(
         "location": data["location"],
         "forecast": data["forecast"]
     }
+@app.get("/intervention")
+async def intervention(
+    risk_score: float,
+    temperature: float,
+    humidity: float,
+    hour: int,
+    vulnerable_population: float = 0
+):
+    return generate_interventions(
+        risk_score=risk_score,
+        temperature=temperature,
+        humidity=humidity,
+        hour=hour,
+        vulnerable_population=vulnerable_population
+    )
+@app.post("/intervention/simulate")
+async def intervention_simulation(
+    risk_score: float,
+    cooling_center: bool = False,
+    outdoor_work_restriction: bool = False,
+    hydration_stations: bool = False
+):
+    return simulate_intervention(
+        risk_score=risk_score,
+        cooling_center=cooling_center,
+        outdoor_work_restriction=outdoor_work_restriction,
+        hydration_stations=hydration_stations
+    )
