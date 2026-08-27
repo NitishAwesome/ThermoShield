@@ -9,7 +9,7 @@ Implements standardized formulations for:
 """
 
 import math
-from typing import Optional
+from typing import Optional, Tuple
 from backend.thermal_stress.models import WeatherInput, ThermalIndices
 
 
@@ -151,6 +151,24 @@ def calculate_heat_index(temperature_c: float, relative_humidity_pct: float) -> 
     return hi_c
 
 
+def get_heat_index_status(temperature_c: float, relative_humidity_pct: float) -> str:
+    """
+    Returns an operational status string for the NOAA Heat Index calculation:
+      - "VALID": Within standard NOAA operational envelope
+      - "NOT_APPLICABLE_COOL": Air temperature < 20°C (cool conditions)
+      - "OUTSIDE_VALIDATED_RANGE": Extreme temperature/humidity exceeding Rothfusz polynomial validity
+    """
+    if temperature_c < 20.0:
+        return "NOT_APPLICABLE_COOL"
+    if temperature_c > 50.0:
+        return "OUTSIDE_VALIDATED_RANGE"
+
+    hi = calculate_heat_index(temperature_c, relative_humidity_pct)
+    if hi is None:
+        return "OUTSIDE_VALIDATED_RANGE"
+    return "VALID"
+
+
 def calculate_apparent_temperature(
     temperature_c: float,
     relative_humidity_pct: float,
@@ -185,6 +203,10 @@ def compute_all_indices(weather: WeatherInput) -> ThermalIndices:
         temperature_c=weather.temperature,
         relative_humidity_pct=weather.relative_humidity,
     )
+    hi_status = get_heat_index_status(
+        temperature_c=weather.temperature,
+        relative_humidity_pct=weather.relative_humidity,
+    )
     at = calculate_apparent_temperature(
         temperature_c=weather.temperature,
         relative_humidity_pct=weather.relative_humidity,
@@ -200,4 +222,5 @@ def compute_all_indices(weather: WeatherInput) -> ThermalIndices:
         heat_index_c=hi,
         apparent_temperature_c=at,
         wet_bulb_temp_c=tw,
+        heat_index_status=hi_status,
     )

@@ -79,11 +79,13 @@ class ThermalIndices:
         heat_index_c: NOAA Heat Index (°C), or None if outside the validated domain.
         apparent_temperature_c: Australian Apparent Temperature (°C).
         wet_bulb_temp_c: Estimated Natural Wet-Bulb Temperature (°C) via Stull formula.
+        heat_index_status: Operational validity flag ("VALID", "OUTSIDE_VALIDATED_RANGE", "NOT_APPLICABLE_COOL").
     """
     wbgt_c: float
     heat_index_c: Optional[float]
     apparent_temperature_c: float
     wet_bulb_temp_c: float
+    heat_index_status: str = "VALID"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -91,6 +93,7 @@ class ThermalIndices:
             "heat_index_c": round(self.heat_index_c, 1) if self.heat_index_c is not None else None,
             "apparent_temperature_c": round(self.apparent_temperature_c, 1),
             "wet_bulb_temp_c": round(self.wet_bulb_temp_c, 1),
+            "heat_index_status": self.heat_index_status,
         }
 
 
@@ -101,18 +104,24 @@ class RiskAssessment:
     
     Attributes:
         level: Prototype classification tier (LOW, MODERATE, HIGH, EXTREME).
-        score: Continuous thermal strain score normalized to [0.00, 1.00].
+        score: Thermal Stress Risk Score normalized to [0.00, 1.00].
+               NOTE: This is a normalized biometeorological severity index, NOT a mortality
+               probability, heat stroke probability, or clinical individual risk percentage.
         primary_index: Primary signal used for assessment ("WBGT").
-        reason: Diagnostic explanation of thermal stress drivers.
+        reason: Diagnostic summary explanation of thermal stress level.
         color_code: Hex color code for UI visual severity representation.
         alert_category: Visual severity tier (GREEN, YELLOW, ORANGE, RED).
+        risk_basis: Direct biometeorological factors that determined the risk level.
+        environmental_factors: Contextual environmental observations (humidity, wind, solar).
     """
     level: str  # LOW, MODERATE, HIGH, EXTREME
-    score: float  # Continuous index normalized to [0.00, 1.00]
+    score: float  # Thermal Stress Risk Score normalized to [0.00, 1.00]
     primary_index: str  # "WBGT"
     reason: str
     color_code: str  # Hex color for UI representation
     alert_category: str  # GREEN, YELLOW, ORANGE, RED
+    risk_basis: List[str] = field(default_factory=list)
+    environmental_factors: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -122,6 +131,82 @@ class RiskAssessment:
             "reason": self.reason,
             "color_code": self.color_code,
             "alert_category": self.alert_category,
+            "risk_basis": self.risk_basis,
+            "environmental_factors": self.environmental_factors,
+        }
+
+
+@dataclass
+class HydrationGuidance:
+    """
+    Guideline-based occupational and civic heat-safety hydration guidance.
+    
+    Attributes:
+        priority: Urgency tier ("LOW", "MODERATE", "HIGH", "CRITICAL").
+        recommended_interval: Suggested drinking frequency (e.g. "Every 15–20 minutes").
+        approximate_amount_ml: Suggested benchmark volume in mL per interval, or None for routine.
+        water_ml_per_30_min: Backward-compatible alias for 30-min volume.
+        electrolytes_recommended: Whether electrolytes/ORS are advised for prolonged sweating.
+        guidance: Human-readable actionable advice.
+        basis: Source framework reference (e.g. "NIOSH/OSHA occupational heat-safety guidance").
+    """
+    priority: str  # LOW, MODERATE, HIGH, CRITICAL
+    recommended_interval: str
+    approximate_amount_ml: Optional[int]
+    electrolytes_recommended: bool
+    guidance: str
+    basis: str = "NIOSH/OSHA occupational heat-safety guidance"
+    water_ml_per_30_min: Optional[int] = None
+
+    def __post_init__(self):
+        if self.water_ml_per_30_min is None and self.approximate_amount_ml is not None:
+            self.water_ml_per_30_min = self.approximate_amount_ml
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "priority": self.priority,
+            "recommended_interval": self.recommended_interval,
+            "approximate_amount_ml": self.approximate_amount_ml,
+            "water_ml_per_30_min": self.water_ml_per_30_min,
+            "electrolytes_recommended": self.electrolytes_recommended,
+            "guidance": self.guidance,
+            "basis": self.basis,
+        }
+
+
+@dataclass
+class ActivityGuidance:
+    """
+    Structured occupational and recreational activity guidance.
+    """
+    outdoor_activity: str
+    heavy_physical_work: str
+    rest_guidance: str
+    peak_heat_hours: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "outdoor_activity": self.outdoor_activity,
+            "heavy_physical_work": self.heavy_physical_work,
+            "rest_guidance": self.rest_guidance,
+            "peak_heat_hours": self.peak_heat_hours,
+        }
+
+
+@dataclass
+class VulnerablePopulationGuidance:
+    """
+    Targeted demographic guidance for groups vulnerable to heat-related illness.
+    """
+    priority: bool
+    groups: List[str]
+    guidance: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "priority": self.priority,
+            "groups": self.groups,
+            "guidance": self.guidance,
         }
 
 
@@ -129,17 +214,27 @@ class RiskAssessment:
 class ThermalStressResult:
     """
     Master response contract returned by the Thermal Stress module.
-    Ready for serialization by Ronit's backend and consumption by Sreethu's frontend.
+    Maintains 100% backward compatibility while providing structured SIH guidance.
     """
     indices: ThermalIndices
     risk_assessment: RiskAssessment
     advisories: List[str] = field(default_factory=list)
+    hydration: Optional[HydrationGuidance] = None
+    activity_guidance: Optional[ActivityGuidance] = None
+    vulnerable_population: Optional[VulnerablePopulationGuidance] = None
     input_summary: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        d: Dict[str, Any] = {
             "indices": self.indices.to_dict(),
             "risk_assessment": self.risk_assessment.to_dict(),
             "advisories": self.advisories,
-            "input_summary": self.input_summary,
         }
+        if self.hydration is not None:
+            d["hydration"] = self.hydration.to_dict()
+        if self.activity_guidance is not None:
+            d["activity_guidance"] = self.activity_guidance.to_dict()
+        if self.vulnerable_population is not None:
+            d["vulnerable_population"] = self.vulnerable_population.to_dict()
+        d["input_summary"] = self.input_summary
+        return d

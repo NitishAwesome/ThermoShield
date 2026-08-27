@@ -7,26 +7,12 @@ Human Thermal Stress engine (backend.thermal_stress).
 
 from typing import Optional, Dict, Any
 
-from backend.thermal_stress.models import (
-    WeatherInput,
-    ThermalIndices,
-    RiskAssessment,
-    ThermalStressResult,
-    ThermalRiskLevel,
-)
-from backend.thermal_stress.calculator import (
-    calculate_wbgt,
+from backend.thermal_stress import (
+    analyze_thermal_stress,
     calculate_heat_index as scientific_heat_index,
-    calculate_apparent_temperature,
-    calculate_stull_wet_bulb,
-    compute_all_indices,
-)
-from backend.thermal_stress.risk_classifier import (
-    classify_risk,
     RiskThresholds,
     DEFAULT_THRESHOLDS,
 )
-from backend.thermal_stress.advisory import generate_advisories
 
 
 def calculate_thermal_stress(
@@ -43,34 +29,16 @@ def calculate_thermal_stress(
       1. Validates and structures input via WeatherInput
       2. Computes biometeorological indices (WBGT, Heat Index, Apparent Temp, Stull Wet-Bulb)
       3. Performs 4-tier prototype risk classification (driven primarily by WBGT)
-      4. Generates contextual actionable advisories
+      4. Generates actionable advisories, structured hydration, activity, and vulnerable population guidance
       5. Returns a JSON-serializable dictionary
     """
-    # 1. Create validated WeatherInput
-    weather = WeatherInput(
+    result = analyze_thermal_stress(
         temperature=temperature,
         relative_humidity=humidity,
         wind_speed=wind_speed,
         solar_radiation=solar_radiation,
+        thresholds=thresholds,
     )
-
-    # 2. Compute all scientific indices
-    indices = compute_all_indices(weather)
-
-    # 3. Classify thermal risk using WBGT as primary signal
-    risk = classify_risk(indices=indices, weather=weather, thresholds=thresholds)
-
-    # 4. Generate actionable advisories
-    advisories = generate_advisories(risk=risk, weather=weather)
-
-    # 5. Package as ThermalStressResult and serialize to dict
-    result = ThermalStressResult(
-        indices=indices,
-        risk_assessment=risk,
-        advisories=advisories,
-        input_summary=weather.to_dict(),
-    )
-
     return result.to_dict()
 
 
