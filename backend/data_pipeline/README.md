@@ -1,8 +1,8 @@
 # Weather / Data Pipeline Module
 
-This is the **SIH 2026 prototype weather pipeline** for **SIH26083 — Extreme Heatwave Early Warning and Human Thermal Stress Index**.
+This is the **legacy/demo sample weather pipeline** kept for the SIH 2026 prototype.
 
-It only does the data side of the system:
+The canonical contract now lives in `backend/weather_contract/`. This module only does the demo-data side of the system:
 - loads weather samples,
 - cleans the values,
 - keeps the output in a small shared format,
@@ -54,7 +54,7 @@ The module accepts a raw record with these fields:
 
 ## Output
 
-The cleaned output is the same small contract above.
+The cleaned output is the same small demo contract above, and it is not the live canonical weather contract.
 
 ## How another teammate should use it
 

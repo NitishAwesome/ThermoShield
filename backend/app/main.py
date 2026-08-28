@@ -26,12 +26,16 @@ async def location_search(
         "count": len(locations),
         "locations": locations
     }
+
+
 @app.get("/weather")
 async def weather(
     lat: float,
     lon: float
 ):
     return await get_weather(lat, lon)
+
+
 @app.get("/thermal")
 async def thermal(
     lat: float,
@@ -39,20 +43,31 @@ async def thermal(
 ):
     weather_data = await get_weather(lat, lon)
 
-    weather = weather_data["weather"]
-
     thermal_result = calculate_thermal_stress(
-        temperature=weather["temperature"],
-        humidity=weather["humidity"],
-        wind_speed=weather.get("wind_speed", 1.0),
-        solar_radiation=weather.get("solar_radiation")
+        temperature=weather_data["temperature_c"],
+        humidity=weather_data["relative_humidity_pct"],
+        wind_speed=weather_data.get("wind_speed_mps", 1.0),
+        solar_radiation=weather_data.get("solar_radiation_wm2")
     )
 
     return {
-        "location": weather_data["location"],
-        "weather": weather,
+        "location": {
+            "location": weather_data["location"],
+            "ward": weather_data["ward"],
+            "latitude": weather_data["latitude"],
+            "longitude": weather_data["longitude"],
+        },
+        "weather": {
+            "temperature_c": weather_data["temperature_c"],
+            "relative_humidity_pct": weather_data["relative_humidity_pct"],
+            "wind_speed_mps": weather_data["wind_speed_mps"],
+            "solar_radiation_wm2": weather_data["solar_radiation_wm2"],
+            "timestamp": weather_data["timestamp"],
+        },
         "thermal": thermal_result
     }
+
+
 @app.get("/risk")
 async def risk(
     lat: float,
@@ -60,22 +75,25 @@ async def risk(
 ):
     weather_data = await get_weather(lat, lon)
 
-    weather = weather_data["weather"]
-
     heat_index = calculate_heat_index(
-        weather["temperature"],
-        weather["humidity"]
+        weather_data["temperature_c"],
+        weather_data["relative_humidity_pct"]
     )
 
     risk_score, risk_level = predict_risk(
-        temperature=weather["temperature"],
-        humidity=weather["humidity"],
-        wind_speed=weather["wind_speed"],
-        heat_index=heat_index if heat_index is not None else weather["temperature"]
+        temperature=weather_data["temperature_c"],
+        humidity=weather_data["relative_humidity_pct"],
+        wind_speed=weather_data["wind_speed_mps"],
+        heat_index=heat_index if heat_index is not None else weather_data["temperature_c"]
     )
 
     return {
-        "location": weather_data["location"],
+        "location": {
+            "location": weather_data["location"],
+            "ward": weather_data["ward"],
+            "latitude": weather_data["latitude"],
+            "longitude": weather_data["longitude"],
+        },
         "risk": {
             "score": risk_score,
             "level": risk_level
@@ -84,6 +102,8 @@ async def risk(
             "heat_index": heat_index
         }
     }
+
+
 @app.get("/map/risk")
 async def map_risk(
     locations: list[str] = Query(...)
@@ -102,6 +122,7 @@ async def map_risk(
         "locations": results
     }
 
+
 @app.get("/forecast")
 async def forecast(
     lat: float,
@@ -110,6 +131,11 @@ async def forecast(
     data = await get_weather(lat, lon)
 
     return {
-        "location": data["location"],
+        "location": {
+            "location": data["location"],
+            "ward": data["ward"],
+            "latitude": data["latitude"],
+            "longitude": data["longitude"],
+        },
         "forecast": data["forecast"]
     }
