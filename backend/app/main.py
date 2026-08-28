@@ -21,7 +21,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configure CORS for local dev + dynamically allow deployed Vercel frontends
+# Configure CORS for local dev + Vercel deployed frontend origins
 allowed_origins_env = os.getenv("ALLOWED_ORIGINS")
 if allowed_origins_env:
     allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
@@ -31,6 +31,8 @@ else:
         "http://127.0.0.1:3000",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "https://thermo-shield-tau.vercel.app",
+        "https://thermoshield.vercel.app",
     ]
 
 app.add_middleware(
@@ -210,18 +212,23 @@ async def map_risk(
 ):
     results = []
 
-    for location in locations:
-        lat, lon = map(
-            float,
-            location.split(",")
-        )
+    # Handle multiple coordinates passed as list or separated entries
+    coords_list = []
+    for loc in locations:
+        if ";" in loc:
+            coords_list.extend(loc.split(";"))
+        else:
+            coords_list.append(loc)
 
-        risk_data = await get_location_risk(
-            lat,
-            lon
-        )
-
-        results.append(risk_data)
+    for location in coords_list:
+        try:
+            parts = location.strip().split(",")
+            if len(parts) == 2:
+                lat, lon = float(parts[0]), float(parts[1])
+                risk_data = await get_location_risk(lat, lon)
+                results.append(risk_data)
+        except Exception as e:
+            print(f"Error resolving coordinate '{location}': {e}")
 
     return {
         "count": len(results),
