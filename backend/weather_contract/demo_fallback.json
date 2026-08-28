@@ -1,0 +1,50 @@
+[
+  {
+    "scenario": "LOW",
+    "location": "Ward 10, Coimbatore, Tamil Nadu",
+    "ward": "Ward-10",
+    "latitude": 11.0168,
+    "longitude": 76.9558,
+    "timestamp": "2026-08-27T07:30:00+05:30",
+    "temperature_c": 29.2,
+    "relative_humidity_pct": 64.0,
+    "wind_speed_mps": 2.8,
+    "solar_radiation_wm2": 210.0
+  },
+  {
+    "scenario": "MODERATE",
+    "location": "Ward 22, Chennai, Tamil Nadu",
+    "ward": "Ward-22",
+    "latitude": 13.0827,
+    "longitude": 80.2707,
+    "timestamp": "2026-08-27T10:30:00+05:30",
+    "temperature_c": 34.8,
+    "relative_humidity_pct": 56.0,
+    "wind_speed_mps": 1.9,
+    "solar_radiation_wm2": 620.0
+  },
+  {
+    "scenario": "HIGH",
+    "location": "Ward 12, Nagpur, Maharashtra",
+    "ward": "Ward-12",
+    "latitude": 21.1458,
+    "longitude": 79.0882,
+    "timestamp": "2026-08-27T13:00:00+05:30",
+    "temperature_c": 41.2,
+    "relative_humidity_pct": 34.0,
+    "wind_speed_mps": 1.4,
+    "solar_radiation_wm2": 980.0
+  },
+  {
+    "scenario": "EXTREME",
+    "location": "Ward 08, Hyderabad, Telangana",
+    "ward": "Ward-08",
+    "latitude": 17.385,
+    "longitude": 78.4867,
+    "timestamp": "2026-08-27T14:00:00+05:30",
+    "temperature_c": 44.6,
+    "relative_humidity_pct": 42.0,
+    "wind_speed_mps": 0.9,
+    "solar_radiation_wm2": 1040.0
+  }
+]
