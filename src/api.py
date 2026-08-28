@@ -1,15 +1,13 @@
 from pathlib import Path
 
 import joblib
-import pandas as pd
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from src.risk_model import (
-    FEATURES,
-    calculate_risk_score,
-    get_risk_level
+    HEATWAVE_FEATURES,
+    predict_heatwave
 )
 
 
@@ -20,9 +18,9 @@ from src.risk_model import (
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 MODEL_FILE = (
-    BASE_DIR /
-    "models" /
-    "risk_model.pkl"
+    BASE_DIR
+    / "models"
+    / "heatwave_model.pkl"
 )
 
 
@@ -32,7 +30,7 @@ MODEL_FILE = (
 
 if not MODEL_FILE.exists():
     raise FileNotFoundError(
-        "Model not found. "
+        "Heatwave model not found. "
         "Run 'python src/risk_model.py' first."
     )
 
@@ -46,18 +44,18 @@ model = joblib.load(
 # --------------------------------------------------
 
 app = FastAPI(
-    title="SIH26083 Health Risk Prediction API",
+    title="SIH26083 Heatwave Risk Prediction API",
     description=(
-        "Prototype API for estimating heat-related "
-        "health risk using environmental, thermal, "
-        "vulnerability and historical health signals."
+        "Prototype API for predicting future "
+        "heat-risk levels using environmental, "
+        "thermal, vulnerability and health signals."
     ),
-    version="1.0.0"
+    version="2.1.0"
 )
 
 
 # --------------------------------------------------
-# REQUEST SCHEMAS
+# FORECAST DAY SCHEMA
 # --------------------------------------------------
 
 class ForecastDay(BaseModel):
@@ -78,13 +76,36 @@ class ForecastDay(BaseModel):
         ...,
         ge=0,
         le=100,
-        description="Thermal stress index"
+        description="Forecast thermal stress index"
+    )
+
+    temperature_trend: float = Field(
+        ...,
+        description=(
+            "Temperature change from "
+            "previous day"
+        )
+    )
+
+    thermal_stress_trend: float = Field(
+        ...,
+        description=(
+            "Thermal stress change from "
+            "previous day"
+        )
     )
 
 
+# --------------------------------------------------
+# REQUEST SCHEMA
+# --------------------------------------------------
+
 class PredictionRequest(BaseModel):
 
-    location: str
+    location: str = Field(
+        ...,
+        description="Ward or geographic location"
+    )
 
     vulnerability_index: float = Field(
         ...,
@@ -109,7 +130,10 @@ class PredictionRequest(BaseModel):
         ...,
         min_length=3,
         max_length=5,
-        description="3 to 5 day weather and thermal-stress forecast"
+        description=(
+            "3 to 5 day weather and "
+            "thermal-stress forecast"
+        )
     )
 
 
@@ -121,20 +145,67 @@ class PredictionRequest(BaseModel):
 def home():
 
     return {
+
         "service":
-            "SIH26083 Health Risk Prediction",
+            "SIH26083 Heatwave Risk Prediction",
 
         "status":
             "running",
 
         "model":
-            "Random Forest Regressor",
+            "Random Forest Classifier",
+
+        "classes":
+            [
+                "LOW",
+                "MODERATE",
+                "HIGH",
+                "EXTREME"
+            ],
 
         "forecast_range":
             "3-5 days",
 
+        "primary_horizon":
+            "3 days",
+
         "type":
             "prototype",
+
+        "medical_validation":
+            False
+    }
+
+
+# --------------------------------------------------
+# MODEL INFORMATION
+# --------------------------------------------------
+
+@app.get("/model-info")
+def model_info():
+
+    return {
+
+        "model":
+            "Random Forest Classifier",
+
+        "features":
+            HEATWAVE_FEATURES,
+
+        "target":
+            "future_risk_level",
+
+        "classes":
+            [
+                str(label)
+                for label in model.classes_
+            ],
+
+        "forecast_horizon":
+            "3 days",
+
+        "supported_forecast_range":
+            "3-5 days",
 
         "medical_validation":
             False
@@ -155,8 +226,8 @@ def predict(
     # ----------------------------------------------
 
     days = [
-        day.day
-        for day in request.forecast
+        forecast_day.day
+        for forecast_day in request.forecast
     ]
 
     expected_days = list(
@@ -180,15 +251,15 @@ def predict(
 
     results = []
 
-    for day in request.forecast:
+    for forecast_day in request.forecast:
 
         input_data = {
 
             "temperature_c":
-                day.temperature_c,
+                forecast_day.temperature_c,
 
             "thermal_stress":
-                day.thermal_stress,
+                forecast_day.thermal_stress,
 
             "vulnerability_index":
                 request.vulnerability_index,
@@ -197,63 +268,58 @@ def predict(
                 request.historical_health_events,
 
             "lag_health_events":
-                request.lag_health_events
+                request.lag_health_events,
+
+            "temperature_trend":
+                forecast_day.temperature_trend,
+
+            "thermal_stress_trend":
+                forecast_day.thermal_stress_trend
         }
 
 
-        # Convert input into DataFrame
-        input_df = pd.DataFrame(
-            [input_data]
+        # ------------------------------------------
+        # Heatwave model prediction
+        # ------------------------------------------
+
+        prediction = predict_heatwave(
+            model,
+            input_data
         )
 
 
         # ------------------------------------------
-        # Model prediction
-        # ------------------------------------------
-
-        predicted_impact = model.predict(
-            input_df[FEATURES]
-        )[0]
-
-
-        # ------------------------------------------
-        # Convert prediction to risk score
-        # ------------------------------------------
-
-        risk_score = calculate_risk_score(
-            predicted_impact
-        )
-
-
-        # ------------------------------------------
-        # Determine risk level
-        # ------------------------------------------
-
-        risk_level = get_risk_level(
-            risk_score
-        )
-
-
-        # ------------------------------------------
-        # Store result
+        # Store prediction
         # ------------------------------------------
 
         results.append({
 
             "day":
-                day.day,
+                forecast_day.day,
 
-            "predicted_health_impact_proxy":
-                round(
-                    float(predicted_impact),
-                    2
-                ),
+            "temperature_c":
+                forecast_day.temperature_c,
 
-            "risk_score":
-                risk_score,
+            "thermal_stress":
+                forecast_day.thermal_stress,
 
-            "risk_level":
-                risk_level
+            "temperature_trend":
+                forecast_day.temperature_trend,
+
+            "thermal_stress_trend":
+                forecast_day.thermal_stress_trend,
+
+            "prediction":
+                prediction["prediction"],
+
+            "probability":
+                prediction["probability"],
+
+            "confidence":
+                prediction["confidence"],
+
+            "all_probabilities":
+                prediction["all_probabilities"]
         })
 
 
@@ -270,14 +336,20 @@ def predict(
             len(results),
 
         "model":
-            "Random Forest Regressor",
+            "Random Forest Classifier",
+
+        "prediction_type":
+            "Heatwave risk classification",
+
+        "forecast_horizon":
+            "3 days",
+
+        "forecast":
+            results,
 
         "prototype":
             True,
 
         "medical_validation":
-            False,
-
-        "forecast":
-            results
+            False
     }

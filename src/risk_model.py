@@ -4,7 +4,14 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix
+)
 from sklearn.dummy import DummyRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
@@ -47,6 +54,33 @@ TARGET = "health_impact_proxy"
 # This is NOT a medical threshold.
 PROTOTYPE_MAX_IMPACT = 40.0
 
+# --------------------------------------------------
+# HEATWAVE PREDICTION MODEL CONFIGURATION
+# --------------------------------------------------
+
+HEATWAVE_FEATURES = [
+    "temperature_c",
+    "thermal_stress",
+    "vulnerability_index",
+    "historical_health_events",
+    "lag_health_events",
+    "temperature_trend",
+    "thermal_stress_trend"
+]
+
+HEATWAVE_TARGET = "future_risk_level"
+
+HEATWAVE_DATA_FILE = (
+    DATA_DIR / "weather_history_ml_prepared.csv"
+)
+
+HEATWAVE_MODEL_FILE = (
+    MODEL_DIR / "heatwave_model.pkl"
+)
+
+HEATWAVE_EVALUATION_FILE = (
+    RESULTS_DIR / "heatwave_evaluation.json"
+)
 
 # --------------------------------------------------
 # LOAD DATA
@@ -72,6 +106,45 @@ def load_data(file_path=DATA_FILE):
 
     return data
 
+# --------------------------------------------------
+# LOAD HEATWAVE DATA
+# --------------------------------------------------
+
+def load_heatwave_data(
+    file_path=HEATWAVE_DATA_FILE
+):
+    """Load prepared weather-history data."""
+
+    data = pd.read_csv(
+        file_path
+    )
+
+    required_columns = (
+        HEATWAVE_FEATURES +
+        [HEATWAVE_TARGET]
+    )
+
+    missing_columns = [
+        column
+        for column in required_columns
+        if column not in data.columns
+    ]
+
+    if missing_columns:
+        raise ValueError(
+            f"Missing columns: {missing_columns}"
+        )
+
+    # Remove rows where trend features
+    # cannot be calculated.
+    data = data.dropna(
+        subset=[
+            "temperature_trend",
+            "thermal_stress_trend"
+        ]
+    ).copy()
+
+    return data
 
 # --------------------------------------------------
 # TRAIN MODEL
@@ -104,6 +177,86 @@ def train_model(data):
 
     return model, X_train, X_test, y_train, y_test
 
+# --------------------------------------------------
+# TRAIN HEATWAVE MODEL
+# --------------------------------------------------
+def train_heatwave_model(data):
+    """
+    Train Random Forest classifier using a
+    chronological split within each location.
+
+    For every ward:
+    - Earlier records -> training data
+    - Latest records  -> testing data
+
+    This prevents the test set from being
+    dominated by one ward.
+    """
+
+    data = data.sort_values(
+        ["location", "date"]
+    ).reset_index(drop=True)
+
+    train_parts = []
+    test_parts = []
+
+    for location, location_data in data.groupby(
+        "location",
+        sort=False
+    ):
+
+        location_data = location_data.sort_values(
+            "date"
+        ).reset_index(drop=True)
+
+        split_index = int(
+            len(location_data) * 0.80
+        )
+
+        train_parts.append(
+            location_data.iloc[:split_index]
+        )
+
+        test_parts.append(
+            location_data.iloc[split_index:]
+        )
+
+    train_data = pd.concat(
+        train_parts,
+        ignore_index=True
+    )
+
+    test_data = pd.concat(
+        test_parts,
+        ignore_index=True
+    )
+
+    X_train = train_data[HEATWAVE_FEATURES]
+    X_test = test_data[HEATWAVE_FEATURES]
+
+    y_train = train_data[HEATWAVE_TARGET]
+    y_test = test_data[HEATWAVE_TARGET]
+
+    model = RandomForestClassifier(
+        n_estimators=100,
+        max_depth=6,
+        min_samples_leaf=2,
+        random_state=42,
+        class_weight="balanced"
+    )
+
+    model.fit(
+        X_train,
+        y_train
+    )
+
+    return (
+        model,
+        X_train,
+        X_test,
+        y_train,
+        y_test
+    )
 
 # --------------------------------------------------
 # EVALUATION
@@ -176,6 +329,88 @@ def evaluate_model(
         "medical_validation": False
     }
 
+# --------------------------------------------------
+# EVALUATE HEATWAVE MODEL
+# --------------------------------------------------
+
+def evaluate_heatwave_model(
+    model,
+    X_test,
+    y_test
+):
+    """Evaluate heatwave classification model."""
+
+    predictions = model.predict(
+        X_test
+    )
+
+    accuracy = accuracy_score(
+        y_test,
+        predictions
+    )
+
+    precision = precision_score(
+        y_test,
+        predictions,
+        average="weighted",
+        zero_division=0
+    )
+
+    recall = recall_score(
+        y_test,
+        predictions,
+        average="weighted",
+        zero_division=0
+    )
+
+    f1 = f1_score(
+        y_test,
+        predictions,
+        average="weighted",
+        zero_division=0
+    )
+
+    matrix = confusion_matrix(
+        y_test,
+        predictions,
+        labels=[
+            "MODERATE",
+            "HIGH",
+            "EXTREME"
+        ]
+    )
+
+    return {
+        "model":
+            "Random Forest Classifier",
+
+        "dataset_type":
+            "synthetic_prototype",
+
+        "prediction_horizon":
+            "3 days",
+
+        "train_test_split":
+            "80/20 chronological",
+
+        "accuracy":
+            round(float(accuracy), 3),
+
+        "precision_weighted":
+            round(float(precision), 3),
+
+        "recall_weighted":
+            round(float(recall), 3),
+
+        "f1_weighted":
+            round(float(f1), 3),
+
+        "confusion_matrix":
+            matrix.tolist(),
+
+        "medical_validation":
+            False
+    }
 
 # --------------------------------------------------
 # FEATURE IMPORTANCE
@@ -196,6 +431,30 @@ def get_feature_importance(model):
         for feature, value in importance.items()
     }
 
+# --------------------------------------------------
+# HEATWAVE FEATURE IMPORTANCE
+# --------------------------------------------------
+
+def get_heatwave_feature_importance(
+    model
+):
+    """Return heatwave model feature importance."""
+
+    importance = pd.Series(
+        model.feature_importances_,
+        index=HEATWAVE_FEATURES
+    ).sort_values(
+        ascending=False
+    )
+
+    return {
+        feature: round(
+            float(value),
+            4
+        )
+        for feature, value
+        in importance.items()
+    }
 
 # --------------------------------------------------
 # RISK SCORE
@@ -265,6 +524,78 @@ def predict_health_impact(
     )[0]
 
     return float(prediction)
+
+# --------------------------------------------------
+# HEATWAVE PREDICTION
+# --------------------------------------------------
+
+# --------------------------------------------------
+# HEATWAVE PREDICTION
+# --------------------------------------------------
+
+def predict_heatwave(
+    model,
+    input_data
+):
+    """
+    Predict future heat-risk category.
+
+    Probability means the model-estimated
+    probability of the defined risk category.
+    It is NOT a medical probability.
+    """
+
+    input_df = pd.DataFrame(
+        [input_data]
+    )
+
+    prediction = model.predict(
+        input_df[HEATWAVE_FEATURES]
+    )[0]
+
+    probabilities = model.predict_proba(
+        input_df[HEATWAVE_FEATURES]
+    )[0]
+
+    classes = model.classes_
+
+    probability_map = {
+        str(label): round(
+            float(probability),
+            4
+        )
+        for label, probability
+        in zip(
+            classes,
+            probabilities
+        )
+    }
+
+    predicted_probability = probability_map[
+        str(prediction)
+    ]
+
+    return {
+        "prediction":
+            str(prediction),
+
+        "probability":
+            predicted_probability,
+
+        "forecast_horizon":
+            "3 days",
+
+        "confidence":
+            predicted_probability,
+
+        "all_probabilities":
+            probability_map,
+
+        "top_features":
+            get_heatwave_feature_importance(
+                model
+            )
+    }
 
 
 # --------------------------------------------------
@@ -460,6 +791,130 @@ def main():
         "\nModel training completed."
     )
 
+# --------------------------------------------------
+# HEATWAVE MODEL MAIN
+# --------------------------------------------------
+
+def main_heatwave():
+
+    print(
+        "\nSIH26083 - Heatwave Prediction Model"
+    )
+
+    print(
+        "=========================================="
+    )
+
+    # Load prepared data
+    data = load_heatwave_data()
+
+    print(
+        f"\nDataset loaded: {len(data)} records"
+    )
+
+    # Train classifier
+    (
+        model,
+        X_train,
+        X_test,
+        y_train,
+        y_test
+    ) = train_heatwave_model(data)
+
+    print(
+        "Heatwave model trained successfully."
+    )
+
+    # Evaluate
+    evaluation = evaluate_heatwave_model(
+        model,
+        X_test,
+        y_test
+    )
+
+    # Feature importance
+    evaluation["feature_importance"] = (
+        get_heatwave_feature_importance(
+            model
+        )
+    )
+
+    # Save model
+    MODEL_DIR.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    joblib.dump(
+        model,
+        HEATWAVE_MODEL_FILE
+    )
+
+    print(
+        f"Heatwave model saved to: "
+        f"{HEATWAVE_MODEL_FILE}"
+    )
+
+    # Save evaluation
+    RESULTS_DIR.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    with open(
+        HEATWAVE_EVALUATION_FILE,
+        "w",
+        encoding="utf-8"
+    ) as file:
+
+        json.dump(
+            evaluation,
+            file,
+            indent=4
+        )
+
+    print(
+        f"Evaluation saved to: "
+        f"{HEATWAVE_EVALUATION_FILE}"
+    )
+
+    print("\nHeatwave Model Evaluation")
+    print("-------------------------")
+
+    print(
+        f"Accuracy  : "
+        f"{evaluation['accuracy']}"
+    )
+
+    print(
+        f"Precision : "
+        f"{evaluation['precision_weighted']}"
+    )
+
+    print(
+        f"Recall    : "
+        f"{evaluation['recall_weighted']}"
+    )
+
+    print(
+        f"F1 Score  : "
+        f"{evaluation['f1_weighted']}"
+    )
+
+    print("\nFeature Importance")
+    print("-------------------------")
+
+    for feature, value in (
+        evaluation["feature_importance"].items()
+    ):
+        print(
+            f"{feature}: {value}"
+        )
+
+    print(
+        "\nHeatwave model training completed."
+    )
 
 if __name__ == "__main__":
-    main()
+    main_heatwave()
+
