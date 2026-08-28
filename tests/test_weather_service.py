@@ -43,12 +43,13 @@ class FakeAsyncClient:
     async def __aexit__(self, exc_type, exc, tb):
         return False
 
-    async def get(self, url, params=None, timeout=None):
+    async def get(self, url, params=None, timeout=None, headers=None):
         self.call_count += 1
         self.last_request = {
             "url": url,
             "params": params,
             "timeout": timeout,
+            "headers": headers,
         }
         return self.response
 
