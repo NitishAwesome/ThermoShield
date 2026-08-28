@@ -1,0 +1,38 @@
+[
+  {
+    "location": "Chennai, Tamil Nadu",
+    "ward": "Ward-50",
+    "temperature": 36.4,
+    "humidity": 58,
+    "wind_speed": 1.8,
+    "solar_radiation": 820,
+    "timestamp": "2026-08-27T10:00:00+05:30"
+  },
+  {
+    "location": "Chennai, Tamil Nadu",
+    "ward": "Ward-51",
+    "temperature": 38.1,
+    "humidity": 52,
+    "wind_speed": 2.3,
+    "solar_radiation": 910,
+    "timestamp": "2026-08-27T13:00:00+05:30"
+  },
+  {
+    "location": "Nagpur, Maharashtra",
+    "ward": "Ward-12",
+    "temperature": 41.2,
+    "humidity": 34,
+    "wind_speed": 1.4,
+    "solar_radiation": 980,
+    "timestamp": "2026-08-27T13:00:00+05:30"
+  },
+  {
+    "location": "Hyderabad, Telangana",
+    "ward": "Ward-08",
+    "temperature": 39.0,
+    "humidity": 45,
+    "wind_speed": 2.0,
+    "solar_radiation": 860,
+    "timestamp": "2026-08-27T12:30:00+05:30"
+  }
+]

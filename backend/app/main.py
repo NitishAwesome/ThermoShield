@@ -1,5 +1,7 @@
 
+import os
 from fastapi import FastAPI, Query
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.services.location import search_location
 from app.services.weather import get_weather
@@ -18,6 +20,27 @@ from app.services.sms import send_sms
 app = FastAPI(
     title="SIH26083 Heat Health API",
     version="1.0.0"
+)
+
+# Configure CORS for local dev + dynamically allow deployed Vercel frontends
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS")
+if allowed_origins_env:
+    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+else:
+    allowed_origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
