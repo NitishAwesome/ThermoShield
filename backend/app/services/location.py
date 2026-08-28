@@ -1,5 +1,5 @@
 import httpx
-from app.config import NOMINATIM_URL
+from backend.app.config import NOMINATIM_URL
 
 
 async def search_location(query: str):
@@ -19,18 +19,20 @@ async def search_location(query: str):
             NOMINATIM_URL,
             params=params,
             headers=headers,
-            timeout=10
+            timeout=10,
         )
 
     response.raise_for_status()
 
-    data = response.json()
+    results = response.json()
 
-    return [
-        {
-            "name": item["display_name"],
-            "latitude": float(item["lat"]),
-            "longitude": float(item["lon"])
-        }
-        for item in data
-    ]
+    locations = []
+
+    for item in results:
+        locations.append({
+            "name": item.get("display_name"),
+            "latitude": float(item.get("lat")),
+            "longitude": float(item.get("lon"))
+        })
+
+    return locations
