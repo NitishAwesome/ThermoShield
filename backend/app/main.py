@@ -1,18 +1,20 @@
+
 import os
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.services.location import search_location
-from backend.app.services.weather import get_weather
-from backend.app.services.thermal import (
+from app.services.location import search_location
+from app.services.weather import get_weather
+from app.services.thermal import (
+    calculate_thermal_stress,
     calculate_heat_index,
     classify_heat_stress,
-    calculate_thermal_stress,
 )
-from backend.app.services.risk import predict_risk
-from backend.app.services.map_services import get_location_risk
-from backend.app.services.intervention import generate_interventions
-from backend.app.services.simulator import simulate_intervention
+from app.services.risk import predict_risk
+from app.services.map_services import get_location_risk
+from app.services.intervention import generate_interventions
+from app.services.simulator import simulate_intervention
+from app.services.sms import send_sms
 
 
 app = FastAPI(
@@ -42,6 +44,10 @@ app.add_middleware(
 )
 
 
+# ---------------------------------------------------------
+# HOME
+# ---------------------------------------------------------
+
 @app.get("/")
 def home():
     return {
@@ -49,12 +55,20 @@ def home():
     }
 
 
+# ---------------------------------------------------------
+# HEALTH CHECK
+# ---------------------------------------------------------
+
 @app.get("/health")
 def health():
     return {
         "status": "healthy"
     }
 
+
+# ---------------------------------------------------------
+# LOCATION SEARCH
+# ---------------------------------------------------------
 
 @app.get("/location/search")
 async def location_search(
@@ -68,6 +82,10 @@ async def location_search(
     }
 
 
+# ---------------------------------------------------------
+# WEATHER
+# ---------------------------------------------------------
+
 @app.get("/weather")
 async def weather(
     lat: float,
@@ -75,6 +93,10 @@ async def weather(
 ):
     return await get_weather(lat, lon)
 
+
+# ---------------------------------------------------------
+# THERMAL
+# ---------------------------------------------------------
 
 @app.get("/thermal")
 async def thermal(
@@ -85,6 +107,7 @@ async def thermal(
 
     weather = weather_data["weather"]
 
+    # Complete scientific thermal engine
     thermal_result = calculate_thermal_stress(
         temperature=weather["temperature"],
         humidity=weather["humidity"],
@@ -92,12 +115,30 @@ async def thermal(
         solar_radiation=weather.get("solar_radiation")
     )
 
+    indices = thermal_result["indices"]
+    risk = thermal_result["risk_assessment"]
+
     return {
         "location": weather_data["location"],
         "weather": weather,
-        "thermal": thermal_result
+        "thermal": {
+            "heat_index": indices.get("heat_index_c"),
+            "thermal_stress": indices.get("wbgt_c"),
+            "thermal_risk_level": risk.get("level"),
+            "wbgt": indices.get("wbgt_c"),
+            "apparent_temperature": indices.get(
+                "apparent_temperature_c"
+            ),
+            "wet_bulb_temperature": indices.get(
+                "wet_bulb_temp_c"
+            )
+        }
     }
 
+
+# ---------------------------------------------------------
+# RISK + AUTOMATIC SMS ALERT
+# ---------------------------------------------------------
 
 @app.get("/risk")
 async def risk(
@@ -107,12 +148,14 @@ async def risk(
     historical_health_events: int = 17,
     lag_health_events: int = 15
 ):
-    # Get current weather
     weather_data = await get_weather(lat, lon)
 
     weather = weather_data["weather"]
 
-    # Run Nitish's actual thermal stress engine
+    # -----------------------------------------------------
+    # 1. Calculate actual thermal stress
+    # -----------------------------------------------------
+
     thermal_result = calculate_thermal_stress(
         temperature=weather["temperature"],
         humidity=weather["humidity"],
@@ -120,27 +163,18 @@ async def risk(
         solar_radiation=weather.get("solar_radiation")
     )
 
-    # Extract thermal indices
-    heat_index = thermal_result["indices"]["heat_index_c"]
+    indices = thermal_result["indices"]
+    thermal_risk = thermal_result["risk_assessment"]
 
-    wbgt = thermal_result["indices"]["wbgt_c"]
+    heat_index = indices.get("heat_index_c")
 
-    apparent_temperature = (
-        thermal_result["indices"]["apparent_temperature_c"]
-    )
+    # Use WBGT as thermal_stress input for ML model
+    thermal_stress = indices.get("wbgt_c")
 
-    wet_bulb_temperature = (
-        thermal_result["indices"]["wet_bulb_temp_c"]
-    )
+    # -----------------------------------------------------
+    # 2. ML risk prediction
+    # -----------------------------------------------------
 
-    # Thermal engine score is 0-1.
-    # ML training feature thermal_stress is approximately 0-100.
-    thermal_stress = round(
-        thermal_result["risk_assessment"]["score"] * 100,
-        2
-    )
-
-    # Run ML risk model
     risk_result = predict_risk(
         temperature_c=weather["temperature"],
         thermal_stress=thermal_stress,
@@ -148,6 +182,30 @@ async def risk(
         historical_health_events=historical_health_events,
         lag_health_events=lag_health_events
     )
+
+    # -----------------------------------------------------
+    # 3. Automatic DEMO SMS alert
+    # -----------------------------------------------------
+
+    sms_alert = None
+
+    if risk_result["risk_level"] in ["HIGH", "EXTREME"]:
+
+        message = (
+            f"ThermoShield ALERT: "
+            f"{risk_result['risk_level']} heat-health risk detected. "
+            f"Risk score: "
+            f"{risk_result['risk_score']}/100."
+        )
+
+        sms_alert = await send_sms(
+            phone_number="+919999999999",
+            message=message
+        )
+
+    # -----------------------------------------------------
+    # 4. Final response
+    # -----------------------------------------------------
 
     return {
         "location": weather_data["location"],
@@ -157,15 +215,23 @@ async def risk(
         "thermal": {
             "heat_index": heat_index,
             "thermal_stress": thermal_stress,
-            "thermal_risk_level": (
-                thermal_result["risk_assessment"]["level"]
+            "thermal_risk_level": thermal_risk.get("level"),
+            "wbgt": indices.get("wbgt_c"),
+            "apparent_temperature": indices.get(
+                "apparent_temperature_c"
             ),
-            "wbgt": wbgt,
-            "apparent_temperature": apparent_temperature,
-            "wet_bulb_temperature": wet_bulb_temperature,
-        }
+            "wet_bulb_temperature": indices.get(
+                "wet_bulb_temp_c"
+            )
+        },
+
+        "sms_alert": sms_alert
     }
 
+
+# ---------------------------------------------------------
+# MAP RISK
+# ---------------------------------------------------------
 
 @app.get("/map/risk")
 async def map_risk(
@@ -174,9 +240,15 @@ async def map_risk(
     results = []
 
     for location in locations:
-        lat, lon = map(float, location.split(","))
+        lat, lon = map(
+            float,
+            location.split(",")
+        )
 
-        risk = await get_location_risk(lat, lon)
+        risk = await get_location_risk(
+            lat,
+            lon
+        )
 
         results.append(risk)
 
@@ -185,6 +257,10 @@ async def map_risk(
         "locations": results
     }
 
+
+# ---------------------------------------------------------
+# FORECAST
+# ---------------------------------------------------------
 
 @app.get("/forecast")
 async def forecast(
@@ -198,6 +274,10 @@ async def forecast(
         "forecast": data["forecast"]
     }
 
+
+# ---------------------------------------------------------
+# INTERVENTION
+# ---------------------------------------------------------
 
 @app.get("/intervention")
 async def intervention(
@@ -215,6 +295,10 @@ async def intervention(
         vulnerable_population=vulnerable_population
     )
 
+
+# ---------------------------------------------------------
+# INTERVENTION SIMULATION
+# ---------------------------------------------------------
 
 @app.post("/intervention/simulate")
 async def intervention_simulation(
