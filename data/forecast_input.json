@@ -1,0 +1,33 @@
+{
+    "location": "Ward_A",
+    "vulnerability_index": 30,
+    "historical_health_events": 17,
+    "lag_health_events": 15,
+    "forecast": [
+        {
+            "day": 1,
+            "temperature_c": 40.5,
+            "thermal_stress": 78
+        },
+        {
+            "day": 2,
+            "temperature_c": 41.2,
+            "thermal_stress": 82
+        },
+        {
+            "day": 3,
+            "temperature_c": 42.0,
+            "thermal_stress": 86
+        },
+        {
+            "day": 4,
+            "temperature_c": 42.5,
+            "thermal_stress": 89
+        },
+        {
+            "day": 5,
+            "temperature_c": 41.8,
+            "thermal_stress": 84
+        }
+    ]
+}

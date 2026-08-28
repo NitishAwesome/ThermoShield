@@ -1,0 +1,37 @@
+{
+    "model": "Random Forest Classifier",
+    "dataset_type": "synthetic_prototype",
+    "prediction_horizon": "3 days",
+    "train_test_split": "80/20 chronological",
+    "accuracy": 0.917,
+    "precision_weighted": 0.933,
+    "recall_weighted": 0.917,
+    "f1_weighted": 0.917,
+    "confusion_matrix": [
+        [
+            3,
+            0,
+            0
+        ],
+        [
+            0,
+            4,
+            1
+        ],
+        [
+            0,
+            0,
+            4
+        ]
+    ],
+    "medical_validation": false,
+    "feature_importance": {
+        "temperature_c": 0.2588,
+        "thermal_stress": 0.2171,
+        "lag_health_events": 0.2144,
+        "historical_health_events": 0.2143,
+        "vulnerability_index": 0.0651,
+        "thermal_stress_trend": 0.0297,
+        "temperature_trend": 0.0006
+    }
+}
