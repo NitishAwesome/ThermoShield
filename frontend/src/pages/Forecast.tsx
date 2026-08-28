@@ -1,62 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
-import { ForecastResponse, LocationItem } from '../types';
+import { ForecastResponse } from '../types';
 import { LocationSearch } from '../components/LocationSearch';
 import { ForecastChart } from '../components/ForecastChart';
 import { LoadingState } from '../components/LoadingState';
-import { Calendar, Thermometer, Sun, CloudSun, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Calendar, Thermometer, Sun, CloudSun, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
 import { formatTemperature } from '../utils/risk';
-
 import { getCachedData, setCachedData } from '../services/cache';
+import { useLocation } from '../context/LocationContext';
 
 export const Forecast: React.FC = () => {
-  const [coords, setCoords] = useState<{ lat: number; lon: number }>({ lat: 19.076, lon: 72.8777 });
-  const [locationName, setLocationName] = useState<string>('Mumbai, Maharashtra');
+  const { coords, locationName, isLocating, setLocation, detectMyLocation } = useLocation();
+
   const [forecastData, setForecastData] = useState<ForecastResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchForecast = async () => {
-      const cached = getCachedData(coords.lat, coords.lon);
-      if (cached?.forecast) {
-        setForecastData(cached.forecast);
-        setIsLoading(false);
-      } else {
-        setIsLoading(true);
-      }
-      setError(null);
+  const fetchForecast = async () => {
+    const cached = getCachedData(coords.lat, coords.lon);
+    if (cached?.forecast) {
+      setForecastData(cached.forecast);
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
+    }
+    setError(null);
 
-      try {
-        const res = await api.getForecast(coords.lat, coords.lon);
-        setForecastData(res);
-        setCachedData(coords.lat, coords.lon, { forecast: res });
-      } catch (err: any) {
-        if (!cached?.forecast) {
-          setError(err.message || 'Failed to load 5-day synoptic forecast.');
-        }
-      } finally {
-        setIsLoading(false);
+    try {
+      const res = await api.getForecast(coords.lat, coords.lon);
+      setForecastData(res);
+      setCachedData(coords.lat, coords.lon, { forecast: res });
+    } catch (err: any) {
+      if (!cached?.forecast) {
+        setError(err.message || 'Failed to load 5-day synoptic forecast.');
       }
-    };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchForecast();
   }, [coords.lat, coords.lon]);
-
-  const handleSelectLocation = (loc: LocationItem) => {
-    setLocationName(loc.name);
-    setCoords({ lat: loc.latitude, lon: loc.longitude });
-  };
-
-  const handleUseMyLocation = () => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocationName(`Current Location (${pos.coords.latitude.toFixed(3)}°N, ${pos.coords.longitude.toFixed(3)}°E)`);
-        setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude });
-      },
-      (err) => alert(`Location access error: ${err.message}`)
-    );
-  };
 
   return (
     <div className="space-y-6 pb-12">
@@ -73,101 +58,138 @@ export const Forecast: React.FC = () => {
       </div>
 
       {/* Location Search Bar */}
-      <div className="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 backdrop-blur-md">
+      <div className="relative z-40 bg-slate-900/80 p-4 rounded-2xl border border-slate-800/90 backdrop-blur-md shadow-lg">
         <LocationSearch
           currentLocationName={locationName}
-          onSelectLocation={handleSelectLocation}
-          onUseMyLocation={handleUseMyLocation}
+          onSelectLocation={setLocation}
+          onUseMyLocation={detectMyLocation}
+          isLocating={isLocating}
         />
       </div>
 
-      {isLoading ? (
-        <LoadingState message="Fetching 5-day weather & heat forecast..." />
-      ) : error ? (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
-          {error}
+      {/* Error Alert */}
+      {error && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0" />
+            <p className="text-sm">{error}</p>
+          </div>
+          <button
+            onClick={fetchForecast}
+            className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-xs font-bold text-red-200 flex items-center space-x-1 cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Retry</span>
+          </button>
         </div>
+      )}
+
+      {isLoading && !forecastData ? (
+        <LoadingState message="Loading multi-day meteorological forecast..." />
       ) : forecastData ? (
-        <>
-          {/* Main Forecast Chart */}
+        <div className="space-y-6">
+          {/* Visual Trend Chart */}
           <ForecastChart forecast={forecastData.forecast} />
 
-          {/* Daily Breakdown Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            {forecastData.forecast.dates.map((dateStr, idx) => {
-              const d = new Date(dateStr);
-              const maxT = forecastData.forecast.max_temperature[idx];
-              const minT = forecastData.forecast.min_temperature[idx];
-              const isHeatwaveDay = maxT >= 40.0;
-              const isHighDay = maxT >= 35.0 && maxT < 40.0;
+          {/* 5-Day Card Grid */}
+          <div>
+            <h3 className="text-lg font-bold text-slate-100 mb-4 flex items-center space-x-2">
+              <Calendar className="w-5 h-5 text-cyan-400" />
+              <span>Daily High / Low Outlook Matrix ({locationName})</span>
+            </h3>
 
-              return (
-                <div
-                  key={dateStr}
-                  className={`p-4 rounded-2xl bg-slate-800/90 border ${
-                    isHeatwaveDay
-                      ? 'border-red-500/40 shadow-red-500/10'
-                      : isHighDay
-                      ? 'border-orange-500/40'
-                      : 'border-slate-700/80'
-                  } shadow-lg backdrop-blur-md flex flex-col justify-between`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between border-b border-slate-700/60 pb-2 mb-3">
-                      <span className="text-xs font-bold text-slate-400">
-                        {d.toLocaleDateString([], { weekday: 'short' })}
-                      </span>
-                      <span className="text-xs text-slate-300 font-mono">
-                        {d.toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                      </span>
-                    </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              {forecastData.forecast.dates.map((dateStr, idx) => {
+                const maxTemp = forecastData.forecast.max_temperature[idx];
+                const minTemp = forecastData.forecast.min_temperature[idx];
+                const isExtreme = maxTemp >= 40.0;
+                const isHigh = maxTemp >= 36.0 && maxTemp < 40.0;
 
-                    <div className="flex items-center justify-center my-3">
-                      {isHeatwaveDay ? (
-                        <Sun className="w-10 h-10 text-red-400 animate-spin" />
-                      ) : isHighDay ? (
-                        <Sun className="w-10 h-10 text-orange-400" />
+                const dateObj = new Date(dateStr);
+                const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+                const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+                return (
+                  <div
+                    key={dateStr}
+                    className={`p-4 rounded-xl border transition-all ${
+                      isExtreme
+                        ? 'bg-red-950/20 border-red-500/40 hover:border-red-400 shadow-lg shadow-red-950/30'
+                        : isHigh
+                        ? 'bg-amber-950/20 border-amber-500/40 hover:border-amber-400'
+                        : 'bg-slate-800/80 border-slate-700 hover:border-slate-600'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-3 border-b border-slate-700/60 pb-2">
+                      <div>
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">
+                          {idx === 0 ? 'Today' : dayName}
+                        </span>
+                        <span className="text-xs text-slate-300 font-medium">{formattedDate}</span>
+                      </div>
+                      {isExtreme ? (
+                        <Sun className="w-6 h-6 text-red-400 animate-pulse" />
+                      ) : isHigh ? (
+                        <CloudSun className="w-6 h-6 text-amber-400" />
                       ) : (
-                        <CloudSun className="w-10 h-10 text-amber-400" />
+                        <CloudSun className="w-6 h-6 text-cyan-400" />
                       )}
                     </div>
 
-                    <div className="text-center">
-                      <div className="flex items-baseline justify-center space-x-2">
-                        <span className="text-2xl font-extrabold text-white">
-                          {formatTemperature(maxT)}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-400 flex items-center space-x-1">
+                          <Thermometer className="w-3.5 h-3.5 text-red-400" />
+                          <span>Max Temp:</span>
                         </span>
-                        <span className="text-xs text-slate-400">
-                          / {formatTemperature(minT)}
+                        <span
+                          className={`text-base font-extrabold font-mono ${
+                            isExtreme ? 'text-red-400' : isHigh ? 'text-amber-400' : 'text-slate-100'
+                          }`}
+                        >
+                          {formatTemperature(maxTemp)}
                         </span>
                       </div>
-                      <span className="text-[10px] text-slate-400">Max / Min Air Temp</span>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-400 flex items-center space-x-1">
+                          <Thermometer className="w-3.5 h-3.5 text-blue-400" />
+                          <span>Min Temp:</span>
+                        </span>
+                        <span className="text-sm font-semibold font-mono text-slate-300">
+                          {formatTemperature(minTemp)}
+                        </span>
+                      </div>
+
+                      {/* Daily Advisory Tag */}
+                      <div className="pt-2">
+                        {isExtreme ? (
+                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">
+                            <AlertTriangle className="w-2.5 h-2.5" />
+                            <span>Extreme Heat Threat</span>
+                          </span>
+                        ) : isHigh ? (
+                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            <AlertTriangle className="w-2.5 h-2.5" />
+                            <span>Elevated Vigilance</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                            <CheckCircle className="w-2.5 h-2.5" />
+                            <span>Moderate Range</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-
-                  <div className="mt-4 pt-2 border-t border-slate-700/50 text-center">
-                    {isHeatwaveDay ? (
-                      <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-red-400 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20">
-                        <AlertTriangle className="w-3 h-3" />
-                        <span>Heatwave Risk</span>
-                      </span>
-                    ) : isHighDay ? (
-                      <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20">
-                        <span>Caution Period</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                        <CheckCircle className="w-3 h-3" />
-                        <span>Standard Range</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </>
+        </div>
       ) : null}
     </div>
   );
 };
+
+export default Forecast;
