@@ -17,10 +17,11 @@ import {
 import { getRiskBadgeStyles } from '../utils/risk';
 
 import { getCachedData, setCachedData } from '../services/cache';
+import { useLocation } from '../context/LocationContext';
 
 export const Alerts: React.FC = () => {
-  const [coords, setCoords] = useState<{ lat: number; lon: number }>({ lat: 19.076, lon: 72.8777 });
-  const [locationName, setLocationName] = useState<string>('Mumbai, Maharashtra');
+  const { coords, locationName, isLocating, setLocation, detectMyLocation } = useLocation();
+
   const [thermalData, setThermalData] = useState<ThermalResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,22 +52,6 @@ export const Alerts: React.FC = () => {
     fetchAlerts();
   }, [coords.lat, coords.lon]);
 
-  const handleSelectLocation = (loc: LocationItem) => {
-    setLocationName(loc.name);
-    setCoords({ lat: loc.latitude, lon: loc.longitude });
-  };
-
-  const handleUseMyLocation = () => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocationName(`GPS (${pos.coords.latitude.toFixed(3)}°N, ${pos.coords.longitude.toFixed(3)}°E)`);
-        setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude });
-      },
-      (err) => alert(`Location error: ${err.message}`)
-    );
-  };
-
   const risk = thermalData?.thermal?.risk_assessment;
   const hydration = thermalData?.thermal?.hydration;
   const activity = thermalData?.thermal?.activity_guidance;
@@ -79,19 +64,20 @@ export const Alerts: React.FC = () => {
       {/* Header */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-sans">
-          Public Health Alerts & Civic Safety Advisories
+          Public Health Alerts & Physiological Guidance
         </h1>
         <p className="text-sm text-slate-400 mt-1">
-          Evidence-based civic heat action plan guidelines, occupational work/rest cycles, and hydration protocols
+          Evidence-based clinical advisories, hydration quotas, work-rest schedules, and vulnerable cohort protection
         </p>
       </div>
 
       {/* Location Search Bar */}
-      <div className="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 backdrop-blur-md">
+      <div className="relative z-40 bg-slate-900/80 p-4 rounded-2xl border border-slate-800/90 backdrop-blur-md shadow-lg">
         <LocationSearch
           currentLocationName={locationName}
-          onSelectLocation={handleSelectLocation}
-          onUseMyLocation={handleUseMyLocation}
+          onSelectLocation={setLocation}
+          onUseMyLocation={detectMyLocation}
+          isLocating={isLocating}
         />
       </div>
 

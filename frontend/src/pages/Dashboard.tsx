@@ -5,7 +5,6 @@ import {
   RiskResponse,
   WeatherResponse,
   MapLocationRisk,
-  LocationItem,
 } from '../types';
 import { LocationSearch } from '../components/LocationSearch';
 import { RiskCard } from '../components/RiskCard';
@@ -16,27 +15,12 @@ import { ForecastChart } from '../components/ForecastChart';
 import { AlertBanner } from '../components/AlertBanner';
 import { LoadingState } from '../components/LoadingState';
 import { AlertCircle, RefreshCw } from 'lucide-react';
-
-const REGIONAL_COORDINATES = [
-  '19.0760,72.8777', // Mumbai
-  '28.6139,77.2090', // Delhi
-  '26.9124,75.7873', // Jaipur
-  '12.9716,77.5946', // Bengaluru
-  '13.0827,80.2707', // Chennai
-  '23.0225,72.5714', // Ahmedabad
-  '22.5726,88.3639', // Kolkata
-];
-
 import { getCachedData, setCachedData } from '../services/cache';
+import { useLocation } from '../context/LocationContext';
 
 export const Dashboard: React.FC = () => {
-  // Default coordinate: Mumbai (19.0760, 72.8777)
-  const [coords, setCoords] = useState<{ lat: number; lon: number }>({
-    lat: 19.076,
-    lon: 72.8777,
-  });
-  const [locationName, setLocationName] = useState<string>('Mumbai, Maharashtra');
-  const [isLocating, setIsLocating] = useState<boolean>(false);
+  const { coords, locationName, isLocating, setLocation, setCoordsAndName, detectMyLocation } = useLocation();
+
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -140,46 +124,18 @@ export const Dashboard: React.FC = () => {
     fetchData(coords.lat, coords.lon);
   }, [coords.lat, coords.lon]);
 
-  const handleSelectLocation = (loc: LocationItem) => {
-    setLocationName(loc.name);
-    setCoords({ lat: loc.latitude, lon: loc.longitude });
-  };
-
   const handleMapClick = (lat: number, lon: number) => {
-    setLocationName(`Custom (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`);
-    setCoords({ lat, lon });
-  };
-
-  const handleUseMyLocation = () => {
-    if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
-      return;
-    }
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setIsLocating(false);
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-        setLocationName(`Current GPS (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`);
-        setCoords({ lat, lon });
-      },
-      (err) => {
-        setIsLocating(false);
-        alert(`Location permission denied or unavailable: ${err.message}`);
-      },
-      { timeout: 10000, enableHighAccuracy: true }
-    );
+    setCoordsAndName({ lat, lon }, `Custom (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`);
   };
 
   return (
     <div className="space-y-6 pb-12">
       {/* Top Controls: Search Bar & Location Detect */}
-      <div className="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 backdrop-blur-md">
+      <div className="relative z-40 bg-slate-900/80 p-4 rounded-2xl border border-slate-800/90 backdrop-blur-md shadow-lg">
         <LocationSearch
           currentLocationName={locationName}
-          onSelectLocation={handleSelectLocation}
-          onUseMyLocation={handleUseMyLocation}
+          onSelectLocation={setLocation}
+          onUseMyLocation={detectMyLocation}
           isLocating={isLocating}
         />
       </div>
@@ -196,7 +152,7 @@ export const Dashboard: React.FC = () => {
           </div>
           <button
             onClick={() => fetchData(coords.lat, coords.lon)}
-            className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-xs font-bold text-red-200 flex items-center space-x-1"
+            className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-xs font-bold text-red-200 flex items-center space-x-1 cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Retry</span>
@@ -259,3 +215,5 @@ export const Dashboard: React.FC = () => {
     </div>
   );
 };
+
+export default Dashboard;
