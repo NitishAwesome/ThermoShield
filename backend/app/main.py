@@ -1,20 +1,19 @@
-
 import os
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.services.location import search_location
-from app.services.weather import get_weather
-from app.services.thermal import (
+from backend.app.services.location import search_location
+from backend.app.services.weather import get_weather
+from backend.app.services.thermal import (
     calculate_thermal_stress,
     calculate_heat_index,
     classify_heat_stress,
 )
-from app.services.risk import predict_risk
-from app.services.map_services import get_location_risk
-from app.services.intervention import generate_interventions
-from app.services.simulator import simulate_intervention
-from app.services.sms import send_sms
+from backend.app.services.risk import predict_risk
+from backend.app.services.map_services import get_location_risk
+from backend.app.services.intervention import generate_interventions
+from backend.app.services.simulator import simulate_intervention
+from backend.app.services.sms import send_sms
 
 
 app = FastAPI(
@@ -115,24 +114,10 @@ async def thermal(
         solar_radiation=weather.get("solar_radiation")
     )
 
-    indices = thermal_result["indices"]
-    risk = thermal_result["risk_assessment"]
-
     return {
         "location": weather_data["location"],
         "weather": weather,
-        "thermal": {
-            "heat_index": indices.get("heat_index_c"),
-            "thermal_stress": indices.get("wbgt_c"),
-            "thermal_risk_level": risk.get("level"),
-            "wbgt": indices.get("wbgt_c"),
-            "apparent_temperature": indices.get(
-                "apparent_temperature_c"
-            ),
-            "wet_bulb_temperature": indices.get(
-                "wet_bulb_temp_c"
-            )
-        }
+        "thermal": thermal_result,
     }
 
 
@@ -163,13 +148,12 @@ async def risk(
         solar_radiation=weather.get("solar_radiation")
     )
 
-    indices = thermal_result["indices"]
-    thermal_risk = thermal_result["risk_assessment"]
-
-    heat_index = indices.get("heat_index_c")
-
-    # Use WBGT as thermal_stress input for ML model
-    thermal_stress = indices.get("wbgt_c")
+    # Thermal engine score is 0-1.
+    # ML training feature thermal_stress is approximately 0-100.
+    thermal_stress = round(
+        thermal_result["risk_assessment"]["score"] * 100,
+        2
+    )
 
     # -----------------------------------------------------
     # 2. ML risk prediction
@@ -209,23 +193,10 @@ async def risk(
 
     return {
         "location": weather_data["location"],
-
+        "weather": weather,
         "risk": risk_result,
-
-        "thermal": {
-            "heat_index": heat_index,
-            "thermal_stress": thermal_stress,
-            "thermal_risk_level": thermal_risk.get("level"),
-            "wbgt": indices.get("wbgt_c"),
-            "apparent_temperature": indices.get(
-                "apparent_temperature_c"
-            ),
-            "wet_bulb_temperature": indices.get(
-                "wet_bulb_temp_c"
-            )
-        },
-
-        "sms_alert": sms_alert
+        "thermal": thermal_result,
+        "sms_alert": sms_alert,
     }
 
 
@@ -245,12 +216,12 @@ async def map_risk(
             location.split(",")
         )
 
-        risk = await get_location_risk(
+        risk_data = await get_location_risk(
             lat,
             lon
         )
 
-        results.append(risk)
+        results.append(risk_data)
 
     return {
         "count": len(results),
@@ -267,11 +238,11 @@ async def forecast(
     lat: float,
     lon: float
 ):
-    data = await get_weather(lat, lon)
+    weather_data = await get_weather(lat, lon)
 
     return {
-        "location": data["location"],
-        "forecast": data["forecast"]
+        "location": weather_data["location"],
+        "forecast": weather_data["forecast"]
     }
 
 
