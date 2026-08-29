@@ -19,10 +19,11 @@ import {
 import { formatTemperature, formatPercent, formatSpeed, getRiskBadgeStyles } from '../utils/risk';
 
 import { getCachedData, setCachedData } from '../services/cache';
+import { useLocation } from '../context/LocationContext';
 
 export const RiskDetails: React.FC = () => {
-  const [coords, setCoords] = useState<{ lat: number; lon: number }>({ lat: 19.076, lon: 72.8777 });
-  const [locationName, setLocationName] = useState<string>('Mumbai, Maharashtra');
+  const { coords, locationName, isLocating, setLocation, detectMyLocation } = useLocation();
+
   const [thermalData, setThermalData] = useState<ThermalResponse | null>(null);
   const [riskData, setRiskData] = useState<RiskResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -72,7 +73,7 @@ export const RiskDetails: React.FC = () => {
         }
       } catch (err: any) {
         if (!cached?.thermal) {
-          setError(err.message || 'Failed to load deep risk analysis.');
+          setError(err.message || 'An unexpected error occurred while fetching risk analysis.');
         }
       } finally {
         setIsLoading(false);
@@ -80,22 +81,6 @@ export const RiskDetails: React.FC = () => {
     };
     fetchData();
   }, [coords.lat, coords.lon]);
-
-  const handleSelectLocation = (loc: LocationItem) => {
-    setLocationName(loc.name);
-    setCoords({ lat: loc.latitude, lon: loc.longitude });
-  };
-
-  const handleUseMyLocation = () => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocationName(`GPS (${pos.coords.latitude.toFixed(3)}°N, ${pos.coords.longitude.toFixed(3)}°E)`);
-        setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude });
-      },
-      (err) => alert(`Location error: ${err.message}`)
-    );
-  };
 
   const risk = thermalData?.thermal?.risk_assessment;
   const indices = thermalData?.thermal?.indices;
@@ -115,11 +100,12 @@ export const RiskDetails: React.FC = () => {
       </div>
 
       {/* Location Search Bar */}
-      <div className="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 backdrop-blur-md">
+      <div className="relative z-40 bg-slate-900/80 p-4 rounded-2xl border border-slate-800/90 backdrop-blur-md shadow-lg">
         <LocationSearch
           currentLocationName={locationName}
-          onSelectLocation={handleSelectLocation}
-          onUseMyLocation={handleUseMyLocation}
+          onSelectLocation={setLocation}
+          onUseMyLocation={detectMyLocation}
+          isLocating={isLocating}
         />
       </div>
 
