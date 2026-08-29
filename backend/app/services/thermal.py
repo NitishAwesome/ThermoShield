@@ -1,6 +1,6 @@
 from typing import Optional, Dict, Any
 
-from backend.thermal_stress import (
+from thermal_stress import (
     analyze_thermal_stress,
     calculate_heat_index as scientific_heat_index,
     classify_risk,

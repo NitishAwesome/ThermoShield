@@ -1,5 +1,5 @@
 import httpx
-from backend.app.config import NOMINATIM_URL
+from app.config import NOMINATIM_URL
 
 
 async def search_location(query: str):
