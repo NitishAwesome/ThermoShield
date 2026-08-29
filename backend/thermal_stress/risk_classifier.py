@@ -24,7 +24,7 @@ Scientific Basis & Assumptions:
 
 from dataclasses import dataclass
 from typing import Optional, List, Tuple
-from backend.thermal_stress.models import ThermalRiskLevel, RiskAssessment, ThermalIndices, WeatherInput
+from thermal_stress.models import ThermalRiskLevel, RiskAssessment, ThermalIndices, WeatherInput
 
 
 @dataclass

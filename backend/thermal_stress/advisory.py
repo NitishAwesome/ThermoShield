@@ -8,7 +8,7 @@ and civic heatwave action plans (HAPs).
 """
 
 from typing import List
-from backend.thermal_stress.models import (
+from thermal_stress.models import (
     ThermalRiskLevel,
     RiskAssessment,
     WeatherInput,

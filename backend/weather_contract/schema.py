@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
-from backend.thermal_stress.models import WeatherInput
+from thermal_stress.models import WeatherInput
 
 DATA_FILE = Path(__file__).with_name("demo_fallback.json")
 

@@ -10,7 +10,7 @@ Implements standardized formulations for:
 
 import math
 from typing import Optional, Tuple
-from backend.thermal_stress.models import WeatherInput, ThermalIndices
+from thermal_stress.models import WeatherInput, ThermalIndices
 
 
 def calculate_vapor_pressure(temperature_c: float, relative_humidity_pct: float) -> float:
