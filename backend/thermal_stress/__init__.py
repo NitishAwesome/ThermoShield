@@ -17,7 +17,7 @@ Exports:
 """
 
 from typing import Optional, Union, Dict, Any
-from backend.thermal_stress.models import (
+from thermal_stress.models import (
     WeatherInput,
     ThermalIndices,
     RiskAssessment,
@@ -27,7 +27,7 @@ from backend.thermal_stress.models import (
     ThermalStressResult,
     ThermalRiskLevel,
 )
-from backend.thermal_stress.calculator import (
+from thermal_stress.calculator import (
     calculate_wbgt,
     calculate_heat_index,
     get_heat_index_status,
@@ -36,14 +36,14 @@ from backend.thermal_stress.calculator import (
     calculate_vapor_pressure,
     compute_all_indices,
 )
-from backend.thermal_stress.risk_classifier import (
+from thermal_stress.risk_classifier import (
     classify_risk,
     calculate_normalized_risk_score,
     generate_explainability_factors,
     RiskThresholds,
     DEFAULT_THRESHOLDS,
 )
-from backend.thermal_stress.advisory import (
+from thermal_stress.advisory import (
     generate_advisories,
     generate_hydration_guidance,
     generate_activity_guidance,

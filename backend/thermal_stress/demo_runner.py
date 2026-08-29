@@ -13,7 +13,7 @@ import sys
 import json
 import argparse
 from typing import Dict, Any, List
-from backend.thermal_stress import analyze_thermal_stress, ThermalStressResult
+from thermal_stress import analyze_thermal_stress, ThermalStressResult
 
 # Ensure safe encoding for Windows PowerShell / CMD
 if hasattr(sys.stdout, "reconfigure"):

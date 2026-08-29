@@ -7,9 +7,9 @@ and ML risk prediction to generate consistent geospatial risk coordinates.
 """
 
 try:
-    from backend.app.services.weather import get_weather
-    from backend.app.services.thermal import calculate_thermal_stress
-    from backend.app.services.risk import predict_risk
+    from app.services.weather import get_weather
+    from app.services.thermal import calculate_thermal_stress
+    from app.services.risk import predict_risk
 except ImportError:
     from app.services.weather import get_weather
     from app.services.thermal import calculate_thermal_stress
