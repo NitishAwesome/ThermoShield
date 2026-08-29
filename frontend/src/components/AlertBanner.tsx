@@ -69,7 +69,7 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
             {activity?.peak_heat_hours && (
               <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700/80 text-amber-300">
                 <Clock className="w-3.5 h-3.5 text-amber-400" />
-                <span>Avoid Midday Exertion ({activity.peak_heat_hours})</span>
+                <span>Daily Peak Sun Window: {activity.peak_heat_hours}</span>
               </div>
             )}
           </div>

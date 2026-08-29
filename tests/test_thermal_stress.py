@@ -169,6 +169,24 @@ class TestThermalStressModule(unittest.TestCase):
         self.assertIsNone(d["indices"]["heat_index_c"])
         self.assertIn("score", d["risk_assessment"])
 
+    def test_20_nighttime_zero_solar_wbgt_and_explainability(self):
+        """Test that zero solar radiation produces indoor/shaded WBGT and no false radiant heat factors."""
+        result = analyze_thermal_stress(temperature=28.0, relative_humidity=75.0, wind_speed=3.0, solar_radiation=0.0)
+        # With solar = 0.0, WBGT = 0.7 * Tw + 0.3 * Ta
+        tw = calculate_stull_wet_bulb(28.0, 75.0)
+        expected_wbgt = 0.7 * tw + 0.3 * 28.0
+        self.assertAlmostEqual(result.indices.wbgt_c, expected_wbgt, places=2)
+        # Environmental factors must NOT mention radiant heat load
+        for factor in result.risk_assessment.environmental_factors:
+            self.assertNotIn("solar radiation", factor.lower())
+            self.assertNotIn("radiant heat burden", factor.lower())
+
+    def test_21_daytime_vs_nighttime_wbgt_differential(self):
+        """Test that adding solar radiation strictly increases WBGT due to radiant solar load on the black globe."""
+        night = analyze_thermal_stress(temperature=32.0, relative_humidity=60.0, wind_speed=2.0, solar_radiation=0.0)
+        day = analyze_thermal_stress(temperature=32.0, relative_humidity=60.0, wind_speed=2.0, solar_radiation=750.0)
+        self.assertGreater(day.indices.wbgt_c, night.indices.wbgt_c)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

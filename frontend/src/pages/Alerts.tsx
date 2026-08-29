@@ -179,7 +179,7 @@ export const Alerts: React.FC = () => {
                   </div>
 
                   <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-                    <span className="text-slate-400 block font-semibold">Peak Danger Hours:</span>
+                    <span className="text-slate-400 block font-semibold">Daily Peak Sun Window:</span>
                     <span className="text-xs font-bold text-orange-300 mt-0.5 block">
                       {activity?.peak_heat_hours}
                     </span>
