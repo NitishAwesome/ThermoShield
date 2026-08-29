@@ -230,3 +230,18 @@ async def _execute_fetch_and_resolve(
     finally:
         async with _CACHE_LOCK:
             _INFLIGHT_REQUESTS.pop(key, None)
+
+
+async def get_forecast(
+    latitude: float = 0.0,
+    longitude: float = 0.0,
+    lat: Optional[float] = None,
+    lon: Optional[float] = None,
+) -> Dict[str, Any]:
+    effective_lat = latitude if lat is None else lat
+    effective_lon = longitude if lon is None else lon
+    weather_data = await get_weather(effective_lat, effective_lon)
+    return {
+        "location": weather_data["location"],
+        "forecast": weather_data["forecast"]
+    }

@@ -1,11 +1,23 @@
 import os
+import sys
+import logging
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+# Ensure project root and backend are in sys.path
+backend_dir = Path(__file__).resolve().parent.parent
+project_root = backend_dir.parent
+for p in (str(project_root), str(backend_dir)):
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 from fastapi import FastAPI, Query, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from app.services.location import search_location
-from app.services.weather import get_weather
+from app.services.weather import get_weather, get_forecast
 
 from app.services.thermal import (
     calculate_heat_index,
@@ -725,87 +737,63 @@ async def risk(
 
 
     # --------------------------------------------------
-    # 6. FIND DATABASE LOCATION
+    # 6. DATABASE LOCATION & RISK PERSISTENCE (Fail-Safe)
     # --------------------------------------------------
-
-    location = get_location_by_coordinates(
-        db,
-        lat,
-        lon
-    )
-
-    if location is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Location not found in database"
-        )
-
-
-    # --------------------------------------------------
-    # 7. SAVE RISK TO DATABASE
-    # --------------------------------------------------
-
-    risk_data = RiskCreate(
-        location_id=location.id,
-        temperature_c=weather["temperature"],
-        thermal_stress=thermal_stress,
-        heat_index=heat_index,
-        wbgt=wbgt,
-        predicted_health_impact_proxy=(
-            risk_result[
-                "predicted_health_impact_proxy"
-            ]
-        ),
-        risk_score=risk_result["risk_score"],
-        risk_level=risk_result["risk_level"],
-    )
-
-    saved_risk = create_risk(
-        db,
-        risk_data
-    )
-
-
-    # --------------------------------------------------
-    # 8. DATABASE ALERT DECISION ENGINE
-    # --------------------------------------------------
-
+    saved_risk = None
     alert = None
 
-    if should_create_alert(
-        risk_result["risk_level"]
-    ):
-
-        user = (
-            db.query(User)
-            .filter(User.id == 1)
-            .first()
-        )
-
-        if user is not None:
-
-            alert_message = (
-                f"Heat health risk is "
-                f"{risk_result['risk_level']} "
-                f"at {location.name}."
-            )
-
-            alert_data = AlertCreate(
-                user_id=user.id,
-                location_id=location.id,
-                risk_level=risk_result["risk_level"],
-                risk_score=risk_result["risk_score"],
-                message=alert_message,
-                status="PENDING",
-                phone_number=user.phone_number,
-                reference_id=f"RISK-{saved_risk.id}"
-            )
-
-            alert = create_alert(
+    try:
+        location = get_location_by_coordinates(db, lat, lon)
+        if location is None:
+            loc_name = weather_data.get("location", {}).get("name") or f"Location ({lat:.4f}, {lon:.4f})"
+            location = create_location(
                 db,
-                alert_data
+                LocationCreate(
+                    name=loc_name,
+                    latitude=lat,
+                    longitude=lon,
+                )
             )
 
+        if location is not None:
+            risk_data = RiskCreate(
+                location_id=location.id,
+                temperature_c=weather["temperature"],
+                thermal_stress=thermal_stress,
+                heat_index=heat_index,
+                wbgt=wbgt,
+                predicted_health_impact_proxy=(
+                    risk_result["predicted_health_impact_proxy"]
+                ),
+                risk_score=risk_result["risk_score"],
+                risk_level=risk_result["risk_level"],
+            )
+            saved_risk = create_risk(db, risk_data)
+
+            # --------------------------------------------------
+            # 8. DATABASE ALERT DECISION ENGINE
+            # --------------------------------------------------
+            if should_create_alert(risk_result["risk_level"]):
+                user = db.query(User).filter(User.id == 1).first()
+                if user is not None:
+                    alert_message = (
+                        f"Heat health risk is "
+                        f"{risk_result['risk_level']} "
+                        f"at {location.name}."
+                    )
+                    alert_data = AlertCreate(
+                        user_id=user.id,
+                        location_id=location.id,
+                        risk_level=risk_result["risk_level"],
+                        risk_score=risk_result["risk_score"],
+                        message=alert_message,
+                        status="PENDING",
+                        phone_number=user.phone_number,
+                        reference_id=f"RISK-{saved_risk.id if saved_risk else 0}"
+                    )
+                    alert = create_alert(db, alert_data)
+    except Exception as e:
+        logger.warning(f"Database persistence warning for /risk: {e}")
 
     # --------------------------------------------------
     # 9. AUTOMATIC SMS ALERT
@@ -922,16 +910,15 @@ async def map_risk(
                     lon
                 )
 
-                results.append(
-                    risk_data
-                )
+                results.append(risk_data)
 
         except Exception as e:
 
             print(
-                f"Error resolving coordinate "
-                f"'{location}': {e}"
+                f"Error processing location {location}: {e}"
             )
+
+            continue
 
 
     return {
@@ -949,23 +936,18 @@ async def forecast(
     lat: float,
     lon: float
 ):
-    weather_data = await get_weather(
-        lat,
-        lon
+    return await get_forecast(
+        lat=lat,
+        lon=lon
     )
-
-    return {
-        "location": weather_data["location"],
-        "forecast": weather_data["forecast"]
-    }
 
 
 # ==================================================
-# INTERVENTION
+# INTERVENTIONS
 # ==================================================
 
 @app.get("/intervention")
-async def intervention(
+def get_interventions_endpoint(
     risk_score: float,
     temperature: float,
     humidity: float,
@@ -987,7 +969,8 @@ async def intervention(
 
 @app.post("/intervention/simulate")
 async def intervention_simulation(
-    risk_id: int,
+    risk_id: int | None = Query(None),
+    risk_score: float | None = Query(None),
     cooling_center: bool = False,
     outdoor_work_restriction: bool = False,
     hydration_stations: bool = False,
@@ -995,28 +978,32 @@ async def intervention_simulation(
 ):
 
     # --------------------------------------------------
-    # 1. FIND RISK
+    # 1. RESOLVE BASE RISK SCORE
     # --------------------------------------------------
+    effective_risk_score = risk_score
+    risk_obj = None
 
-    risk = (
-        db.query(Risk)
-        .filter(Risk.id == risk_id)
-        .first()
-    )
+    if risk_id is not None:
+        try:
+            risk_obj = (
+                db.query(Risk)
+                .filter(Risk.id == risk_id)
+                .first()
+            )
+            if risk_obj is not None and effective_risk_score is None:
+                effective_risk_score = risk_obj.risk_score
+        except Exception as e:
+            logger.warning(f"Database query warning in /intervention/simulate: {e}")
 
-    if risk is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Risk not found"
-        )
-
+    if effective_risk_score is None:
+        effective_risk_score = 50.0
 
     # --------------------------------------------------
     # 2. RUN INTERVENTION SIMULATION
     # --------------------------------------------------
 
     simulation_result = simulate_intervention(
-        risk_score=risk.risk_score,
+        risk_score=effective_risk_score,
         cooling_center=cooling_center,
         outdoor_work_restriction=(
             outdoor_work_restriction
@@ -1025,7 +1012,6 @@ async def intervention_simulation(
             hydration_stations
         )
     )
-
 
     # --------------------------------------------------
     # 3. EXTRACT BEFORE / AFTER RISK
@@ -1039,68 +1025,47 @@ async def intervention_simulation(
         simulation_result["projected_risk"]
     )
 
-
     # --------------------------------------------------
-    # 4. SAVE INTERVENTION TO DATABASE
+    # 4. OPTIONAL SAVE TO DATABASE
     # --------------------------------------------------
+    if risk_obj is not None:
+        try:
+            intervention_data = InterventionCreate(
+                location_id=risk_obj.location_id,
+                risk_id=risk_obj.id,
+                cooling_center=cooling_center,
+                hydration_station=hydration_stations,
+                outdoor_work_restriction=(
+                    outdoor_work_restriction
+                ),
+                before_risk_score=before_risk_score,
+                after_risk_score=after_risk_score
+            )
 
-    intervention_data = InterventionCreate(
-        location_id=risk.location_id,
-        risk_id=risk.id,
-        cooling_center=cooling_center,
-        hydration_station=hydration_stations,
-        outdoor_work_restriction=(
-            outdoor_work_restriction
-        ),
-        before_risk_score=before_risk_score,
-        after_risk_score=after_risk_score
-    )
-
-    saved_intervention = create_intervention(
-        db,
-        intervention_data
-    )
-
+            create_intervention(
+                db,
+                intervention_data
+            )
+        except Exception as e:
+            logger.warning(f"Database save warning in /intervention/simulate: {e}")
 
     # --------------------------------------------------
     # 5. RETURN RESULT
     # --------------------------------------------------
+    active_list = []
+    if cooling_center:
+        active_list.append("cooling_center")
+    if outdoor_work_restriction:
+        active_list.append("outdoor_work_restriction")
+    if hydration_stations:
+        active_list.append("hydration_stations")
 
     return {
-        "risk_id": risk.id,
-
-        "location_id": risk.location_id,
-
-        "simulation": simulation_result,
-
-        "intervention": {
-            "id": saved_intervention.id,
-
-            "cooling_center": (
-                saved_intervention.cooling_center
-            ),
-
-            "hydration_station": (
-                saved_intervention.hydration_station
-            ),
-
-            "outdoor_work_restriction": (
-                saved_intervention
-                .outdoor_work_restriction
-            ),
-
-            "before_risk_score": (
-                saved_intervention
-                .before_risk_score
-            ),
-
-            "after_risk_score": (
-                saved_intervention
-                .after_risk_score
-            ),
-
-            "created_at": (
-                saved_intervention.created_at
-            )
-        }
+        "risk_id": risk_id,
+        "current_risk": simulation_result["current_risk"],
+        "projected_risk": simulation_result["projected_risk"],
+        "risk_reduction": simulation_result["risk_reduction"],
+        "projected_level": simulation_result.get("projected_level", "LOW"),
+        "active_interventions": active_list,
+        "policy_count": len(active_list),
     }
