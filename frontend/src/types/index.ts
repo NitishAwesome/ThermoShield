@@ -109,6 +109,7 @@ export interface RiskResponse {
     latitude: number;
     longitude: number;
   };
+  weather?: WeatherCondition;
   risk: MLRiskData;
   thermal: {
     heat_index: number | null;

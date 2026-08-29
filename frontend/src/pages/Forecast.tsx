@@ -49,10 +49,10 @@ export const Forecast: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-sans">
-            5-Day Extreme Heatwave Synoptic Forecast
+            5-Day Weather Forecast
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Predictive temperature progression and multi-day thermal trend trajectory
+            See how temperature conditions are expected to change over the next five days.
           </p>
         </div>
       </div>

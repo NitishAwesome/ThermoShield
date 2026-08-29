@@ -20,10 +20,11 @@ export const apiClient = axios.create({
 });
 
 export const api = {
-  // Location Search
-  searchLocations: async (query: string): Promise<LocationSearchResult> => {
+  // Location Search Endpoint
+  searchLocations: async (query: string, signal?: AbortSignal): Promise<LocationSearchResult> => {
     const res = await apiClient.get<LocationSearchResult>('/location/search', {
       params: { q: query },
+      signal,
     });
     return res.data;
   },

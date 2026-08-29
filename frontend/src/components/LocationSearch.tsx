@@ -21,8 +21,12 @@ export const LocationSearch: React.FC<LocationSearchProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef<number>(0);
+  const lastExecutedQueryRef = useRef<string>('');
 
   // Close on outside click
   useEffect(() => {
@@ -35,36 +39,76 @@ export const LocationSearch: React.FC<LocationSearchProps> = ({
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
-  // Debounced search query
+  // Debounced search query with strict AbortController and sequence versioning
   useEffect(() => {
-    if (query.trim().length < 2) {
+    const trimmed = query.trim();
+
+    // Cancel any previous in-flight HTTP request immediately on new keystroke
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    if (trimmed.length < 2) {
       setSuggestions([]);
       setIsOpen(false);
       setSelectedIndex(-1);
+      setIsLoading(false);
+      lastExecutedQueryRef.current = '';
       return;
     }
 
+    // Increment request sequence ID
+    const currentRequestId = ++requestIdRef.current;
+
     const timer = setTimeout(async () => {
+      // Create fresh AbortController for this request
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      lastExecutedQueryRef.current = trimmed;
       setIsLoading(true);
+
       try {
-        const res = await api.searchLocations(query.trim());
-        const locs = res.locations || [];
-        setSuggestions(locs);
-        setIsOpen(locs.length > 0);
-        setSelectedIndex(-1);
-      } catch (err) {
-        console.error('Location search failed:', err);
-      } finally {
-        setIsLoading(false);
+        const res = await api.searchLocations(trimmed, controller.signal);
+
+        // Version guard: only commit state if this request is still the newest active one
+        if (currentRequestId === requestIdRef.current) {
+          const locs = res.locations || [];
+          setSuggestions(locs);
+          setIsOpen(locs.length > 0);
+          setSelectedIndex(-1);
+          setIsLoading(false);
+        }
+      } catch (err: any) {
+        // Silently ignore aborted/cancelled requests without altering valid state
+        if (err.name === 'CanceledError' || err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+          return;
+        }
+        if (currentRequestId === requestIdRef.current) {
+          console.error('Location search failed:', err);
+          setIsLoading(false);
+        }
       }
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+    };
   }, [query]);
+
+  // Clean up on component unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const handleSelect = (loc: LocationItem) => {
     onSelectLocation(loc);
     setQuery('');
+    setSuggestions([]);
     setIsOpen(false);
     setSelectedIndex(-1);
     inputRef.current?.blur();

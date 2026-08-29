@@ -40,14 +40,15 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <span className={`px-2.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${styles.badge}`}>
-                {level} ALERT
+              <span className={`px-2.5 py-0.5 rounded text-xs font-extrabold uppercase tracking-wider ${styles.badge}`}>
+                {level} RISK ALERT
               </span>
               <span className="text-xs text-slate-400 font-mono">
-                Severity Score: {riskAssessment.score.toFixed(2)}
+                Severity: {Math.round(riskAssessment.score * 100)}/100
               </span>
             </div>
             <p className="mt-1 text-sm font-semibold text-slate-100">
+              <span className="text-slate-400 font-normal">Why it matters: </span>
               {riskAssessment.reason}
             </p>
           </div>
@@ -68,7 +69,7 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
             {activity?.peak_heat_hours && (
               <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700/80 text-amber-300">
                 <Clock className="w-3.5 h-3.5 text-amber-400" />
-                <span>Peak: {activity.peak_heat_hours}</span>
+                <span>Avoid Midday Exertion ({activity.peak_heat_hours})</span>
               </div>
             )}
           </div>
@@ -80,8 +81,8 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
         <div className="mt-3 pt-3 border-t border-slate-700/40 flex items-start space-x-2 text-xs text-orange-300">
           <UserX className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
           <div>
-            <span className="font-bold">Prioritized Groups: </span>
-            <span>{vulnerable.groups?.join(', ')}. </span>
+            <span className="font-bold">What to do for Vulnerable Groups: </span>
+            <span>{vulnerable.groups?.join(', ')} should stay in ventilated indoor spaces. </span>
             <span className="text-slate-300">{vulnerable.guidance}</span>
           </div>
         </div>

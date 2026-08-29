@@ -2,20 +2,20 @@
     "model": "Random Forest Regressor",
     "dataset_type": "synthetic_prototype",
     "train_test_split": "80/20",
-    "mae": 1.611,
-    "rmse": 1.872,
-    "r2": 0.93,
+    "mae": 0.522,
+    "rmse": 0.675,
+    "r2": 0.988,
     "baseline": {
         "model": "Mean Predictor",
-        "mae": 5.8,
-        "r2": -0.076
+        "mae": 5.586,
+        "r2": -0.099
     },
     "medical_validation": false,
     "feature_importance": {
-        "historical_health_events": 0.8309,
-        "lag_health_events": 0.0817,
-        "temperature_c": 0.0385,
-        "thermal_stress": 0.0384,
-        "vulnerability_index": 0.0104
+        "historical_health_events": 0.5391,
+        "lag_health_events": 0.2455,
+        "thermal_stress": 0.1586,
+        "temperature_c": 0.0521,
+        "vulnerability_index": 0.0047
     }
 }

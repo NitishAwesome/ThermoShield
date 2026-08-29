@@ -71,7 +71,7 @@ export const RiskMap: React.FC<RiskMapProps> = ({
         <div className="flex items-center space-x-2">
           <Navigation className="w-5 h-5 text-cyan-400" />
           <h3 className="text-base font-bold text-slate-100 font-sans">
-            Interactive Thermal Risk GIS Map
+            Regional Thermal Risk Map
           </h3>
           {isLoadingMap && (
             <Loader2 className="w-3.5 h-3.5 text-cyan-400 animate-spin ml-2" />
@@ -80,19 +80,19 @@ export const RiskMap: React.FC<RiskMapProps> = ({
         <div className="flex items-center space-x-3 text-xs text-slate-400">
           <span className="flex items-center space-x-1">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <span>Low</span>
+            <span>LOW</span>
           </span>
           <span className="flex items-center space-x-1">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-            <span>Mod</span>
+            <span>MODERATE</span>
           </span>
           <span className="flex items-center space-x-1">
             <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
-            <span>High</span>
+            <span>HIGH</span>
           </span>
           <span className="flex items-center space-x-1">
             <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
-            <span className="text-red-400 font-bold">Extreme</span>
+            <span className="text-red-400 font-bold">EXTREME</span>
           </span>
         </div>
       </div>
@@ -137,7 +137,7 @@ export const RiskMap: React.FC<RiskMapProps> = ({
           {/* Selected Location Marker */}
           <Marker position={center}>
             <Popup className="custom-popup">
-              <div className="p-1 min-w-[200px]">
+              <div className="p-1 min-w-[210px]">
                 <div className="flex items-center justify-between border-b border-slate-700 pb-1 mb-2">
                   <span className="font-bold text-slate-100 text-sm">{locationName}</span>
                   <span
@@ -147,29 +147,34 @@ export const RiskMap: React.FC<RiskMapProps> = ({
                     {riskLevel}
                   </span>
                 </div>
-                <div className="space-y-1 text-xs text-slate-300">
+                <div className="space-y-1.5 text-xs text-slate-300">
+                  {riskScore !== undefined && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Risk Severity Score:</span>
+                      <span className="font-bold text-slate-100">{riskScore.toFixed(2)} / 1.00</span>
+                    </div>
+                  )}
                   {temperature !== undefined && (
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Temperature:</span>
+                      <span className="text-slate-400">Air Temperature:</span>
                       <span className="font-bold text-slate-100">{temperature.toFixed(1)}°C</span>
                     </div>
                   )}
                   {humidity !== undefined && (
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Humidity:</span>
+                      <span className="text-slate-400">Relative Humidity:</span>
                       <span className="font-bold text-slate-100">{Math.round(humidity)}%</span>
                     </div>
                   )}
+                  <div className="pt-1.5 border-t border-slate-700 text-[11px] text-cyan-300">
+                    <strong>Action: </strong>
+                    {riskLevel === 'EXTREME' || riskLevel === 'HIGH'
+                      ? 'Drink water regularly and limit direct outdoor physical labor.'
+                      : 'Maintain routine hydration during daytime activities.'}
+                  </div>
                   {wbgt !== undefined && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Estimated WBGT:</span>
-                      <span className="font-bold text-cyan-400">{wbgt.toFixed(1)}°C</span>
-                    </div>
-                  )}
-                  {riskScore !== undefined && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Thermal Score:</span>
-                      <span className="font-bold text-slate-100">{riskScore.toFixed(2)} / 1.00</span>
+                    <div className="pt-1 text-[10px] text-slate-400">
+                      Estimated WBGT: {wbgt.toFixed(1)}°C
                     </div>
                   )}
                 </div>
@@ -177,11 +182,11 @@ export const RiskMap: React.FC<RiskMapProps> = ({
             </Popup>
           </Marker>
 
-          {/* Real Backend /map/risk Location Hotspots */}
+          {/* Additional Map Regional Locations */}
           {mapLocations.map((loc, idx) => {
             const locColor = getRiskColor(loc.risk_level);
             return (
-              <React.Fragment key={`${loc.latitude}-${loc.longitude}-${idx}`}>
+              <React.Fragment key={idx}>
                 <Circle
                   center={[loc.latitude, loc.longitude]}
                   radius={20000}
@@ -192,33 +197,28 @@ export const RiskMap: React.FC<RiskMapProps> = ({
                     weight: 1.5,
                   }}
                 />
-                <Marker
-                  position={[loc.latitude, loc.longitude]}
-                  eventHandlers={{
-                    click: () => {
-                      if (onMapClick) onMapClick(loc.latitude, loc.longitude);
-                    },
-                  }}
-                >
-                  <Popup>
-                    <div className="p-1 min-w-[180px]">
+                <Marker position={[loc.latitude, loc.longitude]}>
+                  <Popup className="custom-popup">
+                    <div className="p-1 min-w-[190px]">
                       <div className="flex items-center justify-between border-b border-slate-700 pb-1 mb-1.5">
-                        <span className="font-bold text-xs text-slate-200">
+                        <span className="font-bold text-slate-100 text-xs">
                           {loc.latitude.toFixed(3)}°N, {loc.longitude.toFixed(3)}°E
                         </span>
                         <span
-                          className="px-1.5 py-0.2 rounded text-[10px] font-bold text-white uppercase"
+                          className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase text-white"
                           style={{ backgroundColor: locColor }}
                         >
                           {loc.risk_level}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-300">
-                        ML Health Risk Score: <span className="font-bold text-slate-100">{loc.risk_score.toFixed(1)} / 100</span>
-                      </p>
-                      <p className="text-[10px] text-cyan-400 mt-1 cursor-pointer">
-                        Click to focus location
-                      </p>
+                      <div className="text-xs text-slate-300 space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Risk Score:</span>
+                          <span className="font-mono font-bold text-slate-100">
+                            {loc.risk_score.toFixed(1)} / 100
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </Popup>
                 </Marker>
@@ -228,10 +228,9 @@ export const RiskMap: React.FC<RiskMapProps> = ({
         </MapContainer>
       </div>
 
-      <div className="mt-2 text-right">
-        <span className="text-[11px] text-slate-400">
-          💡 Click anywhere on the map to query live weather and thermal stress for that coordinate.
-        </span>
+      <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400">
+        <span>Click anywhere on the map to inspect location coordinates</span>
+        <span className="hidden sm:inline">Map Data © OpenStreetMap</span>
       </div>
     </div>
   );
