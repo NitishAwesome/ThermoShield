@@ -2,7 +2,10 @@ import os
 import sys
 import logging
 from pathlib import Path
-
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from app.routers.personal_risk import router as personal_risk_router
 logger = logging.getLogger(__name__)
 
 # Ensure project root and backend are in sys.path
@@ -12,10 +15,11 @@ for p in (str(project_root), str(backend_dir)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-from fastapi import FastAPI, Query, Depends, HTTPException
+from fastapi import FastAPI, Query, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
+from app.auth.router import router as auth_router
 from app.services.location import search_location
 from app.services.weather import get_weather, get_forecast
 
@@ -109,7 +113,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-
+app.include_router(personal_risk_router)
 # ==================================================
 # CORS CONFIGURATION
 # ==================================================
@@ -141,6 +145,39 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth_router)
+
+
+# ==================================================
+# EMAIL NOTIFICATION HELPER
+# ==================================================
+def send_notification_email(to_email: str, subject: str, body: str):
+    sender_email = os.getenv("MAIL_USERNAME")
+    sender_password = os.getenv("MAIL_PASSWORD")
+    smtp_server = os.getenv("MAIL_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.getenv("MAIL_PORT", 587))
+
+    if not sender_email or not sender_password:
+        logger.warning("Mail credentials not configured. Skipping email dispatch.")
+        return {"status": "skipped", "message": "Missing credentials"}
+
+    message = MIMEMultipart()
+    message["From"] = sender_email
+    message["To"] = to_email
+    message["Subject"] = subject
+
+    message.attach(MIMEText(body, "plain"))
+
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, to_email, message.as_string())
+        return {"status": "success", "message": "Email sent successfully"}
+    except Exception as e:
+        logger.error(f"Failed to send email: {e}")
+        return {"status": "error", "message": str(e)}
 
 
 # ==================================================
@@ -655,7 +692,7 @@ async def thermal(
 
 
 # ==================================================
-# RISK ANALYSIS + DATABASE + SMS
+# RISK ANALYSIS + DATABASE + SMS + EMAIL
 # ==================================================
 
 @app.get("/risk")
@@ -665,6 +702,7 @@ async def risk(
     vulnerability_index: float = 30.0,
     historical_health_events: int = 17,
     lag_health_events: int = 15,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db)
 ):
     # --------------------------------------------------
@@ -741,6 +779,7 @@ async def risk(
     # --------------------------------------------------
     saved_risk = None
     alert = None
+    user = None
 
     try:
         location = get_location_by_coordinates(db, lat, lon)
@@ -796,28 +835,60 @@ async def risk(
         logger.warning(f"Database persistence warning for /risk: {e}")
 
     # --------------------------------------------------
-    # 9. AUTOMATIC SMS ALERT
+    # 9. AUTOMATIC SMS & EMAIL ALERTS (HIGH / EXTREME HARDCODED FOR TESTING)
     # --------------------------------------------------
 
     sms_alert = None
+    email_status = None
 
-    if risk_result["risk_level"] in [
+    current_risk_level = risk_result["risk_level"].upper().strip()
+
+    if current_risk_level in [
+        "MODERATE",
         "HIGH",
         "EXTREME"
     ]:
+        # Generate informative interventions for the alert message
+        recommended_interventions = generate_interventions(
+            risk_score=risk_result["risk_score"],
+            temperature=weather["temperature"],
+            humidity=weather["humidity"],
+            hour=12,
+            vulnerable_population=vulnerability_index
+        )
+        
+        intervention_texts = []
+        if recommended_interventions:
+            for item in recommended_interventions.get("interventions", [])[:3]:
+                intervention_texts.append(f"- {item.get('title', '')}: {item.get('description', '')}")
+        
+        interventions_formatted = "\n".join(intervention_texts) if intervention_texts else "- Stay hydrated and avoid direct sunlight."
 
         message = (
-            f"ThermoShield ALERT: "
-            f"{risk_result['risk_level']} "
-            f"heat-health risk detected. "
-            f"Risk score: "
-            f"{risk_result['risk_score']}/100."
+            f"🚨 THERMOSHIELD CRITICAL HEAT ALERT 🚨\n\n"
+            f"Risk Level: {current_risk_level}\n"
+            f"Risk Score: {risk_result['risk_score']}/100\n"
+            f"Temperature: {weather['temperature']}°C\n\n"
+            f"🛡️ RECOMMENDED SAFETY ACTIONS & INTERVENTIONS:\n"
+            f"{interventions_formatted}\n\n"
+            f"Please take necessary precautions immediately!"
         )
 
         sms_alert = await send_sms(
             phone_number="+919999999999",
             message=message
         )
+
+        target_email = getattr(user, "email", None) if user else os.getenv("MAIL_USERNAME")
+        if target_email:
+            subject = f"⚠️ CRITICAL HEAT ALERT: {current_risk_level} Risk Level Detected"
+            background_tasks.add_task(
+                send_notification_email,
+                to_email=target_email,
+                subject=subject,
+                body=message
+            )
+            email_status = "queued"
 
 
     # --------------------------------------------------
@@ -863,6 +934,7 @@ async def risk(
         },
 
         "sms_alert": sms_alert,
+        "email_alert_status": email_status,
     }
 
 
@@ -875,9 +947,6 @@ async def map_risk(
     locations: list[str] = Query(...)
 ):
     results = []
-
-    # Handle multiple coordinates passed
-    # as list or semicolon-separated values
 
     coords_list = []
 

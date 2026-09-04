@@ -1,5 +1,6 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr,Field
 from datetime import datetime
+from typing import List
 
 class UserCreate(BaseModel):
     name: str
@@ -103,3 +104,12 @@ class InterventionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+class PersonalRiskInput(BaseModel):
+
+    age: int = Field(..., ge=1, le=120)
+
+    smoking: bool
+
+    health_conditions: List[str] = []
+
+    physical_activity: str = "moderate"

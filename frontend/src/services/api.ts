@@ -7,10 +7,14 @@ import {
   ForecastResponse,
   InterventionResponse,
   SimulationResponse,
+  AuthResponse,
+  LoginCredentials,
+  RegisterCredentials,
+  User,
 } from '../types';
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'https://thermoshield.onrender.com';
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -18,6 +22,15 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+// Attach JWT token to outgoing requests if available
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('thermoshield_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 export const api = {
@@ -112,17 +125,33 @@ export const api = {
     hydration_stations?: boolean;
   }): Promise<SimulationResponse> => {
     const res = await apiClient.post<SimulationResponse>(
-      '/intervention/simulate',
-      null,
-      {
-        params: {
-          risk_score: params.risk_score,
-          cooling_center: params.cooling_center ?? false,
-          outdoor_work_restriction: params.outdoor_work_restriction ?? false,
-          hydration_stations: params.hydration_stations ?? false,
-        },
-      }
-    );
+       '/intervention/simulate',
+       null,
+       {
+         params: {
+           risk_score: params.risk_score,
+           cooling_center: params.cooling_center ?? false,
+           outdoor_work_restriction: params.outdoor_work_restriction ?? false,
+           hydration_stations: params.hydration_stations ?? false,
+         },
+       }
+     );
+     return res.data;
+   },
+
+  // Auth Endpoints
+  login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
+    const res = await apiClient.post<AuthResponse>('/auth/login', credentials);
+    return res.data;
+  },
+
+  register: async (data: RegisterCredentials): Promise<AuthResponse> => {
+    const res = await apiClient.post<AuthResponse>('/auth/register', data);
+    return res.data;
+  },
+
+  getMe: async (): Promise<User> => {
+    const res = await apiClient.get<User>('/auth/me');
     return res.data;
   },
 };

@@ -153,3 +153,30 @@ export interface SimulationResponse {
   risk_reduction: number;
   projected_level: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
 }
+
+export interface User {
+  id: number;
+  name: string;
+  phone_number: string;
+  email: string;
+  role: 'user' | 'official' | 'responder' | 'analyst' | string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
+export interface LoginCredentials {
+  email: string;
+  password?: string;
+}
+
+export interface RegisterCredentials {
+  name: string;
+  email: string;
+  phone_number: string;
+  password?: string;
+  role?: string;
+}
