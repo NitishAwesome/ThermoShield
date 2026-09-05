@@ -11,6 +11,7 @@ const Forecast = lazy(() => import('./pages/Forecast').then((m) => ({ default: m
 const RiskDetails = lazy(() => import('./pages/RiskDetails').then((m) => ({ default: m.RiskDetails })));
 const Alerts = lazy(() => import('./pages/Alerts').then((m) => ({ default: m.Alerts })));
 const Intervention = lazy(() => import('./pages/Intervention').then((m) => ({ default: m.Intervention })));
+const PersonalRisk = lazy(() => import('./pages/PersonalRisk').then((m) => ({ default: m.PersonalRisk })));
 const Auth = lazy(() => import('./pages/Auth').then((m) => ({ default: m.Auth })));
 
 export const App: React.FC = () => {
@@ -27,6 +28,8 @@ export const App: React.FC = () => {
               <Suspense fallback={<LoadingState message="Loading module..." />}>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
+                  <Route path="/personal-risk" element={<PersonalRisk />} />
+                  <Route path="/individual-risk" element={<PersonalRisk />} />
                   <Route path="/forecast" element={<Forecast />} />
                   <Route path="/risk-details" element={<RiskDetails />} />
                   <Route path="/alerts" element={<Alerts />} />

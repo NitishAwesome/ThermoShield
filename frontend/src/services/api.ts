@@ -11,10 +11,13 @@ import {
   LoginCredentials,
   RegisterCredentials,
   User,
+  PersonalRiskRequest,
+  PersonalRiskResult,
+  AreasRiskOverviewResponse,
 } from '../types';
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+  import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8001';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -152,6 +155,18 @@ export const api = {
 
   getMe: async (): Promise<User> => {
     const res = await apiClient.get<User>('/auth/me');
+    return res.data;
+  },
+
+  // Personal Risk Calculation (Individual Strain Engine)
+  calculatePersonalRisk: async (data: PersonalRiskRequest): Promise<PersonalRiskResult> => {
+    const res = await apiClient.post<PersonalRiskResult>('/personal-risk/calculate', data);
+    return res.data;
+  },
+
+  // Multi-Area Heat Risk Overview (Showcases every major area)
+  getAreasRiskOverview: async (): Promise<AreasRiskOverviewResponse> => {
+    const res = await apiClient.get<AreasRiskOverviewResponse>('/areas/risk-overview');
     return res.data;
   },
 };

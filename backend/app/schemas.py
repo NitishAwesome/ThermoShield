@@ -105,11 +105,54 @@ class InterventionResponse(BaseModel):
     class Config:
         from_attributes = True
 class PersonalRiskInput(BaseModel):
-
     age: int = Field(..., ge=1, le=120)
-
-    smoking: bool
-
+    smoking: bool = False
     health_conditions: List[str] = []
-
     physical_activity: str = "moderate"
+    is_pregnant: bool = False
+    hydration_status: str = "moderate"
+    outdoor_exposure_hours: float = Field(1.0, ge=0.0, le=24.0)
+    clothing_type: str = "standard"
+    temperature_c: float | None = None
+    humidity_pct: float | None = None
+    wbgt_c: float | None = None
+    solar_radiation: float | None = None
+
+
+class PersonalRiskFactorContribution(BaseModel):
+    factor: str
+    contribution: float
+    category: str
+    description: str
+
+
+class PersonalRiskResponse(BaseModel):
+    risk_score: float
+    risk_level: str
+    heat_strain_level: str
+    alert: str
+    recommended_water_intake_ml_hr: int
+    work_rest_cycle: str
+    risk_factors_breakdown: List[PersonalRiskFactorContribution] = []
+    safety_recommendations: List[str] = []
+
+
+class AreaRiskOverviewItem(BaseModel):
+    name: str
+    state: str
+    zone: str
+    latitude: float
+    longitude: float
+    temperature_c: float
+    humidity_pct: float
+    wbgt_c: float
+    risk_score: float
+    risk_level: str
+    vulnerability_tag: str
+    summary_advisory: str
+
+
+class AreaRiskOverviewResponse(BaseModel):
+    count: int
+    updated_at: str
+    areas: List[AreaRiskOverviewItem]

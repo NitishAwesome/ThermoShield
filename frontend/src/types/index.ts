@@ -180,3 +180,57 @@ export interface RegisterCredentials {
   password?: string;
   role?: string;
 }
+
+export interface PersonalRiskRequest {
+  age: number;
+  smoking?: boolean;
+  health_conditions?: string[];
+  physical_activity?: 'sedentary' | 'light' | 'moderate' | 'heavy' | string;
+  is_pregnant?: boolean;
+  hydration_status?: 'well_hydrated' | 'moderate' | 'dehydrated' | string;
+  outdoor_exposure_hours?: number;
+  clothing_type?: 'light' | 'standard' | 'heavy_protective' | string;
+  temperature_c?: number | null;
+  humidity_pct?: number | null;
+  wbgt_c?: number | null;
+  solar_radiation?: number | null;
+}
+
+export interface PersonalRiskFactorContribution {
+  factor: string;
+  contribution: number;
+  category: string;
+  description: string;
+}
+
+export interface PersonalRiskResult {
+  risk_score: number;
+  risk_level: RiskLevel;
+  heat_strain_level: string;
+  alert: string;
+  recommended_water_intake_ml_hr: number;
+  work_rest_cycle: string;
+  risk_factors_breakdown: PersonalRiskFactorContribution[];
+  safety_recommendations: string[];
+}
+
+export interface AreaRiskItem {
+  name: string;
+  state: string;
+  zone: string;
+  latitude: number;
+  longitude: number;
+  temperature_c: number;
+  humidity_pct: number;
+  wbgt_c: number;
+  risk_score: number;
+  risk_level: RiskLevel;
+  vulnerability_tag: string;
+  summary_advisory: string;
+}
+
+export interface AreasRiskOverviewResponse {
+  count: number;
+  updated_at: string;
+  areas: AreaRiskItem[];
+}

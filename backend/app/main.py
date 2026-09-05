@@ -34,11 +34,11 @@ from app.services.alert_engine import (
     get_alert_priority,
 )
 
-from app.database.models import Location, User, Risk
-from app.database.connection import get_db
+from app.database.models import Location, User, Risk, Alert, Intervention
+from app.database.connection import get_db, engine, Base
 
 from app.services.risk import predict_risk
-from app.services.map_services import get_location_risk
+from app.services.map_services import get_location_risk, get_all_areas_risk_overview
 from app.services.intervention import generate_interventions
 from app.services.simulator import simulate_intervention
 from app.services.sms import send_sms
@@ -112,6 +112,15 @@ app = FastAPI(
     title="SIH26083 Heat Health API",
     version="1.0.0"
 )
+
+@app.on_event("startup")
+def on_startup():
+    try:
+        from app.database import models  # noqa: F401
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables initialized successfully.")
+    except Exception as e:
+        logger.warning(f"Database initialization warning: {e}")
 
 app.include_router(personal_risk_router)
 # ==================================================
@@ -994,6 +1003,19 @@ async def map_risk(
         "count": len(results),
         "locations": results
     }
+
+
+# ==================================================
+# ALL AREAS HEAT RISK OVERVIEW
+# ==================================================
+
+@app.get("/areas/risk-overview")
+async def areas_risk_overview():
+    """
+    Returns multi-area heat-health risk intelligence across major Indian municipal zones.
+    Provides immediate visibility for guest users and regional monitoring.
+    """
+    return await get_all_areas_risk_overview()
 
 
 # ==================================================

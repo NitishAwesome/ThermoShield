@@ -16,7 +16,8 @@ import {
   ShieldCheck,
   Building2,
   Flame,
-  ActivitySquare
+  ActivitySquare,
+  HeartPulse,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -50,6 +51,7 @@ export const Navbar: React.FC = () => {
 
   const navItems = [
     { to: '/', label: 'Dashboard', icon: Activity },
+    { to: '/personal-risk', label: 'Personal Risk', icon: HeartPulse, isPersonal: true },
     { to: '/forecast', label: 'Forecast', icon: Calendar },
     { to: '/risk-details', label: 'Risk Analysis', icon: Layers },
     { to: '/alerts', label: 'Alerts & Guidance', icon: Bell },
@@ -122,12 +124,19 @@ export const Navbar: React.FC = () => {
                     `flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                       isActive
                         ? 'bg-slate-800 text-cyan-400 border border-slate-700 shadow-sm'
+                        : item.isPersonal && isAuthenticated
+                        ? 'text-orange-300 hover:text-white hover:bg-orange-500/10'
                         : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                     }`
                   }
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className={`w-4 h-4 ${item.isPersonal ? (isAuthenticated ? 'text-orange-400' : 'text-slate-400') : ''}`} />
                   <span>{item.label}</span>
+                  {item.isPersonal && isAuthenticated && (
+                    <span className="ml-1 px-1.5 py-0.2 text-[9px] font-bold rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30">
+                      My Risk
+                    </span>
+                  )}
                 </NavLink>
               );
             })}
@@ -180,6 +189,14 @@ export const Navbar: React.FC = () => {
                     </div>
 
                     <div className="p-1">
+                      <NavLink
+                        to="/personal-risk"
+                        onClick={() => setDropdownOpen(false)}
+                        className="flex items-center space-x-2.5 px-3 py-2 text-xs text-orange-300 hover:text-white hover:bg-orange-500/10 rounded-xl transition-colors font-semibold"
+                      >
+                        <HeartPulse className="w-4 h-4 text-orange-400" />
+                        <span>My Personal Risk Calculator</span>
+                      </NavLink>
                       <NavLink
                         to="/alerts"
                         onClick={() => setDropdownOpen(false)}
