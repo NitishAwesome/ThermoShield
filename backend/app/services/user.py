@@ -4,14 +4,15 @@ from app.database.models import User
 from app.schemas import UserCreate
 
 def create_user(
-    db:Session,
+    db: Session,
     user_data: UserCreate
 ):
     user = User(
         name=user_data.name,
         phone_number=user_data.phone_number,      
         email=user_data.email,
-        role=user_data.role
+        role=user_data.role,
+        password_hash="UNSET_PASSWORD_RESET_REQUIRED"
     )
     db.add(user)
     db.commit()

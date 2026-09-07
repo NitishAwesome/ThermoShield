@@ -16,6 +16,22 @@ export const getRiskColor = (level: RiskLevel | string | undefined): string => {
   }
 };
 
+export const getRiskBgColor = (level: RiskLevel | string | undefined): string => {
+  switch (level?.toUpperCase()) {
+    case 'LOW':
+      return 'rgba(16, 185, 129, 0.15)';
+    case 'MODERATE':
+      return 'rgba(245, 158, 11, 0.15)';
+    case 'HIGH':
+      return 'rgba(249, 115, 22, 0.15)';
+    case 'EXTREME':
+    case 'CRITICAL':
+      return 'rgba(239, 68, 68, 0.15)';
+    default:
+      return 'rgba(107, 114, 128, 0.15)';
+  }
+};
+
 export const getRiskBadgeStyles = (level: RiskLevel | string | undefined) => {
   switch (level?.toUpperCase()) {
     case 'LOW':

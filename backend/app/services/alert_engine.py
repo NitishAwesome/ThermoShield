@@ -1,9 +1,9 @@
 def should_create_alert(risk_level: str) -> bool:
     """
-    Decide whether a risk level requires an alert.
+    Decide whether a risk level requires a database alert entry.
     """
 
-    return risk_level in ["HIGH", "EXTREME"]
+    return risk_level.upper().strip() in ["MODERATE", "HIGH", "EXTREME"]
 
 
 def get_alert_priority(risk_level: str) -> str:

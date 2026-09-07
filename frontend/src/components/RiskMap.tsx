@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap, useMapEvents } from 'react-leaflet';
-import { Navigation, AlertCircle, Loader2 } from 'lucide-react';
+import { Navigation, AlertCircle, Loader2, Info } from 'lucide-react';
 import L from 'leaflet';
 import { RiskLevel, MapLocationRisk } from '../types';
 import { getRiskColor } from '../utils/risk';
+import { Card, CardHeader, CardContent, Badge } from './ui';
 
 // Fix leaflet default marker icon in React
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -26,6 +27,7 @@ interface RiskMapProps {
   isLoadingMap?: boolean;
   mapError?: string | null;
   onMapClick?: (lat: number, lon: number) => void;
+  className?: string;
 }
 
 // Helper to recenter map when center prop changes
@@ -62,177 +64,182 @@ export const RiskMap: React.FC<RiskMapProps> = ({
   isLoadingMap = false,
   mapError = null,
   onMapClick,
+  className = '',
 }) => {
   const currentRiskColor = getRiskColor(riskLevel);
 
   return (
-    <div className="rounded-2xl bg-slate-800/90 border border-slate-700/80 p-4 shadow-xl backdrop-blur-md relative">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 mb-3 border-b border-slate-700/60 gap-2">
-        <div className="flex items-center space-x-2">
-          <Navigation className="w-5 h-5 text-cyan-400" />
-          <h3 className="text-base font-bold text-slate-100 font-sans">
-            Interactive Thermal Risk GIS Map
-          </h3>
-          {isLoadingMap && (
-            <Loader2 className="w-3.5 h-3.5 text-cyan-400 animate-spin ml-2" />
-          )}
-        </div>
-        <div className="flex items-center space-x-3 text-xs text-slate-400">
-          <span className="flex items-center space-x-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <span>Low</span>
-          </span>
-          <span className="flex items-center space-x-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-            <span>Mod</span>
-          </span>
-          <span className="flex items-center space-x-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
-            <span>High</span>
-          </span>
-          <span className="flex items-center space-x-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
-            <span className="text-red-400 font-bold">Extreme</span>
-          </span>
-        </div>
-      </div>
+    <Card className={`overflow-hidden ${className}`}>
+      <CardHeader
+        title="Geospatial Heat Strain Layer"
+        subtitle="Interactive spatial distribution of biometeorological thermal strain across municipal coordinates."
+        badge={
+          <Badge variant="brand" size="sm">
+            Live GIS
+          </Badge>
+        }
+        action={
+          <div className="flex items-center space-x-2 sm:space-x-3 text-xs">
+            <span className="flex items-center space-x-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+              <span className="ts-text-muted text-[11px] font-semibold hidden xs:inline">LOW</span>
+            </span>
+            <span className="flex items-center space-x-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+              <span className="ts-text-muted text-[11px] font-semibold hidden xs:inline">MODERATE</span>
+            </span>
+            <span className="flex items-center space-x-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+              <span className="ts-text-muted text-[11px] font-semibold hidden xs:inline">HIGH</span>
+            </span>
+            <span className="flex items-center space-x-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-red-400 text-[11px] font-bold">EXTREME</span>
+            </span>
+          </div>
+        }
+      />
+      <CardContent className="space-y-3">
+        {/* Map Error Banner if /map/risk fails */}
+        {mapError && (
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
+            <span>Map risk layer notice: {mapError}. Displaying base geographic view.</span>
+          </div>
+        )}
 
-      {/* Map Error Banner if /map/risk fails */}
-      {mapError && (
-        <div className="mb-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center space-x-2">
-          <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
-          <span>Map risk layer unavailable: {mapError}. Displaying base geographic view.</span>
-        </div>
-      )}
-
-      {/* Map Canvas */}
-      <div className="relative h-[340px] sm:h-[420px] w-full rounded-xl overflow-hidden border border-slate-700 shadow-inner">
-        <MapContainer
-          center={center}
-          zoom={zoom}
-          scrollWheelZoom={true}
-          style={{ height: '100%', width: '100%' }}
-        >
-          <MapRecenter center={center} />
-          <MapClickHandler onMapClick={onMapClick} />
-
-          {/* CartoDB Voyager tile layer */}
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-
-          {/* Primary selected location heat risk radius circle */}
-          <Circle
+        {/* Map Canvas */}
+        <div className="relative h-[340px] sm:h-[420px] w-full rounded-xl overflow-hidden border ts-border shadow-inner">
+          <MapContainer
             center={center}
-            radius={25000}
-            pathOptions={{
-              color: currentRiskColor,
-              fillColor: currentRiskColor,
-              fillOpacity: 0.35,
-              weight: 2,
-            }}
-          />
+            zoom={zoom}
+            scrollWheelZoom={true}
+            style={{ height: '100%', width: '100%' }}
+          >
+            <MapRecenter center={center} />
+            <MapClickHandler onMapClick={onMapClick} />
 
-          {/* Selected Location Marker */}
-          <Marker position={center}>
-            <Popup className="custom-popup">
-              <div className="p-1 min-w-[200px]">
-                <div className="flex items-center justify-between border-b border-slate-700 pb-1 mb-2">
-                  <span className="font-bold text-slate-100 text-sm">{locationName}</span>
-                  <span
-                    className="px-2 py-0.5 rounded text-[10px] font-bold uppercase text-white"
-                    style={{ backgroundColor: currentRiskColor }}
-                  >
-                    {riskLevel}
-                  </span>
-                </div>
-                <div className="space-y-1 text-xs text-slate-300">
-                  {temperature !== undefined && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Temperature:</span>
-                      <span className="font-bold text-slate-100">{temperature.toFixed(1)}°C</span>
-                    </div>
-                  )}
-                  {humidity !== undefined && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Humidity:</span>
-                      <span className="font-bold text-slate-100">{Math.round(humidity)}%</span>
-                    </div>
-                  )}
-                  {wbgt !== undefined && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Estimated WBGT:</span>
-                      <span className="font-bold text-cyan-400">{wbgt.toFixed(1)}°C</span>
-                    </div>
-                  )}
-                  {riskScore !== undefined && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Thermal Score:</span>
-                      <span className="font-bold text-slate-100">{riskScore.toFixed(2)} / 1.00</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Popup>
-          </Marker>
+            {/* Tile layer */}
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
 
-          {/* Real Backend /map/risk Location Hotspots */}
-          {mapLocations.map((loc, idx) => {
-            const locColor = getRiskColor(loc.risk_level);
-            return (
-              <React.Fragment key={`${loc.latitude}-${loc.longitude}-${idx}`}>
-                <Circle
-                  center={[loc.latitude, loc.longitude]}
-                  radius={20000}
-                  pathOptions={{
-                    color: locColor,
-                    fillColor: locColor,
-                    fillOpacity: 0.25,
-                    weight: 1.5,
-                  }}
-                />
-                <Marker
-                  position={[loc.latitude, loc.longitude]}
-                  eventHandlers={{
-                    click: () => {
-                      if (onMapClick) onMapClick(loc.latitude, loc.longitude);
-                    },
-                  }}
-                >
-                  <Popup>
-                    <div className="p-1 min-w-[180px]">
-                      <div className="flex items-center justify-between border-b border-slate-700 pb-1 mb-1.5">
-                        <span className="font-bold text-xs text-slate-200">
-                          {loc.latitude.toFixed(3)}°N, {loc.longitude.toFixed(3)}°E
-                        </span>
-                        <span
-                          className="px-1.5 py-0.2 rounded text-[10px] font-bold text-white uppercase"
-                          style={{ backgroundColor: locColor }}
-                        >
-                          {loc.risk_level}
-                        </span>
+            {/* Primary selected location heat risk radius circle */}
+            <Circle
+              center={center}
+              radius={25000}
+              pathOptions={{
+                color: currentRiskColor,
+                fillColor: currentRiskColor,
+                fillOpacity: 0.35,
+                weight: 2,
+              }}
+            />
+
+            {/* Selected Location Marker */}
+            <Marker position={center}>
+              <Popup className="custom-popup">
+                <div className="p-1 min-w-[210px]">
+                  <div className="flex items-center justify-between border-b ts-border pb-1 mb-2">
+                    <span className="font-bold ts-text-primary text-sm">{locationName}</span>
+                    <span
+                      className="px-2 py-0.5 rounded text-[10px] font-bold uppercase text-white"
+                      style={{ backgroundColor: currentRiskColor }}
+                    >
+                      {riskLevel}
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 text-xs ts-text-muted">
+                    {riskScore !== undefined && (
+                      <div className="flex justify-between">
+                        <span className="ts-text-subtle">Strain Score:</span>
+                        <span className="font-bold ts-text-primary">{riskScore.toFixed(2)} / 1.00</span>
                       </div>
-                      <p className="text-xs text-slate-300">
-                        ML Health Risk Score: <span className="font-bold text-slate-100">{loc.risk_score.toFixed(1)} / 100</span>
-                      </p>
-                      <p className="text-[10px] text-cyan-400 mt-1 cursor-pointer">
-                        Click to focus location
-                      </p>
+                    )}
+                    {temperature !== undefined && (
+                      <div className="flex justify-between">
+                        <span className="ts-text-subtle">Air Temperature:</span>
+                        <span className="font-bold ts-text-primary">{temperature.toFixed(1)}°C</span>
+                      </div>
+                    )}
+                    {humidity !== undefined && (
+                      <div className="flex justify-between">
+                        <span className="ts-text-subtle">Relative Humidity:</span>
+                        <span className="font-bold ts-text-primary">{Math.round(humidity)}%</span>
+                      </div>
+                    )}
+                    <div className="pt-1.5 border-t ts-border text-[11px] text-orange-400">
+                      <strong>Action: </strong>
+                      {riskLevel === 'EXTREME' || riskLevel === 'HIGH'
+                        ? 'Hydrate frequently and limit unshaded direct labor.'
+                        : 'Routine hydration recommended.'}
                     </div>
-                  </Popup>
-                </Marker>
-              </React.Fragment>
-            );
-          })}
-        </MapContainer>
-      </div>
+                    {wbgt !== undefined && (
+                      <div className="pt-1 text-[10px] ts-text-subtle">
+                        Estimated WBGT: {wbgt.toFixed(1)}°C
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
 
-      <div className="mt-2 text-right">
-        <span className="text-[11px] text-slate-400">
-          💡 Click anywhere on the map to query live weather and thermal stress for that coordinate.
-        </span>
-      </div>
-    </div>
+            {/* Additional Map Regional Locations */}
+            {mapLocations.map((loc, idx) => {
+              const locColor = getRiskColor(loc.risk_level);
+              return (
+                <React.Fragment key={idx}>
+                  <Circle
+                    center={[loc.latitude, loc.longitude]}
+                    radius={20000}
+                    pathOptions={{
+                      color: locColor,
+                      fillColor: locColor,
+                      fillOpacity: 0.25,
+                      weight: 1.5,
+                    }}
+                  />
+                  <Marker position={[loc.latitude, loc.longitude]}>
+                    <Popup className="custom-popup">
+                      <div className="p-1 min-w-[190px]">
+                        <div className="flex items-center justify-between border-b ts-border pb-1 mb-1.5">
+                          <span className="font-bold ts-text-primary text-xs">
+                            {loc.latitude.toFixed(3)}°N, {loc.longitude.toFixed(3)}°E
+                          </span>
+                          <span
+                            className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase text-white"
+                            style={{ backgroundColor: locColor }}
+                          >
+                            {loc.risk_level}
+                          </span>
+                        </div>
+                        <div className="text-xs ts-text-muted space-y-1">
+                          <div className="flex justify-between">
+                            <span className="ts-text-subtle">Civic Risk Score:</span>
+                            <span className="font-mono font-bold ts-text-primary">
+                              {loc.risk_score.toFixed(1)} / 100
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </Popup>
+                  </Marker>
+                </React.Fragment>
+              );
+            })}
+          </MapContainer>
+        </div>
+
+        {/* Legend / Tip */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] ts-text-muted pt-1">
+          <div className="flex items-center space-x-1.5">
+            <Info className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+            <span>Click any coordinate on the map to recalculate local thermal stress and civic risk.</span>
+          </div>
+          <span className="ts-text-subtle">Map telemetry © OpenStreetMap</span>
+        </div>
+      </CardContent>
+    </Card>
   );
 };

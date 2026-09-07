@@ -2,6 +2,9 @@
 __pycache__/
 *.py[codz]
 *$py.class
+*.db
+*.sqlite
+*.sqlite3
 
 # C extensions
 *.so
@@ -232,3 +235,5 @@ yarn-debug.log*
 yarn-error.log*
 
 
+frontend/node_modules/
+.neon

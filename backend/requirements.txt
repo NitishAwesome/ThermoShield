@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+httpx
+pydantic[email]
+email-validator
+python-dotenv
+pandas
+numpy
+scikit-learn
+joblib
+sqlalchemy
+psycopg2-binary
+alembic
+pyjwt
+bcrypt

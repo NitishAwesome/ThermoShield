@@ -3,58 +3,236 @@
 @tailwind utilities;
 
 @layer base {
+  /* Calm Command Center Dark Mode (Default) */
+  :root,
+  html.dark {
+    --bg-app: #080d1a;
+    --bg-surface: #0f172a;
+    --bg-surface-elevated: #152238;
+    --bg-surface-subtle: #111c30;
+    --border-app: #1e2e4a;
+    --border-strong: #2f456c;
+    --text-main: #f8fafc;
+    --text-muted: #cbd5e1; /* High contrast readable secondary text */
+    --text-subtle: #94a3b8; /* Clearly visible metadata */
+    --accent-brand: #ea580c;
+  }
+
+  /* Intentionally Designed Professional Light Mode */
+  html.light {
+    --bg-app: #f8fafc;
+    --bg-surface: #ffffff;
+    --bg-surface-elevated: #f1f5f9;
+    --bg-surface-subtle: #f8fafc;
+    --border-app: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --text-main: #0f172a;
+    --text-muted: #334155; /* High contrast dark secondary text */
+    --text-subtle: #64748b; /* Clearly visible metadata */
+    --accent-brand: #ea580c;
+  }
+
   body {
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: var(--bg-app);
+    color: var(--text-main);
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    transition: background-color 0.15s ease, color 0.15s ease;
+    overflow-x: hidden;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Outfit', 'Inter', sans-serif;
   }
+
+  /* Accessible focus indicators */
+  *:focus-visible {
+    outline: 2px solid #ea580c;
+    outline-offset: 2px;
+  }
 }
 
-/* Custom scrollbar */
+/* Reusable Theme System Components */
+@layer components {
+  .ts-card {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-app);
+    border-radius: 1rem;
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.08);
+    transition: border-color 0.15s ease;
+  }
+
+  .ts-card:hover {
+    border-color: var(--border-strong);
+  }
+
+  .ts-card-elevated {
+    background-color: var(--bg-surface-elevated);
+    border: 1px solid var(--border-app);
+    border-radius: 0.875rem;
+  }
+
+  .ts-card-subtle {
+    background-color: var(--bg-surface-subtle);
+    border: 1px solid var(--border-app);
+    border-radius: 0.75rem;
+  }
+
+  .ts-border {
+    border-color: var(--border-app);
+  }
+
+  .ts-text-primary {
+    color: var(--text-main);
+  }
+
+  .ts-text-muted {
+    color: var(--text-muted);
+  }
+
+  .ts-text-subtle {
+    color: var(--text-subtle);
+  }
+
+  .ts-input {
+    background-color: var(--bg-surface-elevated);
+    color: var(--text-main);
+    border: 1px solid var(--border-app);
+    border-radius: 0.75rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .ts-input:focus {
+    outline: none;
+    border-color: #ea580c;
+    box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.15);
+  }
+}
+
+/* Light mode seamless surface adaptation for legacy slate containers */
+html.light .bg-slate-900,
+html.light .bg-slate-900\/95,
+html.light .bg-slate-900\/90,
+html.light .bg-slate-900\/80,
+html.light .bg-slate-900\/60,
+html.light .bg-slate-900\/50,
+html.light .bg-slate-900\/40,
+html.light .bg-slate-950,
+html.light .bg-slate-950\/60,
+html.light .bg-slate-950\/40,
+html.light .bg-slate-800,
+html.light .bg-slate-800\/90,
+html.light .bg-slate-800\/80,
+html.light .bg-slate-800\/70,
+html.light .bg-slate-800\/60,
+html.light .bg-slate-800\/40,
+html.light .bg-slate-800\/30 {
+  background-color: var(--bg-surface) !important;
+  color: var(--text-main);
+  border-color: var(--border-app) !important;
+}
+
+html.light .border-slate-800,
+html.light .border-slate-800\/90,
+html.light .border-slate-800\/80,
+html.light .border-slate-700,
+html.light .border-slate-700\/80,
+html.light .border-slate-700\/70,
+html.light .border-slate-700\/60,
+html.light .border-slate-700\/50 {
+  border-color: var(--border-app) !important;
+}
+
+html.light .text-slate-100,
+html.light .text-white {
+  color: var(--text-main) !important;
+}
+
+html.light .text-slate-200,
+html.light .text-slate-300 {
+  color: var(--text-muted) !important;
+}
+
+html.light .text-slate-400 {
+  color: var(--text-subtle) !important;
+}
+
+/* Light Mode Semantic Badge Contrast Hardening */
+html.light .bg-emerald-500\/15 {
+  background-color: #ecfdf5 !important;
+  color: #065f46 !important;
+  border-color: #a7f3d0 !important;
+}
+
+html.light .bg-amber-500\/15 {
+  background-color: #fffbeb !important;
+  color: #92400e !important;
+  border-color: #fde68a !important;
+}
+
+html.light .bg-orange-500\/15,
+html.light .bg-orange-500\/10 {
+  background-color: #fff7ed !important;
+  color: #9a3412 !important;
+  border-color: #fed7aa !important;
+}
+
+html.light .bg-red-500\/20,
+html.light .bg-red-500\/15,
+html.light .bg-red-500\/10 {
+  background-color: #fef2f2 !important;
+  color: #991b1b !important;
+  border-color: #fecaca !important;
+}
+
+html.light .bg-sky-500\/15 {
+  background-color: #f0f9ff !important;
+  color: #075985 !important;
+  border-color: #bae6fd !important;
+}
+
+/* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: var(--bg-app);
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--border-strong);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #64748b;
 }
 
-/* Leaflet dark styling */
+/* Leaflet Container Theme-Aware Styling */
 .leaflet-container {
   width: 100%;
   height: 100%;
-  border-radius: 0.75rem;
-  background-color: #0f172a !important;
+  border-radius: 0.875rem;
+  background-color: var(--bg-app) !important;
   z-index: 10;
 }
 
 .leaflet-popup-content-wrapper {
-  background-color: #1e293b !important;
-  color: #f1f5f9 !important;
+  background-color: var(--bg-surface) !important;
+  color: var(--text-main) !important;
   border-radius: 0.75rem !important;
-  border: 1px solid #334155 !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+  border: 1px solid var(--border-app) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2) !important;
 }
 
 .leaflet-popup-tip {
-  background-color: #1e293b !important;
+  background-color: var(--bg-surface) !important;
 }
 
 .leaflet-control-zoom-in, .leaflet-control-zoom-out {
-  background-color: #1e293b !important;
-  color: #f8fafc !important;
-  border-color: #334155 !important;
+  background-color: var(--bg-surface) !important;
+  color: var(--text-main) !important;
+  border-color: var(--border-app) !important;
 }
 
 .leaflet-control-zoom-in:hover, .leaflet-control-zoom-out:hover {
-  background-color: #334155 !important;
+  background-color: var(--bg-surface-elevated) !important;
 }

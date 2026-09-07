@@ -33,6 +33,7 @@ RESULTS_DIR = BASE_DIR / "results"
 
 DATA_FILE = DATA_DIR / "health_risk_data.csv"
 MODEL_FILE = MODEL_DIR / "risk_model.pkl"
+BACKEND_MODEL_FILE = BASE_DIR / "backend" / "app" / "models" / "risk_model.pkl"
 EVALUATION_FILE = RESULTS_DIR / "evaluation.json"
 
 
@@ -659,7 +660,7 @@ def generate_forecast(
 # --------------------------------------------------
 
 def save_model(model):
-    """Save trained model."""
+    """Save trained model to models/ and backend/app/models/."""
 
     MODEL_DIR.mkdir(
         parents=True,
@@ -673,6 +674,20 @@ def save_model(model):
 
     print(
         f"Model saved to: {MODEL_FILE}"
+    )
+
+    BACKEND_MODEL_FILE.parent.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    joblib.dump(
+        model,
+        BACKEND_MODEL_FILE
+    )
+
+    print(
+        f"Backend model saved to: {BACKEND_MODEL_FILE}"
     )
 
 
@@ -916,5 +931,6 @@ def main_heatwave():
     )
 
 if __name__ == "__main__":
+    main()
     main_heatwave()
 

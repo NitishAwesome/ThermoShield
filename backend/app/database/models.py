@@ -29,7 +29,8 @@ class User(Base):
     phone_number = Column(
         String(20),
         nullable=False,
-        unique=True
+        unique=True,
+        index=True
     )
 
     email = Column(
@@ -43,6 +44,25 @@ class User(Base):
         String(20),
         nullable=False,
         default="user"
+    )
+
+    password_hash = Column(
+        String(255),
+        nullable=False,
+        default=""
+    )
+
+    created_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow
+    )
+
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
     )
 
     alerts = relationship(
@@ -67,7 +87,8 @@ class Location(Base):
     name = Column(
         String(100),
         nullable=False,
-        unique=True
+        unique=True,
+        index=True
     )
 
     latitude = Column(
@@ -152,13 +173,15 @@ class Risk(Base):
 
     risk_level = Column(
         String(20),
-        nullable=False
+        nullable=False,
+        index=True
     )
 
     created_at = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow
+        default=datetime.utcnow,
+        index=True
     )
 
 # --------------------------------------------------
@@ -216,7 +239,8 @@ class Alert(Base):
     status = Column(
         String(20),
         nullable=False,
-        default="PENDING"
+        default="PENDING",
+        index=True
     )
 
     phone_number = Column(
@@ -232,7 +256,8 @@ class Alert(Base):
     created_at = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow
+        default=datetime.utcnow,
+        index=True
     )
 
 # --------------------------------------------------
@@ -302,5 +327,6 @@ class Intervention(Base):
     created_at = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow
+        default=datetime.utcnow,
+        index=True
     )

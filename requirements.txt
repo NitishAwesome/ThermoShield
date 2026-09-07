@@ -1,7 +1,8 @@
 fastapi
 uvicorn[standard]
 httpx
-pydantic
+pydantic[email]
+email-validator
 python-dotenv
 pandas
 numpy
@@ -10,3 +11,5 @@ joblib
 sqlalchemy
 psycopg2-binary
 alembic
+pyjwt
+bcrypt

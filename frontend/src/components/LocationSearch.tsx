@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, MapPin, Navigation, Loader2, X } from 'lucide-react';
+import { Search, MapPin, Navigation, Loader2, X, AlertCircle } from 'lucide-react';
 import { api } from '../services/api';
 import { LocationItem } from '../types';
 
@@ -21,8 +21,13 @@ export const LocationSearch: React.FC<LocationSearchProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
+  const [hasSearched, setHasSearched] = useState(false);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef<number>(0);
+  const lastExecutedQueryRef = useRef<string>('');
 
   // Close on outside click
   useEffect(() => {
@@ -35,38 +40,81 @@ export const LocationSearch: React.FC<LocationSearchProps> = ({
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
-  // Debounced search query
+  // Debounced search query with strict AbortController and sequence versioning
   useEffect(() => {
-    if (query.trim().length < 2) {
+    const trimmed = query.trim();
+
+    // Cancel any previous in-flight HTTP request immediately on new keystroke
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    if (trimmed.length < 2) {
       setSuggestions([]);
       setIsOpen(false);
       setSelectedIndex(-1);
+      setIsLoading(false);
+      setHasSearched(false);
+      lastExecutedQueryRef.current = '';
       return;
     }
 
+    // Increment request sequence ID
+    const currentRequestId = ++requestIdRef.current;
+
     const timer = setTimeout(async () => {
+      // Create fresh AbortController for this request
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      lastExecutedQueryRef.current = trimmed;
       setIsLoading(true);
+      setHasSearched(true);
+
       try {
-        const res = await api.searchLocations(query.trim());
-        const locs = res.locations || [];
-        setSuggestions(locs);
-        setIsOpen(locs.length > 0);
-        setSelectedIndex(-1);
-      } catch (err) {
-        console.error('Location search failed:', err);
-      } finally {
-        setIsLoading(false);
+        const res = await api.searchLocations(trimmed, controller.signal);
+
+        // Version guard: only commit state if this request is still the newest active one
+        if (currentRequestId === requestIdRef.current) {
+          const locs = res.locations || [];
+          setSuggestions(locs);
+          setIsOpen(true);
+          setSelectedIndex(-1);
+          setIsLoading(false);
+        }
+      } catch (err: any) {
+        // Silently ignore aborted/cancelled requests without altering valid state
+        if (err.name === 'CanceledError' || err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+          return;
+        }
+        if (currentRequestId === requestIdRef.current) {
+          console.error('Location search failed:', err);
+          setIsLoading(false);
+        }
       }
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+    };
   }, [query]);
+
+  // Clean up on component unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const handleSelect = (loc: LocationItem) => {
     onSelectLocation(loc);
     setQuery('');
+    setSuggestions([]);
     setIsOpen(false);
     setSelectedIndex(-1);
+    setHasSearched(false);
     inputRef.current?.blur();
   };
 
@@ -92,34 +140,36 @@ export const LocationSearch: React.FC<LocationSearchProps> = ({
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
         {/* Search Input Box */}
         <div className="relative flex-1">
-          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-            <Search className="w-4 h-4 text-cyan-400" />
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none ts-text-muted">
+            <Search className="w-4 h-4 text-orange-400" />
           </div>
           <input
             ref={inputRef}
             type="text"
-            className="w-full pl-10 pr-10 py-2.5 bg-slate-800/95 border border-slate-700/90 rounded-xl text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-inner"
-            placeholder="Search city, ward, or region (e.g. Mumbai, Jaipur, Delhi, Bengaluru)..."
+            className="w-full pl-10 pr-10 py-2.5 ts-input text-sm ts-text-primary placeholder:text-slate-400 focus:outline-none transition-all shadow-inner"
+            placeholder="Search city, ward, or district (e.g. Mumbai, Jaipur, Delhi, Bengaluru)..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             onFocus={() => {
-              if (suggestions.length > 0) setIsOpen(true);
+              if (query.trim().length >= 2) setIsOpen(true);
             }}
           />
           {isLoading && (
             <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center">
-              <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />
+              <Loader2 className="w-4 h-4 text-orange-400 animate-spin" />
             </div>
           )}
           {!isLoading && query && (
             <button
+              type="button"
               onClick={() => {
                 setQuery('');
                 setSuggestions([]);
                 setIsOpen(false);
+                setHasSearched(false);
               }}
-              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-200 cursor-pointer"
+              className="absolute inset-y-0 right-0 pr-3.5 flex items-center ts-text-muted hover:ts-text-primary cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -128,60 +178,71 @@ export const LocationSearch: React.FC<LocationSearchProps> = ({
 
         {/* Use My Location Button */}
         <button
+          type="button"
           onClick={onUseMyLocation}
           disabled={isLocating}
-          className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 rounded-xl text-sm font-semibold text-cyan-400 hover:text-cyan-300 transition-all shadow-sm disabled:opacity-50 cursor-pointer flex-shrink-0"
+          className="flex items-center justify-center space-x-2 px-4 py-2.5 ts-card-subtle hover:bg-slate-800/80 border ts-border rounded-xl text-sm font-semibold text-orange-400 hover:text-orange-300 transition-all shadow-sm disabled:opacity-50 cursor-pointer flex-shrink-0"
           title="Detect Current GPS Location"
         >
           {isLocating ? (
-            <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+            <Loader2 className="w-4 h-4 animate-spin text-orange-400" />
           ) : (
-            <Navigation className="w-4 h-4 text-cyan-400" />
+            <Navigation className="w-4 h-4 text-orange-400" />
           )}
           <span>{isLocating ? 'Locating...' : 'Use My Location'}</span>
         </button>
       </div>
 
-      {/* Autocomplete Suggestions Dropdown: High z-index floating above cards */}
-      {isOpen && suggestions.length > 0 && (
-        <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-slate-900 border border-cyan-500/40 rounded-xl shadow-2xl max-h-72 overflow-y-auto divide-y divide-slate-800 ring-1 ring-black">
-          {suggestions.map((loc, idx) => {
-            const isHighlighted = idx === selectedIndex;
-            return (
-              <button
-                key={`${loc.latitude}-${loc.longitude}-${idx}`}
-                onClick={() => handleSelect(loc)}
-                onMouseDown={(e) => {
-                  // Prevent input blur before click registers
-                  e.preventDefault();
-                  handleSelect(loc);
-                }}
-                onMouseEnter={() => setSelectedIndex(idx)}
-                className={`w-full px-4 py-3 text-left flex items-start space-x-3 transition-colors cursor-pointer group ${
-                  isHighlighted ? 'bg-cyan-950 border-l-2 border-cyan-400' : 'bg-slate-900 hover:bg-slate-800'
-                }`}
-              >
-                <MapPin className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0 group-hover:scale-110 transition-transform" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-slate-100 truncate group-hover:text-cyan-200">
-                    {loc.name}
-                  </p>
-                  <p className="text-xs text-slate-400 font-mono mt-0.5">
-                    {loc.latitude.toFixed(4)}° N, {loc.longitude.toFixed(4)}° E
-                  </p>
-                </div>
-              </button>
-            );
-          })}
+      {/* Autocomplete Suggestions Dropdown */}
+      {isOpen && (
+        <div className="absolute left-0 right-0 top-full mt-1.5 z-50 ts-card-elevated border ts-border rounded-xl shadow-2xl max-h-72 overflow-y-auto divide-y ts-border ring-1 ring-black/10">
+          {suggestions.length > 0 ? (
+            suggestions.map((loc, idx) => {
+              const isHighlighted = idx === selectedIndex;
+              return (
+                <button
+                  type="button"
+                  key={`${loc.latitude}-${loc.longitude}-${idx}`}
+                  onClick={() => handleSelect(loc)}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSelect(loc);
+                  }}
+                  onMouseEnter={() => setSelectedIndex(idx)}
+                  className={`w-full px-4 py-3 text-left flex items-start space-x-3 transition-colors cursor-pointer group ${
+                    isHighlighted ? 'bg-orange-500/15 border-l-2 border-orange-500' : 'hover:bg-slate-800/40'
+                  }`}
+                >
+                  <MapPin className="w-4 h-4 text-orange-400 mt-0.5 flex-shrink-0 group-hover:scale-110 transition-transform" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold ts-text-primary truncate group-hover:text-orange-300">
+                      {loc.name}
+                    </p>
+                    <p className="text-xs ts-text-muted font-mono mt-0.5">
+                      {loc.latitude.toFixed(4)}° N, {loc.longitude.toFixed(4)}° E
+                    </p>
+                  </div>
+                </button>
+              );
+            })
+          ) : (
+            !isLoading && hasSearched && (
+              <div className="px-4 py-5 text-center ts-text-muted text-xs flex flex-col items-center">
+                <AlertCircle className="w-5 h-5 text-slate-400 mb-1" />
+                <span>No matching locations found for "{query}".</span>
+                <span className="text-[11px] ts-text-subtle mt-0.5">Try searching by major city or district name.</span>
+              </div>
+            )
+          )}
         </div>
       )}
 
       {/* Current Active Location Badge */}
       {currentLocationName && (
-        <div className="mt-2 flex items-center space-x-2 text-xs text-slate-400">
-          <MapPin className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
-          <span>Active Location:</span>
-          <span className="font-semibold text-slate-200 truncate">{currentLocationName}</span>
+        <div className="mt-2.5 flex items-center space-x-2 text-xs ts-text-muted">
+          <MapPin className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+          <span>Active Monitored Zone:</span>
+          <span className="font-semibold ts-text-primary truncate">{currentLocationName}</span>
         </div>
       )}
     </div>

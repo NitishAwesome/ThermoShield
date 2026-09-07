@@ -149,6 +149,57 @@ class TestWeatherService(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(cm.exception.status_code, 503)
 
+    async def test_nighttime_solar_radiation_clamped_to_zero(self):
+        # Open-Meteo returns is_day: 0 at night
+        payload = {
+            "current": {
+                "temperature_2m": 27.0,
+                "relative_humidity_2m": 80.0,
+                "wind_speed_10m": 3.0,
+                "shortwave_radiation": 0.0,
+                "is_day": 0,
+                "time": "2026-08-29T23:00",
+            },
+            "daily": {
+                "time": ["2026-08-29"],
+                "temperature_2m_max": [32.0],
+                "temperature_2m_min": [25.0],
+            },
+        }
+        fake_client = FakeAsyncClient(FakeResponse(payload))
+
+        with patch("backend.app.services.weather.httpx.AsyncClient", return_value=fake_client):
+            result = await get_weather(19.0760, 72.8777)
+
+        self.assertEqual(result["weather"]["solar_radiation"], 0.0)
+        self.assertEqual(result["weather"]["is_day"], 0)
+        self.assertEqual(result["weather"]["time"], "2026-08-29T23:00")
+
+    async def test_daytime_solar_radiation_passed_through(self):
+        # Open-Meteo returns is_day: 1 during midday
+        payload = {
+            "current": {
+                "temperature_2m": 34.0,
+                "relative_humidity_2m": 50.0,
+                "wind_speed_10m": 2.5,
+                "shortwave_radiation": 750.0,
+                "is_day": 1,
+                "time": "2026-08-29T13:00",
+            },
+            "daily": {
+                "time": ["2026-08-29"],
+                "temperature_2m_max": [36.0],
+                "temperature_2m_min": [26.0],
+            },
+        }
+        fake_client = FakeAsyncClient(FakeResponse(payload))
+
+        with patch("backend.app.services.weather.httpx.AsyncClient", return_value=fake_client):
+            result = await get_weather(19.0760, 72.8777)
+
+        self.assertEqual(result["weather"]["solar_radiation"], 750.0)
+        self.assertEqual(result["weather"]["is_day"], 1)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
