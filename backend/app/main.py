@@ -22,6 +22,7 @@ from app.auth.router import (
     require_admin_or_official,
 )
 from app.routers.personal_risk import router as personal_risk_router
+from app.services.firebase_service import update_live_risk
 
 from fastapi import FastAPI, Query, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -872,6 +873,8 @@ async def risk(
     saved_risk = None
     alert = None
     user = None
+    # Publish current risk to Firebase for real-time dashboard state
+    firebase_live_risk = None
 
     try:
         location = get_location_by_coordinates(db, lat, lon)
@@ -900,6 +903,20 @@ async def risk(
                 risk_level=risk_result["risk_level"],
             )
             saved_risk = create_risk(db, risk_data)
+            try:
+                firebase_live_risk = update_live_risk(
+                location_id=str(location.id),
+                location=location.name,
+                risk_score=risk_result["risk_score"],
+                risk_level=risk_result["risk_level"],
+                thermal_risk_level=thermal_result["risk_assessment"]["level"],
+                status="ACTIVE",
+            )
+            except Exception as exc:
+                logger.warning(
+                    "Firebase live-risk update failed: %s",
+                exc,
+            )
 
             # --------------------------------------------------
             # 8. DATABASE ALERT DECISION ENGINE
@@ -1047,6 +1064,7 @@ async def risk(
 
         "sms_alert": sms_alert,
         "email_alert_status": email_status,
+        "firebase_live_risk": firebase_live_risk,
     }
 
 

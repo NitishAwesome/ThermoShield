@@ -237,3 +237,6 @@ yarn-error.log*
 
 frontend/node_modules/
 .neon
+
+# Firebase credentials
+secrets/
