@@ -5,9 +5,10 @@ from typing import Optional
 from datetime import datetime, timedelta
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, status, Header
+import bcrypt
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
@@ -21,8 +22,6 @@ router = APIRouter(
     tags=["Authentication"]
 )
 
-# JWT Configuration
-JWT_SECRET = os.getenv("JWT_SECRET", "thermoshield-super-secret-jwt-key-sih26083-2026")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 
@@ -30,20 +29,75 @@ security = HTTPBearer(auto_error=False)
 
 
 # ==================================================
+# JWT SECRET RESOLUTION
+# ==================================================
+
+def get_jwt_secret() -> str:
+    """
+    Retrieve JWT secret from environment.
+    Fails safely and loudly in production if the secret is missing.
+    In local development without .env, provides a development-only fallback with warning.
+    """
+    secret = os.getenv("JWT_SECRET")
+    if secret and secret.strip():
+        return secret.strip()
+
+    is_production = (
+        os.getenv("ENVIRONMENT", "").lower() in ("production", "prod")
+        or os.getenv("RENDER", "").lower() in ("true", "1")
+    )
+    if is_production:
+        raise RuntimeError(
+            "CRITICAL: JWT_SECRET environment variable is missing in production. "
+            "The application will not start without a securely configured JWT_SECRET."
+        )
+
+    logger.warning(
+        "JWT_SECRET is unset in the environment. Using temporary local development key. "
+        "DO NOT USE IN PRODUCTION."
+    )
+    return "dev-local-jwt-secret-key-not-for-production-min32bytes"
+
+
+# ==================================================
+# PASSWORD HASHING HELPERS
+# ==================================================
+
+def hash_password(password: str) -> str:
+    """Hash plaintext password using bcrypt with salt."""
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify plaintext password against a stored bcrypt hash safely."""
+    if not plain_password or not hashed_password:
+        return False
+    try:
+        return bcrypt.checkpw(
+            plain_password.encode("utf-8"),
+            hashed_password.encode("utf-8")
+        )
+    except Exception:
+        # Protect against malformed hashes or legacy unmigrated sentinel strings
+        return False
+
+
+# ==================================================
 # SCHEMAS
 # ==================================================
 
 class UserRegister(BaseModel):
-    name: str
+    name: str = Field(..., min_length=2, max_length=100)
     email: EmailStr
-    phone_number: str
-    password: Optional[str] = None
+    phone_number: str = Field(..., min_length=7, max_length=20)
+    password: str = Field(..., min_length=8, description="Password must be at least 8 characters long")
     role: Optional[str] = "user"
 
 
 class UserLogin(BaseModel):
-    email: str
-    password: Optional[str] = None
+    email: str = Field(..., description="Email address or phone number")
+    password: str = Field(..., min_length=1, description="Account password")
 
 
 class AuthResponse(BaseModel):
@@ -69,13 +123,15 @@ def create_access_token(user: User) -> str:
         "exp": expire,
         "iat": datetime.utcnow()
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    secret = get_jwt_secret()
+    return jwt.encode(payload, secret, algorithm=JWT_ALGORITHM)
 
 
 def decode_access_token(token: str) -> dict:
     """Validate and decode a JWT token."""
+    secret = get_jwt_secret()
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, secret, algorithms=[JWT_ALGORITHM])
         return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(
@@ -122,6 +178,40 @@ def get_current_user(
     return user
 
 
+def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """FastAPI dependency to optionally retrieve user if token is provided, else None."""
+    if not credentials or not credentials.credentials:
+        return None
+    try:
+        payload = decode_access_token(credentials.credentials)
+        user_id = payload.get("user_id")
+        if user_id is None:
+            return None
+        return db.query(User).filter(User.id == int(user_id)).first()
+    except Exception:
+        return None
+
+
+def require_roles(*allowed_roles: str):
+    """Factory dependency for role-based authorization."""
+    def role_checker(current_user: User = Depends(get_current_user)) -> User:
+        user_role = (current_user.role or "user").strip().lower()
+        normalized = [r.strip().lower() for r in allowed_roles]
+        if user_role not in normalized:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access forbidden: action requires one of the following roles: {allowed_roles}."
+            )
+        return current_user
+    return role_checker
+
+
+require_admin_or_official = require_roles("admin", "official")
+
+
 # ==================================================
 # AUTH ENDPOINTS
 # ==================================================
@@ -130,13 +220,19 @@ def get_current_user(
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 def register(user_data: UserRegister, db: Session = Depends(get_db)):
     """
-    Register a new user account and return a JWT access token.
-    Works directly with the existing User database model without schema alteration.
+    Register a new user account with secure password hashing and return a JWT access token.
+    Enforces minimum password requirements and verifies uniqueness of email/phone.
     """
     cleaned_email = user_data.email.strip().lower()
     cleaned_phone = user_data.phone_number.strip()
     cleaned_name = user_data.name.strip()
     role = (user_data.role or "user").strip().lower()
+
+    if len(user_data.password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long."
+        )
 
     if not cleaned_name:
         raise HTTPException(
@@ -160,11 +256,14 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
             detail=f"An account with phone number '{cleaned_phone}' already exists."
         )
 
-    # Create new User using existing DB Model
+    # Hash password securely
+    hashed = hash_password(user_data.password)
+
     new_user = User(
         name=cleaned_name,
         email=cleaned_email,
         phone_number=cleaned_phone,
+        password_hash=hashed,
         role=role
     )
 
@@ -192,13 +291,16 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
 @router.post("/login", response_model=AuthResponse)
 def login(login_data: UserLogin, db: Session = Depends(get_db)):
     """
-    Log in an existing user using email or phone number and return a JWT access token.
+    Log in an existing user using email or phone number and verified password.
+    Returns generic unauthorized error on mismatch to prevent account enumeration.
     """
     identifier = login_data.email.strip()
-    if not identifier:
+    password = login_data.password
+
+    if not identifier or not password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email or phone number is required."
+            detail="Email/phone number and password are required."
         )
 
     # Query user by email (case-insensitive) or phone number
@@ -211,10 +313,11 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
         .first()
     )
 
-    if not user:
+    # Constant-time comparison / generic error message to prevent enumeration
+    if not user or not verify_password(password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Account not found with provided credentials. Please register or check your entry.",
+            detail="Invalid email/phone number or password.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -231,5 +334,6 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
 def get_current_user_profile(current_user: User = Depends(get_current_user)):
     """
     Retrieve the profile of the currently authenticated user.
+    Returns safe user information only (never exposes password hashes or tokens).
     """
     return UserResponse.model_validate(current_user)

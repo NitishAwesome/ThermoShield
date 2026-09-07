@@ -42,19 +42,38 @@ elif DATABASE_URL.startswith("sqlite:///") and not DATABASE_URL.startswith("sqli
 
 
 def _create_database_engine(url: str):
-    connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
-    eng = create_engine(url, pool_pre_ping=True, connect_args=connect_args)
-    # Test connection if remote database
-    if not url.startswith("sqlite"):
-        try:
-            with eng.connect():
-                logger.info(f"PostgreSQL connection verified successfully: {url.split('@')[-1]}")
-        except Exception as err:
-            logger.warning(
-                f"PostgreSQL connection failed ({err}). "
-                f"Falling back safely to local SQLite at {sqlite_url}"
+    is_prod = os.getenv("ENVIRONMENT", "development").lower() == "production"
+    is_sqlite = url.startswith("sqlite")
+
+    if is_sqlite:
+        connect_args = {"check_same_thread": False}
+        return create_engine(url, pool_pre_ping=True, connect_args=connect_args)
+
+    # PostgreSQL / Remote relational database connection
+    engine_kwargs = {
+        "pool_pre_ping": True,
+        "pool_size": int(os.getenv("DB_POOL_SIZE", "10")),
+        "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "20")),
+        "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "1800")),
+    }
+    eng = create_engine(url, **engine_kwargs)
+
+    try:
+        with eng.connect():
+            sanitized_target = url.split("@")[-1] if "@" in url else "postgres"
+            logger.info(f"PostgreSQL connection verified successfully ({sanitized_target})")
+    except Exception as err:
+        if is_prod or os.getenv("ALLOW_SQLITE_FALLBACK", "false" if is_prod else "true").lower() not in ("true", "1", "yes"):
+            raise RuntimeError(
+                f"CRITICAL: Failed to connect to PostgreSQL database in production ({err}). "
+                "Silent SQLite fallback is disabled in production to prevent ephemeral data loss on Render."
             )
-            eng = create_engine(sqlite_url, pool_pre_ping=True, connect_args={"check_same_thread": False})
+        logger.warning(
+            f"PostgreSQL connection failed ({err}). "
+            f"Development mode: Falling back to local SQLite at {sqlite_url}"
+        )
+        eng = create_engine(sqlite_url, pool_pre_ping=True, connect_args={"check_same_thread": False})
+
     return eng
 
 
@@ -84,13 +103,27 @@ def get_db():
 
 
 # --------------------------------------------------
-# CREATE DATABASE TABLES SAFELY
+# DATABASE INITIALIZATION
 # --------------------------------------------------
-try:
-    try:
-        from backend.app.database import models  # noqa: F401
-    except ImportError:
-        from app.database import models  # noqa: F401
-    Base.metadata.create_all(bind=engine)
-except Exception as e:
-    logger.warning(f"Database initialization warning (tables not created automatically): {e}")
+def init_db():
+    """Initialize database tables for development and testing environments.
+    In production (ENVIRONMENT=production), schema evolution must be managed via
+    Alembic migrations ('alembic upgrade head') to avoid uncoordinated DDL.
+    """
+    is_prod = os.getenv("ENVIRONMENT", "development").lower() == "production"
+    auto_create = os.getenv("AUTO_CREATE_TABLES", "false" if is_prod else "true").lower() in ("true", "1", "yes")
+
+    if is_prod and auto_create:
+        logger.info("Production mode detected: skipping runtime Base.metadata.create_all(). Use Alembic migrations.")
+        return
+
+    if auto_create:
+        try:
+            try:
+                from app.database import models  # noqa: F401
+            except ImportError:
+                from backend.app.database import models  # noqa: F401
+            Base.metadata.create_all(bind=engine)
+            logger.info("Development/Test database tables verified via create_all().")
+        except Exception as e:
+            logger.warning(f"Database initialization warning: {e}")

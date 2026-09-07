@@ -16,7 +16,7 @@ sys.path.insert(0, str(BASE_DIR))
 load_dotenv(BASE_DIR.parent / ".env")
 
 from app.database.connection import Base
-from app.database.models import User, Location, Risk, Alert
+from app.database.models import User, Location, Risk, Alert, Intervention
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -24,7 +24,12 @@ config = context.config
 
 database_url = os.getenv("DATABASE_URL")
 if not database_url:
-    raise RuntimeError("DATABASE_URL is not configured in .env")
+    sqlite_path = BASE_DIR / "thermoshield.db"
+    database_url = f"sqlite:///{sqlite_path.as_posix()}"
+
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
 config.set_main_option(
     "sqlalchemy.url",
     database_url

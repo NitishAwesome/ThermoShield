@@ -31,7 +31,9 @@ class TestBackendIntegration(unittest.TestCase):
 
         res = asyncio.run(run_req())
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.json(), {"status": "healthy"})
+        data = res.json()
+        self.assertEqual(data["status"], "healthy")
+        self.assertIn(data["database"], ["sqlite", "postgresql"])
 
     def test_02_weather_wind_speed_unit(self):
         """Test GET /weather returns live weather with wind_speed in m/s."""

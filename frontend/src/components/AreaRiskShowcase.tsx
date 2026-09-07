@@ -12,6 +12,8 @@ import {
   Lock,
   Compass,
   RefreshCw,
+  Filter,
+  CheckCircle2,
 } from 'lucide-react';
 import { AreaRiskItem } from '../types';
 import { api } from '../services/api';
@@ -19,6 +21,7 @@ import { getRiskColor, getRiskBgColor } from '../utils/risk';
 import { useLocation } from '../context/LocationContext';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
+import { Badge } from './ui';
 
 interface AreaRiskShowcaseProps {
   onSelectArea?: (area: AreaRiskItem) => void;
@@ -29,8 +32,8 @@ interface AreaRiskShowcaseProps {
 
 export const AreaRiskShowcase: React.FC<AreaRiskShowcaseProps> = ({
   onSelectArea,
-  title = 'Multi-Area Heat Risk Intelligence Matrix',
-  subtitle = 'Comprehensive biometeorological strain & civic healthcare vulnerability across major Indian regions',
+  title = 'All-Area Municipal Heat Risk Matrix',
+  subtitle = 'Multi-city surveillance: Track which municipal zones face acute heat stress, why the risk exists, and immediate public safety actions.',
   isGuestView = false,
 }) => {
   const { locationName, setLocation } = useLocation();
@@ -41,14 +44,14 @@ export const AreaRiskShowcase: React.FC<AreaRiskShowcaseProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedZone, setSelectedZone] = useState<string>('ALL');
-  const [selectedSeverity, setSelectedSeverity] = useState<string>('ALL');
+  const [selectedSeverity, setSelectedSeverity] = useState<'ALL' | 'CRITICAL_HIGH'>('ALL');
 
   const fetchAreas = async () => {
     setIsLoading(true);
     setError(null);
     try {
       const res = await api.getAreasRiskOverview();
-      setAreas(res.areas);
+      setAreas(res.areas || []);
     } catch (err: any) {
       console.error('Failed to load multi-area risk overview:', err);
       setError('Unable to fetch live multi-area risk matrix. Retrying with fallback cache.');
@@ -66,20 +69,24 @@ export const AreaRiskShowcase: React.FC<AreaRiskShowcaseProps> = ({
     return ['ALL', ...Array.from(zones)];
   }, [areas]);
 
+  // Strict, unambiguous filter logic:
+  // If CRITICAL_HIGH is active, only areas with normalized level of HIGH, EXTREME, or CRITICAL are included.
   const filteredAreas = useMemo(() => {
     return areas.filter((area) => {
+      const query = searchQuery.toLowerCase().trim();
       const matchesSearch =
-        area.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        area.state.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        area.vulnerability_tag.toLowerCase().includes(searchQuery.toLowerCase());
+        !query ||
+        area.name.toLowerCase().includes(query) ||
+        area.state.toLowerCase().includes(query) ||
+        area.vulnerability_tag.toLowerCase().includes(query);
 
       const matchesZone = selectedZone === 'ALL' || area.zone === selectedZone;
 
+      const level = (area.risk_level || '').toUpperCase().trim();
       const matchesSeverity =
-        selectedSeverity === 'ALL' ||
-        (selectedSeverity === 'CRITICAL_HIGH' &&
-          (area.risk_level === 'EXTREME' || area.risk_level === 'HIGH' || area.risk_level === 'CRITICAL')) ||
-        area.risk_level === selectedSeverity;
+        selectedSeverity === 'ALL'
+          ? true
+          : level === 'HIGH' || level === 'EXTREME' || level === 'CRITICAL';
 
       return matchesSearch && matchesZone && matchesSeverity;
     });
@@ -87,9 +94,11 @@ export const AreaRiskShowcase: React.FC<AreaRiskShowcaseProps> = ({
 
   const stats = useMemo(() => {
     const total = areas.length;
-    const severeCount = areas.filter(
-      (a) => a.risk_level === 'EXTREME' || a.risk_level === 'HIGH' || a.risk_level === 'CRITICAL'
-    ).length;
+    const severeCount = areas.filter((a) => {
+      const level = (a.risk_level || '').toUpperCase().trim();
+      return level === 'HIGH' || level === 'EXTREME' || level === 'CRITICAL';
+    }).length;
+
     const avgTemp =
       total > 0
         ? (areas.reduce((acc, curr) => acc + curr.temperature_c, 0) / total).toFixed(1)
@@ -115,45 +124,45 @@ export const AreaRiskShowcase: React.FC<AreaRiskShowcaseProps> = ({
     }
   };
 
-  return (
-    <div className="rounded-3xl bg-slate-900/90 border border-slate-800/90 p-5 sm:p-7 shadow-2xl backdrop-blur-xl relative overflow-hidden">
-      {/* Ambient background glow */}
-      <div className="absolute -top-24 -right-24 w-80 h-80 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+  const toggleHighExtreme = () => {
+    setSelectedSeverity((prev) => (prev === 'CRITICAL_HIGH' ? 'ALL' : 'CRITICAL_HIGH'));
+  };
 
+  return (
+    <div className="rounded-3xl ts-card p-5 sm:p-7 shadow-2xl relative overflow-hidden">
       {/* Guest Mode Callout Header */}
       {(!isAuthenticated || isGuestView) && (
-        <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-cyan-950/60 via-slate-900/80 to-orange-950/40 border border-cyan-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg">
+        <div className="mb-6 p-4 rounded-2xl bg-orange-500/10 border border-orange-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
           <div className="flex items-start space-x-3.5">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <Compass className="w-5 h-5 text-cyan-400 animate-pulse" />
+            <div className="w-10 h-10 rounded-xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Compass className="w-5 h-5 text-orange-400" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-cyan-300">
-                  Guest Public Explorer Mode
+                <span className="text-xs font-extrabold uppercase tracking-wider text-orange-400">
+                  Guest Public Explorer
                 </span>
-                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-cyan-500/20 text-cyan-200 border border-cyan-500/30">
-                  Live Multi-Area Risk
-                </span>
+                <Badge variant="brand" size="sm">
+                  Live National Surveillance
+                </Badge>
               </div>
-              <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
-                You are viewing the regional heat risk overview across all municipal areas. 
-                To calculate your <strong className="text-orange-400">Personalized Individual Heat Health Risk</strong> based on your age, pre-existing health conditions, and work hours, sign in to your account.
+              <p className="text-xs ts-text-muted mt-1 max-w-2xl leading-relaxed">
+                Viewing regional municipal heat risks. To calculate your{' '}
+                <strong className="ts-text-primary">Personalized Heat Stress Index</strong> based on your age, health conditions, and work hours, sign in to your profile.
               </p>
             </div>
           </div>
           <div className="flex items-center space-x-2.5 w-full md:w-auto flex-shrink-0">
             <Link
               to="/personal-risk"
-              className="flex-1 md:flex-none px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-md shadow-orange-500/20 transition-all flex items-center justify-center space-x-1.5"
+              className="flex-1 md:flex-none px-4 py-2 rounded-xl text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 transition-all flex items-center justify-center space-x-1.5 shadow-sm"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Individual Calculator</span>
+              <span>Personal Risk</span>
             </Link>
             <Link
               to="/login"
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors flex items-center space-x-1"
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold ts-text-muted hover:ts-text-primary ts-card-subtle border ts-border transition-colors flex items-center space-x-1"
             >
               <Lock className="w-3.5 h-3.5" />
               <span>Sign In</span>
@@ -163,77 +172,100 @@ export const AreaRiskShowcase: React.FC<AreaRiskShowcaseProps> = ({
       )}
 
       {/* Main Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-800">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b ts-border">
         <div>
           <div className="flex items-center space-x-2.5">
             <Building2 className="w-6 h-6 text-orange-400" />
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">{title}</h2>
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight ts-text-primary">{title}</h2>
           </div>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl">{subtitle}</p>
+          <p className="text-xs sm:text-sm ts-text-muted mt-1 max-w-3xl">{subtitle}</p>
         </div>
 
         <button
+          type="button"
           onClick={fetchAreas}
           disabled={isLoading}
-          className="self-start lg:self-auto flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-xs font-medium text-slate-300 hover:text-white transition-all disabled:opacity-50"
+          className="self-start lg:self-auto flex items-center space-x-1.5 px-3 py-1.5 rounded-xl ts-card-subtle hover:bg-white/[0.05] border ts-border text-xs font-medium ts-text-muted hover:ts-text-primary transition-all disabled:opacity-50 cursor-pointer"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-cyan-400' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-orange-400' : ''}`} />
           <span>Refresh All Areas</span>
         </button>
       </div>
 
-      {/* Summary KPI Counters */}
+      {/* Summary KPI Counters (Clickable for quick filtering) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-5">
-        <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
-          <div className="text-[11px] font-medium text-slate-400">Total Areas Monitored</div>
-          <div className="text-2xl font-black text-white mt-0.5">{stats.total} Areas</div>
-          <div className="text-[10px] text-cyan-400 mt-0.5">India National Network</div>
+        <div
+          onClick={() => {
+            setSelectedSeverity('ALL');
+            setSelectedZone('ALL');
+          }}
+          className={`p-3.5 rounded-2xl ts-card-subtle border transition-all cursor-pointer ${
+            selectedSeverity === 'ALL' ? 'border-orange-500/40 shadow-sm' : 'ts-border hover:border-slate-500/50'
+          }`}
+        >
+          <div className="text-[11px] font-medium ts-text-subtle">Total Areas Monitored</div>
+          <div className="text-2xl font-black ts-text-primary mt-0.5">{stats.total} Areas</div>
+          <div className="text-[10.5px] text-sky-400 font-medium mt-0.5">National Surveillance</div>
         </div>
 
-        <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
-          <div className="text-[11px] font-medium text-slate-400">High / Extreme Alerts</div>
-          <div className="text-2xl font-black text-orange-400 mt-0.5">{stats.severeCount} Areas</div>
-          <div className="text-[10px] text-orange-300/80 mt-0.5">Actionable Warning Active</div>
+        <div
+          onClick={toggleHighExtreme}
+          className={`p-3.5 rounded-2xl ts-card-subtle border transition-all cursor-pointer ${
+            selectedSeverity === 'CRITICAL_HIGH'
+              ? 'border-red-500/60 bg-red-500/10 shadow-sm'
+              : 'ts-border hover:border-red-500/40'
+          }`}
+          title="Click to toggle High/Extreme alerts filter"
+        >
+          <div className="text-[11px] font-medium ts-text-subtle flex items-center justify-between">
+            <span>High / Extreme Alerts</span>
+            <Flame className="w-3.5 h-3.5 text-red-400" />
+          </div>
+          <div className="text-2xl font-black text-red-400 mt-0.5">{stats.severeCount} Areas</div>
+          <div className="text-[10.5px] text-red-400 font-medium mt-0.5">
+            {selectedSeverity === 'CRITICAL_HIGH' ? 'Filter Active (Click to Show All)' : 'Click to Filter Severe Areas'}
+          </div>
         </div>
 
-        <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
-          <div className="text-[11px] font-medium text-slate-400">Average Air Temp</div>
+        <div className="p-3.5 rounded-2xl ts-card-subtle border ts-border">
+          <div className="text-[11px] font-medium ts-text-subtle">Average Air Temp</div>
           <div className="text-2xl font-black text-amber-400 mt-0.5">{stats.avgTemp}°C</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">Regional Macro Average</div>
+          <div className="text-[10.5px] ts-text-subtle mt-0.5">Regional Mean</div>
         </div>
 
-        <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
-          <div className="text-[11px] font-medium text-slate-400">Average Wet-Bulb Globe</div>
-          <div className="text-2xl font-black text-cyan-300 mt-0.5">{stats.avgWbgt}°C</div>
-          <div className="text-[10px] text-cyan-400/80 mt-0.5">ISO 7243 Human Heat Load</div>
+        <div className="p-3.5 rounded-2xl ts-card-subtle border ts-border">
+          <div className="text-[11px] font-medium ts-text-subtle">Average Wet-Bulb (WBGT)</div>
+          <div className="text-2xl font-black text-orange-400 mt-0.5">{stats.avgWbgt}°C</div>
+          <div className="text-[10.5px] ts-text-subtle mt-0.5">Human Heat Load</div>
         </div>
       </div>
 
       {/* Filters & Search Toolbar */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 mb-6 p-3 rounded-2xl bg-slate-950/60 border border-slate-800">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 mb-6 p-3 rounded-2xl ts-card-subtle border ts-border">
         {/* Search */}
         <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 ts-text-subtle absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Search by city, state, or vulnerability tag..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+            className="w-full pl-9 pr-4 py-2 ts-input text-xs ts-text-primary placeholder-slate-400 focus:outline-none"
           />
         </div>
 
         {/* Zone Selector */}
         <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-          <span className="text-[11px] text-slate-400 whitespace-nowrap pl-1">Zone:</span>
+          <span className="text-[11px] ts-text-subtle whitespace-nowrap pl-1">Zone:</span>
           {uniqueZones.map((zone) => (
             <button
               key={zone}
+              type="button"
               onClick={() => setSelectedZone(zone)}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
                 selectedZone === zone
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                  : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                  ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40 font-bold'
+                  : 'ts-card border ts-border ts-text-muted hover:ts-text-primary'
               }`}
             >
               {zone === 'ALL' ? 'All Zones' : zone}
@@ -241,37 +273,40 @@ export const AreaRiskShowcase: React.FC<AreaRiskShowcaseProps> = ({
           ))}
         </div>
 
-        {/* Severity Filter */}
+        {/* Severity Filter Toggle Button */}
         <div className="flex items-center space-x-1.5 flex-shrink-0">
           <button
+            type="button"
             onClick={() => setSelectedSeverity('ALL')}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
               selectedSeverity === 'ALL'
-                ? 'bg-slate-700 text-white'
-                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                ? 'bg-orange-500 text-white font-bold shadow-sm'
+                : 'ts-card border ts-border ts-text-muted hover:ts-text-primary'
             }`}
           >
             All Severities
           </button>
           <button
-            onClick={() => setSelectedSeverity('CRITICAL_HIGH')}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 ${
+            type="button"
+            onClick={toggleHighExtreme}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer ${
               selectedSeverity === 'CRITICAL_HIGH'
-                ? 'bg-red-500/20 text-red-300 border border-red-500/50'
-                : 'bg-slate-900 text-red-400 hover:bg-red-500/10 border border-slate-800'
+                ? 'bg-red-500 text-white shadow-sm border border-red-600'
+                : 'ts-card border border-red-500/30 text-red-400 hover:bg-red-500/10'
             }`}
           >
             <Flame className="w-3.5 h-3.5" />
             <span>High/Extreme Alerts</span>
+            {selectedSeverity === 'CRITICAL_HIGH' && <span className="ml-1 text-[10px]">✓</span>}
           </button>
         </div>
       </div>
 
       {/* Error alert */}
       {error && (
-        <div className="mb-5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between">
+        <div className="mb-5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={fetchAreas} className="underline hover:text-white font-bold ml-2">
+          <button type="button" onClick={fetchAreas} className="underline hover:text-amber-900 dark:hover:text-white font-bold ml-2 cursor-pointer">
             Retry
           </button>
         </div>
@@ -279,87 +314,168 @@ export const AreaRiskShowcase: React.FC<AreaRiskShowcaseProps> = ({
 
       {/* Grid of Areas */}
       {isLoading && areas.length === 0 ? (
-        <div className="py-16 text-center text-slate-400 text-sm">
-          <RefreshCw className="w-8 h-8 text-cyan-400 animate-spin mx-auto mb-3" />
-          <p>Synthesizing biometeorological observations across all regional municipal nodes...</p>
+        <div className="py-16 text-center ts-text-muted text-sm">
+          <RefreshCw className="w-8 h-8 text-orange-400 animate-spin mx-auto mb-3" />
+          <p>Synthesizing biometeorological observations across all municipal nodes...</p>
         </div>
       ) : filteredAreas.length === 0 ? (
-        <div className="py-12 text-center text-slate-400 text-xs bg-slate-950/40 rounded-2xl border border-slate-800/80">
-          <p>No area matches the current search or severity filter.</p>
+        <div className="py-12 text-center ts-text-muted text-xs ts-card-subtle rounded-2xl border ts-border p-6">
+          <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-2 opacity-80" />
+          <p className="font-semibold ts-text-primary text-sm">
+            {selectedSeverity === 'CRITICAL_HIGH'
+              ? 'No High or Extreme heat risks currently detected.'
+              : 'No areas match the current search or zone filters.'}
+          </p>
+          <p className="ts-text-subtle mt-1">
+            {selectedSeverity === 'CRITICAL_HIGH'
+              ? 'All monitored municipal zones are currently operating within Low or Moderate baseline heat thresholds.'
+              : 'Try clearing your search query or selecting All Zones.'}
+          </p>
           <button
+            type="button"
             onClick={() => {
               setSearchQuery('');
               setSelectedZone('ALL');
               setSelectedSeverity('ALL');
             }}
-            className="mt-2 text-cyan-400 hover:underline font-bold"
+            className="mt-4 px-4 py-2 rounded-xl text-xs font-bold text-orange-400 border border-orange-500/30 hover:bg-orange-500/10 transition-colors cursor-pointer"
           >
-            Clear Filters
+            Show All Monitored Areas
           </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredAreas.map((area) => {
             const riskColor = getRiskColor(area.risk_level);
-            const riskBg = getRiskBgColor(area.risk_level);
             const isActive = Boolean(
               locationName &&
               (locationName.toLowerCase().includes(area.name.toLowerCase()) ||
                area.name.toLowerCase().includes(locationName.toLowerCase().split(',')[0].trim()))
             );
 
+            // One-line risk explanation based on severity
+            const getRiskExplanation = (level: string) => {
+              const norm = (level || '').toUpperCase().trim();
+              if (norm === 'EXTREME' || norm === 'CRITICAL') {
+                return 'Dangerous thermal burden; acute risk of heat exhaustion and clinical emergency.';
+              }
+              if (norm === 'HIGH') {
+                return 'Substantial physiological strain; dangerous for outdoor workers and vulnerable groups.';
+              }
+              if (norm === 'MODERATE') {
+                return 'Elevated thermal discomfort; sensitive individuals should restrict continuous outdoor exposure.';
+              }
+              return 'Minimal heat hazard; conditions are currently within safe baseline margins.';
+            };
+
             return (
               <div
                 key={area.name}
-                className={`group relative rounded-2xl transition-all p-4 flex flex-col justify-between shadow-md hover:shadow-xl hover:-translate-y-0.5 duration-200 ${
+                className={`group relative rounded-2xl transition-all p-5 flex flex-col justify-between shadow-sm hover:shadow-md duration-150 h-full ${
                   isActive
-                    ? 'bg-slate-800/95 border-2 border-cyan-400 ring-2 ring-cyan-400/30 shadow-cyan-500/10'
-                    : 'bg-slate-800/70 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-600'
+                    ? 'ts-card-elevated border-2 border-orange-500 ring-2 ring-orange-500/20'
+                    : 'ts-card hover:border-slate-500/50'
                 }`}
               >
-                {/* Top: City & State + Risk Badge */}
                 <div>
+                  {/* 1. Location Name + Region & 2. Risk Status */}
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                        <h3 className={`text-base font-bold transition-colors ${isActive ? 'text-cyan-300' : 'text-white group-hover:text-cyan-300'}`}>
+                        <h3 className="text-base font-extrabold ts-text-primary transition-colors group-hover:text-orange-400">
                           {area.name}
                         </h3>
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-700/80 text-slate-300">
+                        <span className="px-2 py-0.5 rounded text-[11px] font-semibold ts-card-subtle border ts-border ts-text-muted">
                           {area.state}
                         </span>
                         {isActive && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 flex items-center space-x-1 animate-pulse">
-                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-orange-500/15 text-orange-400 border border-orange-500/40 flex items-center space-x-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
                             <span>Active Focus</span>
                           </span>
                         )}
                       </div>
-                      <span className="text-[10px] text-slate-400 font-medium">
-                        {area.zone}
+                      <span className="text-[11px] ts-text-muted font-medium block mt-0.5">
+                        {area.zone} Zone • Lat {area.latitude.toFixed(2)}, Lon {area.longitude.toFixed(2)}
                       </span>
                     </div>
 
-                    <span
-                      className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider text-white shadow-sm flex items-center space-x-1 flex-shrink-0"
-                      style={{ backgroundColor: riskColor }}
-                    >
-                      {area.risk_level === 'EXTREME' || area.risk_level === 'CRITICAL' ? (
-                        <Flame className="w-3 h-3 text-white animate-pulse" />
-                      ) : null}
-                      <span>{area.risk_level}</span>
-                    </span>
+                    {/* Risk Status Badge with High Contrast */}
+                    <Badge riskLevel={area.risk_level} size="sm" showDot showIcon>
+                      {area.risk_level}
+                    </Badge>
                   </div>
 
-                  {/* Risk Score Progress Bar */}
-                  <div className="mt-3">
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-slate-400 text-[11px]">Civic Health Risk Score</span>
-                      <span className="font-mono font-bold text-slate-200">
-                        {area.risk_score.toFixed(1)} / 100
+                  {/* 3. One-line Risk Explanation */}
+                  <p className="text-xs ts-text-muted font-normal mt-2.5 line-clamp-2 leading-relaxed">
+                    {getRiskExplanation(area.risk_level)}
+                  </p>
+
+                  {/* 4. Key Contributing Condition(s) */}
+                  <div className="mt-3.5 pt-3 border-t ts-border">
+                    <div className="text-[11px] font-semibold ts-text-muted mb-2 flex items-center justify-between">
+                      <span>Key Contributing Conditions</span>
+                      <span className="text-[10px] ts-text-subtle font-mono">WBGT {area.wbgt_c.toFixed(1)}°C</span>
+                    </div>
+
+                    {/* Weather Metrics Strip */}
+                    <div className="grid grid-cols-3 gap-2 py-2 px-2.5 rounded-xl ts-card-subtle border ts-border text-center">
+                      <div>
+                        <div className="text-[10px] ts-text-subtle flex items-center justify-center space-x-0.5 font-medium">
+                          <Thermometer className="w-3 h-3 text-amber-400" />
+                          <span>Air Temp</span>
+                        </div>
+                        <div className="text-xs font-bold ts-text-primary mt-0.5 font-mono">
+                          {area.temperature_c.toFixed(1)}°C
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-[10px] ts-text-subtle flex items-center justify-center space-x-0.5 font-medium">
+                          <Droplets className="w-3 h-3 text-sky-400" />
+                          <span>Humidity</span>
+                        </div>
+                        <div className="text-xs font-bold ts-text-primary mt-0.5 font-mono">
+                          {Math.round(area.humidity_pct)}%
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-[10px] ts-text-subtle flex items-center justify-center space-x-0.5 font-medium">
+                          <Flame className="w-3 h-3 text-orange-400" />
+                          <span>Wet-Bulb</span>
+                        </div>
+                        <div className="text-xs font-bold text-orange-400 mt-0.5 font-mono">
+                          {area.wbgt_c.toFixed(1)}°C
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Primary Vulnerability Factor */}
+                    <div className="mt-2.5 text-xs ts-text-muted flex items-start space-x-1.5 leading-snug">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                      <span><strong className="ts-text-primary font-semibold">Local Vulnerability:</strong> {area.vulnerability_tag}</span>
+                    </div>
+                  </div>
+
+                  {/* 5. Primary Recommended Action */}
+                  <div className="mt-3 text-xs ts-text-primary bg-orange-500/10 dark:bg-orange-500/15 border border-orange-500/30 p-2.5 rounded-xl flex items-start space-x-2 leading-relaxed">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-orange-500 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold text-orange-600 dark:text-orange-400 mr-1">Public Action:</span>
+                      <span className="ts-text-primary">{area.summary_advisory}</span>
+                    </div>
+                  </div>
+
+                  {/* Supporting Scientific Metric: Risk Score Progress Bar (Visually Secondary) */}
+                  <div className="mt-3.5 pt-2.5 border-t ts-border">
+                    <div className="flex justify-between text-[11px] mb-1">
+                      <span className="ts-text-subtle font-medium">Civic Health Risk Index</span>
+                      <span className="font-mono font-bold ts-text-muted text-xs">
+                        {area.risk_score.toFixed(1)} <span className="ts-text-subtle font-normal text-[10px]">/ 100</span>
                       </span>
                     </div>
-                    <div className="w-full h-1.5 bg-slate-700/80 rounded-full overflow-hidden">
+                    <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700/40 rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{
@@ -369,64 +485,20 @@ export const AreaRiskShowcase: React.FC<AreaRiskShowcaseProps> = ({
                       />
                     </div>
                   </div>
-
-                  {/* Weather Metrics Strip */}
-                  <div className="grid grid-cols-3 gap-2 mt-3.5 py-2 px-2.5 rounded-xl bg-slate-900/80 border border-slate-700/50 text-center">
-                    <div>
-                      <div className="text-[10px] text-slate-400 flex items-center justify-center space-x-0.5">
-                        <Thermometer className="w-2.5 h-2.5 text-amber-400" />
-                        <span>Temp</span>
-                      </div>
-                      <div className="text-xs font-bold text-white mt-0.5">
-                        {area.temperature_c.toFixed(1)}°C
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-[10px] text-slate-400 flex items-center justify-center space-x-0.5">
-                        <Droplets className="w-2.5 h-2.5 text-cyan-400" />
-                        <span>Humidity</span>
-                      </div>
-                      <div className="text-xs font-bold text-white mt-0.5">
-                        {Math.round(area.humidity_pct)}%
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-[10px] text-slate-400 flex items-center justify-center space-x-0.5">
-                        <Flame className="w-2.5 h-2.5 text-orange-400" />
-                        <span>WBGT</span>
-                      </div>
-                      <div className="text-xs font-bold text-orange-300 mt-0.5">
-                        {area.wbgt_c.toFixed(1)}°C
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Vulnerability Tag */}
-                  <div className="mt-3 text-[11px] text-slate-300 flex items-start space-x-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
-                    <span className="line-clamp-2 leading-tight">{area.vulnerability_tag}</span>
-                  </div>
-
-                  {/* Concise Advisory */}
-                  <div className="mt-2 text-[10px] text-slate-400 italic line-clamp-2">
-                    "{area.summary_advisory}"
-                  </div>
                 </div>
 
-                {/* Card Action Button: Inspect this area */}
+                {/* Card Action Button */}
                 <button
                   type="button"
                   onClick={() => handleSelect(area)}
-                  className={`mt-4 w-full py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 group/btn cursor-pointer ${
+                  className={`mt-4 w-full py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 cursor-pointer ${
                     isActive
-                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-lg shadow-cyan-500/25'
-                      : 'bg-slate-700/60 hover:bg-cyan-500/20 border border-slate-600/80 hover:border-cyan-500/40 text-slate-200 hover:text-cyan-300'
+                      ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-md'
+                      : 'ts-card-subtle hover:bg-white/[0.05] border ts-border ts-text-primary hover:text-orange-400'
                   }`}
                 >
-                  <span>{isActive ? '✓ Focused — Scroll to View Dashboard' : 'Focus Area on Dashboard & Map'}</span>
-                  <ArrowUpRight className={`w-3.5 h-3.5 transition-transform ${isActive ? '' : 'group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5'}`} />
+                  <span>{isActive ? '✓ Focused on Dashboard' : 'Focus Area on Dashboard & Map'}</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             );
