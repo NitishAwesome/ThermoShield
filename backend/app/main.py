@@ -15,6 +15,12 @@ for p in (str(project_root), str(backend_dir)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+from app.auth.router import (
+    router as auth_router,
+    get_current_user,
+    get_current_user_optional,
+    require_admin_or_official,
+)
 from app.routers.personal_risk import router as personal_risk_router
 
 from fastapi import FastAPI, Query, Depends, HTTPException, BackgroundTasks
