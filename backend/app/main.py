@@ -2,18 +2,19 @@ import os
 import sys
 import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from app.routers.personal_risk import router as personal_risk_router
-logger = logging.getLogger(__name__)
-
 # Ensure project root and backend are in sys.path
 backend_dir = Path(__file__).resolve().parent.parent
 project_root = backend_dir.parent
 for p in (str(project_root), str(backend_dir)):
     if p not in sys.path:
         sys.path.insert(0, p)
+
+from app.routers.personal_risk import router as personal_risk_router
 
 from fastapi import FastAPI, Query, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -822,29 +823,39 @@ async def risk(
             # 8. DATABASE ALERT DECISION ENGINE
             # --------------------------------------------------
             if should_create_alert(risk_result["risk_level"]):
-                user = db.query(User).filter(User.id == 1).first()
-                if user is not None:
-                    alert_message = (
-                        f"Heat health risk is "
-                        f"{risk_result['risk_level']} "
-                        f"at {location.name}."
+                user = db.query(User).first()
+                if not user:
+                    user = User(
+                        name="Alert Recipient",
+                        phone_number="9999999999",
+                        email=os.getenv("MAIL_USERNAME") or "alerts@thermoshield.org",
+                        role="official"
                     )
-                    alert_data = AlertCreate(
-                        user_id=user.id,
-                        location_id=location.id,
-                        risk_level=risk_result["risk_level"],
-                        risk_score=risk_result["risk_score"],
-                        message=alert_message,
-                        status="PENDING",
-                        phone_number=user.phone_number,
-                        reference_id=f"RISK-{saved_risk.id if saved_risk else 0}"
-                    )
-                    alert = create_alert(db, alert_data)
+                    db.add(user)
+                    db.commit()
+                    db.refresh(user)
+
+                alert_message = (
+                    f"Heat health risk is "
+                    f"{risk_result['risk_level']} "
+                    f"at {location.name}."
+                )
+                alert_data = AlertCreate(
+                    user_id=user.id,
+                    location_id=location.id,
+                    risk_level=risk_result["risk_level"],
+                    risk_score=risk_result["risk_score"],
+                    message=alert_message,
+                    status="PENDING",
+                    phone_number=user.phone_number,
+                    reference_id=f"RISK-{saved_risk.id if saved_risk else 0}"
+                )
+                alert = create_alert(db, alert_data)
     except Exception as e:
         logger.warning(f"Database persistence warning for /risk: {e}")
 
     # --------------------------------------------------
-    # 9. AUTOMATIC SMS & EMAIL ALERTS (HIGH / EXTREME HARDCODED FOR TESTING)
+    # 9. AUTOMATIC SMS & EMAIL ALERTS (HIGH / EXTREME ONLY)
     # --------------------------------------------------
 
     sms_alert = None
@@ -852,8 +863,8 @@ async def risk(
 
     current_risk_level = risk_result["risk_level"].upper().strip()
 
+    # Email and SMS are dispatched strictly for HIGH or EXTREME risk
     if current_risk_level in [
-        "MODERATE",
         "HIGH",
         "EXTREME"
     ]:
@@ -898,6 +909,13 @@ async def risk(
                 body=message
             )
             email_status = "queued"
+
+        if alert is not None:
+            try:
+                alert.status = "SENT"
+                db.commit()
+            except Exception as err:
+                logger.warning(f"Failed to update alert status: {err}")
 
 
     # --------------------------------------------------
@@ -1086,8 +1104,42 @@ async def intervention_simulation(
         except Exception as e:
             logger.warning(f"Database query warning in /intervention/simulate: {e}")
 
+    # Fallback to the latest calculated Risk if risk_id was not provided
+    if risk_obj is None:
+        try:
+            risk_obj = db.query(Risk).order_by(Risk.created_at.desc()).first()
+            if risk_obj is not None and effective_risk_score is None:
+                effective_risk_score = risk_obj.risk_score
+        except Exception as e:
+            logger.warning(f"Database query fallback warning in /intervention/simulate: {e}")
+
     if effective_risk_score is None:
         effective_risk_score = 50.0
+
+    # Ensure baseline location and risk exist so intervention is always persisted
+    if risk_obj is None:
+        try:
+            loc = db.query(Location).first()
+            if not loc:
+                loc = Location(name="Simulated Area", latitude=19.0760, longitude=72.8777)
+                db.add(loc)
+                db.commit()
+                db.refresh(loc)
+            risk_obj = Risk(
+                location_id=loc.id,
+                temperature_c=34.0,
+                thermal_stress=40.0,
+                heat_index=36.0,
+                wbgt=28.0,
+                predicted_health_impact_proxy=14.0,
+                risk_score=effective_risk_score,
+                risk_level="HIGH" if effective_risk_score >= 50 else "MODERATE"
+            )
+            db.add(risk_obj)
+            db.commit()
+            db.refresh(risk_obj)
+        except Exception as e:
+            logger.warning(f"Could not create baseline risk for intervention: {e}")
 
     # --------------------------------------------------
     # 2. RUN INTERVENTION SIMULATION

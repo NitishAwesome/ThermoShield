@@ -236,3 +236,4 @@ yarn-error.log*
 
 
 frontend/node_modules/
+.neon
