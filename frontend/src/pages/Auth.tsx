@@ -75,10 +75,14 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
         setLocalError('Please provide your email address or phone number.');
         return;
       }
+      if (!password.trim()) {
+        setLocalError('Please enter your password.');
+        return;
+      }
 
       setIsSubmitting(true);
       try {
-        await login({ email: email.trim(), password: password || undefined });
+        await login({ email: email.trim(), password: password });
         setSuccessMsg('Successfully logged in! Redirecting...');
         setTimeout(() => navigate('/'), 600);
       } catch (err: any) {
@@ -100,6 +104,10 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
         setLocalError('Please provide a valid contact phone number.');
         return;
       }
+      if (!password || password.length < 8) {
+        setLocalError('Password must be at least 8 characters long.');
+        return;
+      }
 
       setIsSubmitting(true);
       try {
@@ -107,7 +115,7 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
           name: name.trim(),
           email: email.trim().toLowerCase(),
           phone_number: phoneNumber.trim(),
-          password: password || undefined,
+          password: password,
           role: role,
         });
         setSuccessMsg('Account registered successfully! Welcome to ThermoShield.');

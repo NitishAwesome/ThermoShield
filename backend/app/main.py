@@ -1,11 +1,17 @@
 import os
 import sys
 import logging
+from typing import Optional, List, Dict, Any
 from pathlib import Path
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from app.routers.personal_risk import router as personal_risk_router
+from app.auth.router import (
+    router as auth_router,
+    get_current_user,
+    get_current_user_optional,
+    require_admin_or_official,
+    hash_password,
+)
+from app.services.email import send_notification_email
 logger = logging.getLogger(__name__)
 
 # Ensure project root and backend are in sys.path
@@ -19,7 +25,6 @@ from fastapi import FastAPI, Query, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
-from app.auth.router import router as auth_router
 from app.services.location import search_location
 from app.services.weather import get_weather, get_forecast
 
@@ -34,8 +39,9 @@ from app.services.alert_engine import (
     get_alert_priority,
 )
 
+from sqlalchemy import text
 from app.database.models import Location, User, Risk, Alert, Intervention
-from app.database.connection import get_db, engine, Base
+from app.database.connection import get_db, engine, Base, init_db
 
 from app.services.risk import predict_risk
 from app.services.map_services import get_location_risk, get_all_areas_risk_overview
@@ -113,12 +119,64 @@ app = FastAPI(
     version="1.0.0"
 )
 
+
+def _seed_demo_accounts_if_needed():
+    """Ensure standard judging demo personas exist with valid hashed password 'demo12345'."""
+    db = next(get_db())
+    try:
+        demo_accounts = [
+            {
+                "name": "Dr. Aarav Sharma",
+                "email": "aarav.sharma@health.gov.in",
+                "phone_number": "+91 9811223344",
+                "role": "official",
+            },
+            {
+                "name": "Rajesh Verma (NDRF)",
+                "email": "rajesh.verma@disastermgmt.gov.in",
+                "phone_number": "+91 9822334455",
+                "role": "responder",
+            },
+            {
+                "name": "Pooja Iyer (IMD)",
+                "email": "pooja.iyer@imd.gov.in",
+                "phone_number": "+91 9833445566",
+                "role": "analyst",
+            },
+            {
+                "name": "Siddharth Patel",
+                "email": "siddharth.patel@gmail.com",
+                "phone_number": "+91 9844556677",
+                "role": "user",
+            },
+        ]
+        demo_hash = hash_password("demo12345")
+        for account in demo_accounts:
+            existing = db.query(User).filter(User.email == account["email"]).first()
+            if not existing:
+                user = User(
+                    name=account["name"],
+                    email=account["email"],
+                    phone_number=account["phone_number"],
+                    role=account["role"],
+                    password_hash=demo_hash
+                )
+                db.add(user)
+            elif existing.password_hash == "UNSET_PASSWORD_RESET_REQUIRED":
+                existing.password_hash = demo_hash
+        db.commit()
+    except Exception as err:
+        db.rollback()
+        logger.warning(f"Demo accounts initialization notice: {err}")
+    finally:
+        db.close()
+
+
 @app.on_event("startup")
 def on_startup():
     try:
-        from app.database import models  # noqa: F401
-        Base.metadata.create_all(bind=engine)
-        logger.info("Database tables initialized successfully.")
+        init_db()
+        _seed_demo_accounts_if_needed()
     except Exception as e:
         logger.warning(f"Database initialization warning: {e}")
 
@@ -159,38 +217,7 @@ app.include_router(auth_router)
 
 
 # ==================================================
-# EMAIL NOTIFICATION HELPER
-# ==================================================
-def send_notification_email(to_email: str, subject: str, body: str):
-    sender_email = os.getenv("MAIL_USERNAME")
-    sender_password = os.getenv("MAIL_PASSWORD")
-    smtp_server = os.getenv("MAIL_SERVER", "smtp.gmail.com")
-    smtp_port = int(os.getenv("MAIL_PORT", 587))
-
-    if not sender_email or not sender_password:
-        logger.warning("Mail credentials not configured. Skipping email dispatch.")
-        return {"status": "skipped", "message": "Missing credentials"}
-
-    message = MIMEMultipart()
-    message["From"] = sender_email
-    message["To"] = to_email
-    message["Subject"] = subject
-
-    message.attach(MIMEText(body, "plain"))
-
-    try:
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(sender_email, sender_password)
-            server.sendmail(sender_email, to_email, message.as_string())
-        return {"status": "success", "message": "Email sent successfully"}
-    except Exception as e:
-        logger.error(f"Failed to send email: {e}")
-        return {"status": "error", "message": str(e)}
-
-
-# ==================================================
-# USER CRUD
+# USER CRUD (PROTECTED)
 # ==================================================
 
 @app.post(
@@ -199,6 +226,7 @@ def send_notification_email(to_email: str, subject: str, body: str):
 )
 def create_user_api(
     user_data: UserCreate,
+    current_user: User = Depends(require_admin_or_official),
     db: Session = Depends(get_db)
 ):
     return create_user(
@@ -212,6 +240,7 @@ def create_user_api(
     response_model=list[UserResponse]
 )
 def get_users_api(
+    current_user: User = Depends(require_admin_or_official),
     db: Session = Depends(get_db)
 ):
     return get_users(db)
@@ -223,8 +252,15 @@ def get_users_api(
 )
 def get_user_api(
     user_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    if current_user.id != user_id and (current_user.role or "").lower() not in ["admin", "official"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Access forbidden: you may only view your own user profile."
+        )
+
     user = get_user(
         db,
         user_id
@@ -242,6 +278,7 @@ def get_user_api(
 @app.delete("/users/{user_id}")
 def delete_user_api(
     user_id: int,
+    current_user: User = Depends(require_admin_or_official),
     db: Session = Depends(get_db)
 ):
     deleted = delete_user(
@@ -270,6 +307,7 @@ def delete_user_api(
 )
 def create_location_api(
     location_data: LocationCreate,
+    current_user: User = Depends(require_admin_or_official),
     db: Session = Depends(get_db)
 ):
     return create_location(
@@ -313,6 +351,7 @@ def get_location_api(
 @app.delete("/locations/{location_id}")
 def delete_location_api(
     location_id: int,
+    current_user: User = Depends(require_admin_or_official),
     db: Session = Depends(get_db)
 ):
     deleted = delete_location(
@@ -341,6 +380,7 @@ def delete_location_api(
 )
 def create_risk_api(
     risk_data: RiskCreate,
+    current_user: User = Depends(require_admin_or_official),
     db: Session = Depends(get_db)
 ):
     return create_risk(
@@ -398,6 +438,7 @@ def get_location_risks_api(
 @app.delete("/risks/{risk_id}")
 def delete_risk_api(
     risk_id: int,
+    current_user: User = Depends(require_admin_or_official),
     db: Session = Depends(get_db)
 ):
     deleted = delete_risk(
@@ -417,7 +458,7 @@ def delete_risk_api(
 
 
 # ==================================================
-# ALERT CRUD
+# ALERT CRUD (PROTECTED)
 # ==================================================
 
 @app.post(
@@ -426,6 +467,7 @@ def delete_risk_api(
 )
 def create_alert_api(
     alert_data: AlertCreate,
+    current_user: User = Depends(require_admin_or_official),
     db: Session = Depends(get_db)
 ):
     return create_alert(
@@ -439,9 +481,12 @@ def create_alert_api(
     response_model=list[AlertResponse]
 )
 def get_alerts_api(
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    return get_alerts(db)
+    if (current_user.role or "").lower() in ["admin", "official"]:
+        return get_alerts(db)
+    return get_user_alerts(db, current_user.id)
 
 
 @app.get(
@@ -450,6 +495,7 @@ def get_alerts_api(
 )
 def get_alert_api(
     alert_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     alert = get_alert(
@@ -463,6 +509,12 @@ def get_alert_api(
             detail="Alert not found"
         )
 
+    if alert.user_id != current_user.id and (current_user.role or "").lower() not in ["admin", "official"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Access forbidden: you do not have permission to view this alert."
+        )
+
     return alert
 
 
@@ -472,8 +524,15 @@ def get_alert_api(
 )
 def get_user_alerts_api(
     user_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    if current_user.id != user_id and (current_user.role or "").lower() not in ["admin", "official"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Access forbidden: you may only view your own alerts."
+        )
+
     return get_user_alerts(
         db,
         user_id
@@ -486,6 +545,7 @@ def get_user_alerts_api(
 )
 def get_location_alerts_api(
     location_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     return get_location_alerts(
@@ -497,6 +557,7 @@ def get_location_alerts_api(
 @app.delete("/alerts/{alert_id}")
 def delete_alert_api(
     alert_id: int,
+    current_user: User = Depends(require_admin_or_official),
     db: Session = Depends(get_db)
 ):
     deleted = delete_alert(
@@ -516,7 +577,7 @@ def delete_alert_api(
 
 
 # ==================================================
-# INTERVENTION CRUD
+# INTERVENTION CRUD (PROTECTED)
 # ==================================================
 
 @app.post(
@@ -525,6 +586,7 @@ def delete_alert_api(
 )
 def create_intervention_api(
     intervention_data: InterventionCreate,
+    current_user: User = Depends(require_admin_or_official),
     db: Session = Depends(get_db)
 ):
     return create_intervention(
@@ -538,6 +600,7 @@ def create_intervention_api(
     response_model=list[InterventionResponse]
 )
 def get_interventions_api(
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     return get_interventions(db)
@@ -549,6 +612,7 @@ def get_interventions_api(
 )
 def get_intervention_api(
     intervention_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     intervention = get_intervention(
@@ -571,6 +635,7 @@ def get_intervention_api(
 )
 def get_risk_interventions_api(
     risk_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     return get_risk_interventions(
@@ -585,6 +650,7 @@ def get_risk_interventions_api(
 )
 def get_location_interventions_api(
     location_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     return get_location_interventions(
@@ -598,6 +664,7 @@ def get_location_interventions_api(
 )
 def delete_intervention_api(
     intervention_id: int,
+    current_user: User = Depends(require_admin_or_official),
     db: Session = Depends(get_db)
 ):
     deleted = delete_intervention(
@@ -629,8 +696,21 @@ def home():
 
 @app.get("/health")
 def health():
+    db_status = "unavailable"
+    try:
+        driver = engine.url.drivername
+        backend_name = "sqlite" if "sqlite" in driver else "postgresql"
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        db_status = backend_name
+    except Exception as e:
+        logger.warning(f"Health check database probe failed: {e}")
+        db_status = "unavailable"
+
+    is_healthy = db_status != "unavailable"
     return {
-        "status": "healthy"
+        "status": "healthy" if is_healthy else "degraded",
+        "database": db_status
     }
 
 
@@ -712,7 +792,8 @@ async def risk(
     historical_health_events: int = 17,
     lag_health_events: int = 15,
     background_tasks: BackgroundTasks = BackgroundTasks(),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     # --------------------------------------------------
     # 1. GET CURRENT WEATHER
@@ -822,8 +903,8 @@ async def risk(
             # 8. DATABASE ALERT DECISION ENGINE
             # --------------------------------------------------
             if should_create_alert(risk_result["risk_level"]):
-                user = db.query(User).filter(User.id == 1).first()
-                if user is not None:
+                if current_user is not None:
+                    user = current_user
                     alert_message = (
                         f"Heat health risk is "
                         f"{risk_result['risk_level']} "
@@ -840,6 +921,26 @@ async def risk(
                         reference_id=f"RISK-{saved_risk.id if saved_risk else 0}"
                     )
                     alert = create_alert(db, alert_data)
+                else:
+                    # Public dashboard monitoring: record audit alert under official/admin account without claiming user dispatch
+                    official_user = db.query(User).filter(User.role.in_(["official", "admin"])).first()
+                    if official_user is not None:
+                        alert_message = (
+                            f"Public monitor heat alert: "
+                            f"{risk_result['risk_level']} "
+                            f"at {location.name}."
+                        )
+                        alert_data = AlertCreate(
+                            user_id=official_user.id,
+                            location_id=location.id,
+                            risk_level=risk_result["risk_level"],
+                            risk_score=risk_result["risk_score"],
+                            message=alert_message,
+                            status="LOGGED_UNASSIGNED",
+                            phone_number=None,
+                            reference_id=f"RISK-{saved_risk.id if saved_risk else 0}"
+                        )
+                        alert = create_alert(db, alert_data)
     except Exception as e:
         logger.warning(f"Database persistence warning for /risk: {e}")
 
@@ -883,12 +984,15 @@ async def risk(
             f"Please take necessary precautions immediately!"
         )
 
-        sms_alert = await send_sms(
-            phone_number="+919999999999",
-            message=message
-        )
+        # Only dispatch SMS if authenticated user has a phone number
+        if user and getattr(user, "phone_number", None):
+            sms_alert = await send_sms(
+                phone_number=user.phone_number,
+                message=message
+            )
 
-        target_email = getattr(user, "email", None) if user else os.getenv("MAIL_USERNAME")
+        # Only send email if authenticated user has a registered email; do not default to MAIL_USERNAME
+        target_email = getattr(user, "email", None) if user else None
         if target_email:
             subject = f"⚠️ CRITICAL HEAT ALERT: {current_risk_level} Risk Level Detected"
             background_tasks.add_task(
