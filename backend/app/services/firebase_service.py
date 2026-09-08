@@ -6,6 +6,9 @@ logger = logging.getLogger(__name__)
 try:
     import firebase_admin
     from firebase_admin import firestore
+
+
+    
     FIREBASE_AVAILABLE = True
 except ImportError:
     firebase_admin = None

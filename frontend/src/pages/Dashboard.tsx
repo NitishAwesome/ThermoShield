@@ -79,6 +79,7 @@ export const Dashboard: React.FC = () => {
           location: thermalRes.value.location,
           weather: thermalRes.value.weather,
         });
+        setError(null);
       } else {
         console.error('Thermal API call failed:', thermalRes.reason);
       }
@@ -113,9 +114,11 @@ export const Dashboard: React.FC = () => {
         });
       }
 
-      // If core thermal fails and no cached data exists, notify user
-      if (thermalRes.status === 'rejected' && !cached?.thermal) {
+      // If core thermal fails and no thermal data is present, notify user
+      if (thermalRes.status === 'rejected' && !updatedThermal && !cached?.thermal) {
         setError('Unable to connect to ThermoShield telemetry engine. Please ensure backend is running.');
+      } else if (thermalRes.status === 'fulfilled') {
+        setError(null);
       }
     } catch (err: any) {
       if (!cached?.thermal) {
@@ -183,8 +186,8 @@ export const Dashboard: React.FC = () => {
         />
       </div>
 
-      {/* Error Alert */}
-      {error && (
+      {/* Error Alert: Only shown if telemetry completely fails */}
+      {error && !thermalData && (
         <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 flex items-start justify-between">
           <div className="flex items-start space-x-3">
             <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
