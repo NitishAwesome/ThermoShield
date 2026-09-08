@@ -2,6 +2,7 @@ from pathlib import Path
 import logging
 import joblib
 import pandas as pd
+from .ml_prediction import predict_future_risk
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,8 @@ def predict_risk(
     vulnerability_index: float = 30.0,
     historical_health_events: int = 17,
     lag_health_events: int = 15,
+    temperature_trend: float = 0.0,
+    thermal_stress_trend: float = 0.0,
 ):
     model = get_model()
 
@@ -84,10 +87,22 @@ def predict_risk(
     else:
         level = "LOW"
 
+    # 3-day future heatwave risk prediction
+    future_risk = predict_future_risk(
+        temperature_c=temperature_c,
+        thermal_stress=thermal_stress,
+        vulnerability_index=vulnerability_index,
+        historical_health_events=historical_health_events,
+        lag_health_events=lag_health_events,
+        temperature_trend=temperature_trend,
+        thermal_stress_trend=thermal_stress_trend,
+    )
+
     return {
         "predicted_health_impact_proxy": round(
             float(predicted_impact), 2
         ),
         "risk_score": risk_score,
         "risk_level": level,
+        "future_risk": future_risk,
     }
