@@ -98,10 +98,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem(TOKEN_STORAGE_KEY, res.access_token);
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(res.user));
     } catch (err: any) {
-      const msg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        'Failed to log in. Please check your credentials.';
+      const detail = err?.response?.data?.detail;
+      const msg = Array.isArray(detail)
+        ? detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ')
+        : (typeof detail === 'string' ? detail : err?.response?.data?.message) ||
+          'Failed to log in. Please check your credentials.';
       setError(msg);
       throw new Error(msg);
     } finally {
@@ -119,10 +120,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem(TOKEN_STORAGE_KEY, res.access_token);
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(res.user));
     } catch (err: any) {
-      const msg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        'Failed to create account. Please try again.';
+      const detail = err?.response?.data?.detail;
+      const msg = Array.isArray(detail)
+        ? detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ')
+        : (typeof detail === 'string' ? detail : err?.response?.data?.message) ||
+          'Failed to create account. Please try again.';
       setError(msg);
       throw new Error(msg);
     } finally {

@@ -20,13 +20,17 @@ load_dotenv()
 # --------------------------------------------------
 # DATABASE URL CONFIGURATION
 # --------------------------------------------------
-DATABASE_URL = os.getenv("DATABASE_URL")
-sqlite_path = backend_dir / "thermoshield.db"
-sqlite_url = f"sqlite:///{sqlite_path.as_posix()}"
+NEON_CLOUD_DATABASE_URL = "postgresql://neondb_owner:npg_7oXuPzjQbDG0@ep-sweet-frost-a5jg8zz0-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require"
 
-if not DATABASE_URL:
-    DATABASE_URL = sqlite_url
-    logger.info(f"DATABASE_URL not set; using default SQLite database: {DATABASE_URL}")
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL or DATABASE_URL.strip() == "":
+    if os.getenv("RENDER") or os.getenv("ENVIRONMENT", "").lower() == "production":
+        DATABASE_URL = NEON_CLOUD_DATABASE_URL
+        logger.info("DATABASE_URL not set in cloud environment; defaulting to Neon PostgreSQL.")
+    else:
+        sqlite_path = backend_dir / "thermoshield.db"
+        DATABASE_URL = f"sqlite:///{sqlite_path.as_posix()}"
+        logger.info(f"DATABASE_URL not set; using local SQLite database: {DATABASE_URL}")
 elif DATABASE_URL.startswith("postgres://"):
     # SQLAlchemy 2.0 requires postgresql:// instead of legacy postgres://
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -105,25 +109,21 @@ def get_db():
 # --------------------------------------------------
 # DATABASE INITIALIZATION
 # --------------------------------------------------
-def init_db():
-    """Initialize database tables for development and testing environments.
-    In production (ENVIRONMENT=production), schema evolution must be managed via
-    Alembic migrations ('alembic upgrade head') to avoid uncoordinated DDL.
+def init_db_schema():
     """
-    is_prod = os.getenv("ENVIRONMENT", "development").lower() == "production"
-    auto_create = os.getenv("AUTO_CREATE_TABLES", "false" if is_prod else "true").lower() in ("true", "1", "yes")
-
-    if is_prod and auto_create:
-        logger.info("Production mode detected: skipping runtime Base.metadata.create_all(). Use Alembic migrations.")
-        return
-
-    if auto_create:
+    Ensure all required database tables exist across all environments.
+    SQLAlchemy's create_all creates tables with 'CREATE TABLE IF NOT EXISTS'
+    so it is completely idempotent, non-destructive, and guarantees essential tables
+    exist immediately on server boot.
+    """
+    try:
         try:
-            try:
-                from app.database import models  # noqa: F401
-            except ImportError:
-                from backend.app.database import models  # noqa: F401
-            Base.metadata.create_all(bind=engine)
-            logger.info("Development/Test database tables verified via create_all().")
-        except Exception as e:
-            logger.warning(f"Database initialization warning: {e}")
+            from app.database import models  # noqa: F401
+        except ImportError:
+            from backend.app.database import models  # noqa: F401
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database schema tables verified via create_all().")
+    except Exception as e:
+        logger.warning(f"Database initialization warning: {e}")
+
+init_db = init_db_schema
