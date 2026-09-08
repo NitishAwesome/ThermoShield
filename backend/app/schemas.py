@@ -156,3 +156,41 @@ class AreaRiskOverviewResponse(BaseModel):
     count: int
     updated_at: str
     areas: List[AreaRiskOverviewItem]
+
+
+class SendAlertEmailRequest(BaseModel):
+    email: EmailStr
+    location_name: str | None = "Current Location"
+    lat: float | None = None
+    lon: float | None = None
+    risk_level: str | None = "HIGH"
+    risk_score: float | None = 75.0
+    temperature_c: float | None = None
+    heat_index_c: float | None = None
+    wbgt_c: float | None = None
+    interventions: List[str] | None = None
+    custom_note: str | None = None
+
+
+class SendAlertEmailResponse(BaseModel):
+    status: str
+    message: str
+    recipient: str
+    sender: str
+
+
+class AlertSubscriptionRequest(BaseModel):
+    email: EmailStr
+    name: str | None = None
+    phone_number: str | None = None
+    location_name: str | None = "Current Location"
+    lat: float | None = None
+    lon: float | None = None
+
+
+class AlertSubscriptionResponse(BaseModel):
+    status: str
+    message: str
+    email: str
+    is_new_citizen: bool
+    auto_alert_active: bool

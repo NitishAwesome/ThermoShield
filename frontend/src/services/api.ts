@@ -17,10 +17,14 @@ import {
 } from '../types';
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.PROD
+    ? 'https://thermoshield.onrender.com'
+    : 'http://127.0.0.1:8000');
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
+  
   timeout: 20000,
   headers: {
     'Content-Type': 'application/json',
@@ -70,6 +74,8 @@ export const api = {
       vulnerability_index?: number;
       historical_health_events?: number;
       lag_health_events?: number;
+      email?: string;
+      phone_number?: string;
     }
   ): Promise<RiskResponse> => {
     const res = await apiClient.get<RiskResponse>('/risk', {
@@ -79,6 +85,8 @@ export const api = {
         vulnerability_index: options?.vulnerability_index ?? 30.0,
         historical_health_events: options?.historical_health_events ?? 17,
         lag_health_events: options?.lag_health_events ?? 15,
+        email: options?.email,
+        phone_number: options?.phone_number,
       },
     });
     return res.data;
@@ -169,4 +177,37 @@ export const api = {
     const res = await apiClient.get<AreasRiskOverviewResponse>('/areas/risk-overview');
     return res.data;
   },
+
+  // Dynamic Candidate Email Dispatch
+  sendAlertEmail: async (data: {
+    email: string;
+    location_name?: string;
+    lat?: number;
+    lon?: number;
+    risk_level?: string;
+    risk_score?: number;
+    temperature_c?: number;
+    heat_index_c?: number;
+    wbgt_c?: number;
+    interventions?: string[];
+    custom_note?: string;
+  }): Promise<{ status: string; message: string; recipient: string; sender: string }> => {
+    const res = await apiClient.post<{ status: string; message: string; recipient: string; sender: string }>('/alerts/send-email', data);
+    return res.data;
+  },
+
+  // Automated Citizen Alert Enrollment
+  subscribeCitizenAlerts: async (data: {
+    email: string;
+    name?: string;
+    phone_number?: string;
+    location_name?: string;
+    lat?: number;
+    lon?: number;
+  }): Promise<{ status: string; message: string; email: string; is_new_citizen: boolean; auto_alert_active: boolean }> => {
+    const res = await apiClient.post<{ status: string; message: string; email: string; is_new_citizen: boolean; auto_alert_active: boolean }>('/alerts/subscribe', data);
+    return res.data;
+  },
 };
+
+

@@ -14,20 +14,42 @@ import {
   MapPin,
   RefreshCw,
   Info,
+  Mail,
+  Send,
+  CheckCircle2,
+  Shield,
+  Radio,
+  Zap,
 } from 'lucide-react';
 import { getCachedData, setCachedData } from '../services/cache';
 import { useLocation } from '../context/LocationContext';
+import { useAuth } from '../context/AuthContext';
 import { Card, CardHeader, CardContent, Badge, Button, EmptyState } from '../components/ui';
 
 export const Alerts: React.FC = () => {
   const { coords, locationName, isLocating, setLocation, detectMyLocation } = useLocation();
+  const { user } = useAuth();
 
   const [thermalData, setThermalData] = useState<ThermalResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Dynamic Candidate Email Dispatch State
+  const [recipientEmail, setRecipientEmail] = useState<string>('');
+  const [isSendingEmail, setIsSendingEmail] = useState<boolean>(false);
+  const [emailSuccessMsg, setEmailSuccessMsg] = useState<string | null>(null);
+  const [emailErrorMsg, setEmailErrorMsg] = useState<string | null>(null);
+
+  // Automatically pre-fill logged-in candidate email
+  useEffect(() => {
+    if (user?.email && !recipientEmail) {
+      setRecipientEmail(user.email);
+    }
+  }, [user?.email]);
+
   const fetchAlerts = async () => {
     const cached = getCachedData(coords.lat, coords.lon);
+
     if (cached?.thermal) {
       setThermalData(cached.thermal);
       setIsLoading(false);
@@ -65,7 +87,105 @@ export const Alerts: React.FC = () => {
     ? new Date(weatherTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : 'Live telemetry';
 
+  const handleSendEmailAlert = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recipientEmail || !recipientEmail.includes('@')) {
+      setEmailErrorMsg('Please enter a valid candidate email address.');
+      return;
+    }
+    setIsSendingEmail(true);
+    setEmailErrorMsg(null);
+    setEmailSuccessMsg(null);
+
+    try {
+      const res = await api.sendAlertEmail({
+        email: recipientEmail.trim(),
+        location_name: locationName,
+        lat: coords.lat,
+        lon: coords.lon,
+        risk_level: level,
+        risk_score: risk?.score ? Math.round(risk.score * 100) : 75,
+        temperature_c: thermalData?.weather?.temperature,
+        heat_index_c: thermalData?.thermal?.indices?.heat_index_c,
+        wbgt_c: thermalData?.thermal?.indices?.wbgt_c,
+        interventions: advisories.length > 0 ? advisories : [
+          `Hydration Protocol: ${hydration?.guidance || 'Drink 500mL fluid every 20-30 minutes.'}`,
+          `Activity Guidance: ${activity?.heavy_physical_work || 'Limit strenuous outdoor activity during peak hours.'}`,
+          `Cooling Directive: ${activity?.rest_guidance || 'Mandatory shade breaks and active ventilation.'}`
+        ]
+      });
+      setEmailSuccessMsg(`Alert email successfully sent to ${res.recipient}! Please check inbox/spam.`);
+    } catch (err: any) {
+      setEmailErrorMsg(err?.response?.data?.detail || err?.message || 'Failed to dispatch email alert. Please check connection.');
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
+  const handleEnrollCitizen = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recipientEmail || !recipientEmail.includes('@')) {
+      setEmailErrorMsg('Please enter a valid email address to enroll.');
+      return;
+    }
+    setIsSendingEmail(true);
+    setEmailErrorMsg(null);
+    setEmailSuccessMsg(null);
+
+    try {
+      const res = await api.subscribeCitizenAlerts({
+        email: recipientEmail.trim(),
+        name: user?.name,
+        location_name: locationName,
+        lat: coords.lat,
+        lon: coords.lon,
+      });
+      setEmailSuccessMsg(`🎉 Successfully enrolled ${res.email}! You will automatically receive alerts whenever High or Extreme heat strikes ${locationName}.`);
+    } catch (err: any) {
+      setEmailErrorMsg(err?.response?.data?.detail || err?.message || 'Failed to enroll for automated alerts.');
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
+  const handleSimulateAutoAlert = async () => {
+    const targetEmail = recipientEmail || user?.email;
+    if (!targetEmail || !targetEmail.includes('@')) {
+      setEmailErrorMsg('Please provide or sign in with a valid citizen email to simulate alert dispatch.');
+      return;
+    }
+    setIsSendingEmail(true);
+    setEmailErrorMsg(null);
+    setEmailSuccessMsg(null);
+
+    try {
+      const res = await api.sendAlertEmail({
+        email: targetEmail.trim(),
+        location_name: locationName,
+        lat: coords.lat,
+        lon: coords.lon,
+        risk_level: level === 'HIGH' || level === 'EXTREME' ? level : 'HIGH',
+        risk_score: risk?.score ? Math.round(risk.score * 100) : 84,
+        temperature_c: thermalData?.weather?.temperature || 37.5,
+        heat_index_c: thermalData?.thermal?.indices?.heat_index_c || 41.2,
+        wbgt_c: thermalData?.thermal?.indices?.wbgt_c || 31.0,
+        interventions: advisories.length > 0 ? advisories : [
+          `Hydration Protocol: ${hydration?.guidance || 'Mandatory 500mL fluid every 20 minutes.'}`,
+          `Activity Directive: ${activity?.heavy_physical_work || 'Halt high-strain outdoor work and direct sun exposure.'}`,
+          `Cooling Protocol: ${activity?.rest_guidance || 'Seek designated municipal cooling shelters and hydrated respite.'}`
+        ]
+      });
+      setEmailSuccessMsg(`⚡ Automated heat alert simulated and dispatched to ${res.recipient}! Check your inbox.`);
+    } catch (err: any) {
+      setEmailErrorMsg(err?.response?.data?.detail || err?.message || 'Failed to simulate alert dispatch.');
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
   const isActiveAlert = level === 'HIGH' || level === 'EXTREME';
+
+
 
   return (
     <div className="space-y-6 pb-12">
@@ -164,7 +284,124 @@ export const Alerts: React.FC = () => {
             </div>
           </Card>
 
+          {/* Automated Citizen Heat Defense Network Card */}
+          <Card variant="elevated" className="p-5 sm:p-6 bg-gradient-to-r from-slate-900 via-slate-900/95 to-slate-900 border border-orange-500/30 overflow-hidden relative shadow-xl">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              <div className="space-y-2 max-w-xl">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-orange-400">
+                    <Radio className="w-4 h-4 animate-pulse" />
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-orange-400">
+                    Automated Citizen Heat Defense Network
+                  </span>
+                  <Badge variant="brand" size="sm" className="text-[10px] bg-emerald-500/20 border-emerald-500/40 text-emerald-300">
+                    Auto-Broadcast Active
+                  </Badge>
+                  <Badge variant="neutral" size="sm" className="text-[10px] text-slate-400 border-slate-700">
+                    30m Cooldown Guard
+                  </Badge>
+                </div>
+                
+                <h3 className="text-lg font-bold ts-text-primary flex items-center gap-2">
+                  Automatic Early-Warning Citizen Dispatch
+                </h3>
+                
+                <p className="text-xs ts-text-muted leading-relaxed">
+                  No manual entry required on every visit. Whenever <span className="text-rose-400 font-semibold">HIGH</span> or <span className="text-purple-400 font-semibold">EXTREME</span> heat risk triggers in <span className="text-orange-400 font-semibold">{locationName}</span>, all enrolled citizens are instantly alerted with medical-grade hydration and WBGT work-rest safety directives.
+                </p>
+
+                {user ? (
+                  <div className="flex items-center gap-2 pt-1 text-xs text-emerald-400 font-medium bg-emerald-950/40 border border-emerald-500/30 px-3 py-1.5 rounded-lg w-fit">
+                    <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+                    <span>Enrolled Citizen: <strong>{user.name || 'Resident'}</strong> ({user.email})</span>
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-slate-400 flex items-center gap-1.5 pt-1">
+                    <Info className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+                    <span>Enter your email once below to register your local citizen zone for autonomous heat warnings.</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Controls */}
+              <div className="w-full lg:w-auto flex-shrink-0 flex flex-col gap-2">
+                <form onSubmit={handleEnrollCitizen} className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="email"
+                      required
+                      placeholder="Citizen email address..."
+                      value={recipientEmail}
+                      onChange={(e) => {
+                        setRecipientEmail(e.target.value);
+                        setEmailErrorMsg(null);
+                        setEmailSuccessMsg(null);
+                      }}
+                      className="w-full sm:w-64 pl-9 pr-3 py-2 text-xs rounded-xl bg-slate-800/90 border border-slate-700 ts-text-primary placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    disabled={isSendingEmail || !recipientEmail.trim()}
+                    leftIcon={
+                      isSendingEmail ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Shield className="w-3.5 h-3.5" />
+                      )
+                    }
+                    className="whitespace-nowrap font-bold text-xs"
+                  >
+                    {isSendingEmail ? 'Enrolling...' : 'Enroll Citizen'}
+                  </Button>
+                </form>
+
+                {/* Simulation / Instant Test Button */}
+                <div className="flex items-center justify-between sm:justify-end gap-2 pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isSendingEmail}
+                    onClick={handleSimulateAutoAlert}
+                    leftIcon={
+                      isSendingEmail ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Zap className="w-3.5 h-3.5 text-amber-400" />
+                      )
+                    }
+                    className="text-xs border-slate-700 hover:border-orange-500/50 hover:bg-orange-500/10 text-slate-300"
+                  >
+                    ⚡ Test Emergency Auto-Alert
+                  </Button>
+                  <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">From: ronit.jagdale.39@gmail.com</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Status Feedback Messages */}
+            {emailSuccessMsg && (
+              <div className="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center space-x-2 animate-fadeIn">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                <span className="font-medium">{emailSuccessMsg}</span>
+              </div>
+            )}
+
+            {emailErrorMsg && (
+              <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center space-x-2 animate-fadeIn">
+                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <span>{emailErrorMsg}</span>
+              </div>
+            )}
+          </Card>
+
           {/* 3 Core Pillars: Hydration, Activity Guidance, Vulnerable Populations */}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* 1. Hydration Protocol */}
             <Card variant="elevated" className="flex flex-col justify-between">
