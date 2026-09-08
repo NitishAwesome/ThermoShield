@@ -24,16 +24,9 @@ from app.auth.router import (
     get_current_user,
     get_current_user_optional,
     require_admin_or_official,
-)
-from app.routers.personal_risk import router as personal_risk_router
-from app.auth.router import (
-    router as auth_router,
-    get_current_user,
-    get_current_user_optional,
-    require_admin_or_official,
     hash_password,
 )
-
+from app.routers.personal_risk import router as personal_risk_router
 from app.services.firebase_service import update_live_risk
 
 from fastapi import FastAPI, Query, Depends, HTTPException, BackgroundTasks
