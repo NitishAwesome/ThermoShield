@@ -22,6 +22,7 @@ import { useAuth } from '../context/AuthContext';
 import { AreaRiskShowcase } from '../components/AreaRiskShowcase';
 import { Link } from 'react-router-dom';
 import { Button, Card, EmptyState } from '../components/ui';
+import { subscribeToLiveRisk, type LiveRisk } from "../services/liveRisk";
 
 export const Dashboard: React.FC = () => {
   const { coords, locationName, isLocating, setLocation, setCoordsAndName, detectMyLocation } = useLocation();
@@ -29,6 +30,9 @@ export const Dashboard: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [liveRisk, setLiveRisk] = useState<LiveRisk | null>(null);
+  const [liveRiskError, setLiveRiskError] = useState<string | null>(null);
 
   const [thermalData, setThermalData] = useState<ThermalResponse | null>(null);
   const [riskData, setRiskData] = useState<RiskResponse | null>(null);
@@ -132,6 +136,31 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     fetchData(coords.lat, coords.lon);
   }, [coords.lat, coords.lon]);
+
+  useEffect(() => {
+    const locationId = riskData?.location?.id;
+
+    if (locationId == null) {
+      setLiveRisk(null);
+      return;
+    }
+
+    setLiveRiskError(null);
+
+    const unsubscribe = subscribeToLiveRisk(
+      String(locationId),
+      (updatedRisk) => {
+        setLiveRisk(updatedRisk);
+      },
+      (firebaseError) => {
+        console.error("Firebase live-risk subscription failed:", firebaseError);
+        setLiveRiskError(firebaseError.message);
+        setLiveRisk(null);
+      },
+    );
+
+    return unsubscribe;
+  }, [riskData?.location?.id]);
 
   const handleMapClick = (lat: number, lon: number) => {
     setCoordsAndName({ lat, lon }, `Custom (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`);
@@ -238,6 +267,24 @@ export const Dashboard: React.FC = () => {
 
             <WeatherCard weather={thermalData?.weather || weatherData?.weather} />
           </div>
+
+          {/* TEMPORARY FIREBASE LIVE-RISK VERIFICATION */}
+          {liveRisk && (
+            <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="font-semibold">Firebase Live Risk</span>
+              </div>
+
+              <div className="mt-2 text-sm">
+                <p>Location: {liveRisk.location}</p>
+                <p>Risk Score: {liveRisk.risk_score.toFixed(2)}</p>
+                <p>Risk Level: {liveRisk.risk_level}</p>
+                <p>Thermal Risk: {liveRisk.thermal_risk_level}</p>
+                <p>Status: {liveRisk.status}</p>
+              </div>
+            </div>
+          )}
 
           {/* Why This Rating? — Environmental Risk Drivers Section */}
           <RiskDrivers

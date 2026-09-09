@@ -106,6 +106,8 @@ export interface MLRiskData {
 
 export interface RiskResponse {
   location: {
+    id: number | null;
+    name: string | null;
     latitude: number;
     longitude: number;
   };

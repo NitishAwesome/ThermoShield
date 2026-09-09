@@ -68,6 +68,7 @@ export const api = {
 
   // ML Risk Prediction
   getRisk: async (
+<<<<<<< Updated upstream
     lat: number,
     lon: number,
     options?: {
@@ -91,6 +92,39 @@ export const api = {
     });
     return res.data;
   },
+=======
+  lat: number,
+  lon: number,
+  options?: {
+    vulnerability_index?: number;
+    historical_health_events?: number;
+    lag_health_events?: number;
+  }
+): Promise<RiskResponse> => {
+  const params: Record<string, number> = {
+    lat,
+    lon,
+  };
+
+  if (options?.vulnerability_index !== undefined) {
+    params.vulnerability_index = options.vulnerability_index;
+  }
+
+  if (options?.historical_health_events !== undefined) {
+    params.historical_health_events = options.historical_health_events;
+  }
+
+  if (options?.lag_health_events !== undefined) {
+    params.lag_health_events = options.lag_health_events;
+  }
+
+  const res = await apiClient.get<RiskResponse>('/risk', {
+    params,
+  });
+
+  return res.data;
+},
+>>>>>>> Stashed changes
 
   // Forecast Endpoint
   getForecast: async (lat: number, lon: number): Promise<ForecastResponse> => {

@@ -20,6 +20,8 @@ MAJOR_AREAS = [
         "latitude": 19.0760,
         "longitude": 72.8777,
         "vulnerability_index": 35.0,
+        "historical_health_events": 18,
+        "lag_health_events": 15,
         "vulnerability_tag": "High Coastal Humidity & Dense Informal Settlements",
         "default_temp": 33.5,
         "default_rh": 74.0,
@@ -31,6 +33,8 @@ MAJOR_AREAS = [
         "latitude": 28.6139,
         "longitude": 77.2090,
         "vulnerability_index": 38.0,
+        "historical_health_events": 18,
+        "lag_health_events": 15,
         "vulnerability_tag": "Extreme Continental Heat Island & Outdoor Labor",
         "default_temp": 38.5,
         "default_rh": 42.0,
@@ -42,6 +46,8 @@ MAJOR_AREAS = [
         "latitude": 23.0225,
         "longitude": 72.5714,
         "vulnerability_index": 34.0,
+        "historical_health_events": 18,
+        "lag_health_events": 15,
         "vulnerability_tag": "Intense Dry Heat & High Radiative Solar Index",
         "default_temp": 39.0,
         "default_rh": 36.0,
@@ -53,6 +59,8 @@ MAJOR_AREAS = [
         "latitude": 21.1458,
         "longitude": 79.0882,
         "vulnerability_index": 32.0,
+        "historical_health_events": 18,
+        "lag_health_events": 15,
         "vulnerability_tag": "Central Heatwave Corridor & Prolonged Daytime Highs",
         "default_temp": 39.5,
         "default_rh": 35.0,
@@ -64,6 +72,8 @@ MAJOR_AREAS = [
         "latitude": 13.0827,
         "longitude": 80.2707,
         "vulnerability_index": 30.0,
+        "historical_health_events": 18,
+        "lag_health_events": 15,
         "vulnerability_tag": "Continuous Tropical Dew Point & Moisture Trapping",
         "default_temp": 34.0,
         "default_rh": 76.0,
@@ -75,6 +85,8 @@ MAJOR_AREAS = [
         "latitude": 22.5726,
         "longitude": 88.3639,
         "vulnerability_index": 36.0,
+        "historical_health_events": 18,
+        "lag_health_events": 15,
         "vulnerability_tag": "Severe Wet-Bulb Heat Load & Gangetic Delta Humidity",
         "default_temp": 35.0,
         "default_rh": 72.0,
@@ -86,6 +98,8 @@ MAJOR_AREAS = [
         "latitude": 26.9124,
         "longitude": 75.7873,
         "vulnerability_index": 31.0,
+        "historical_health_events": 18,
+        "lag_health_events": 15,
         "vulnerability_tag": "Thar Desert Border Thermal Waves & High Sun Exposure",
         "default_temp": 38.0,
         "default_rh": 32.0,
@@ -97,6 +111,8 @@ MAJOR_AREAS = [
         "latitude": 17.3850,
         "longitude": 78.4867,
         "vulnerability_index": 28.0,
+        "historical_health_events": 18,
+        "lag_health_events": 15,
         "vulnerability_tag": "Rapid Urbanization & Afternoon Thermal Peaks",
         "default_temp": 36.0,
         "default_rh": 48.0,
@@ -108,6 +124,8 @@ MAJOR_AREAS = [
         "latitude": 12.9716,
         "longitude": 77.5946,
         "vulnerability_index": 22.0,
+        "historical_health_events": 18,
+        "lag_health_events": 15,
         "vulnerability_tag": "Microclimate Urban Density & Rising Summer Anomalies",
         "default_temp": 30.0,
         "default_rh": 55.0,
@@ -119,6 +137,8 @@ MAJOR_AREAS = [
         "latitude": 26.8467,
         "longitude": 80.9462,
         "vulnerability_index": 37.0,
+        "historical_health_events": 18,
+        "lag_health_events": 15,
         "vulnerability_tag": "High Agricultural & Outdoor Construction Worker Ratio",
         "default_temp": 37.5,
         "default_rh": 52.0,
@@ -130,6 +150,8 @@ MAJOR_AREAS = [
         "latitude": 25.5941,
         "longitude": 85.1376,
         "vulnerability_index": 40.0,
+        "historical_health_events": 18,
+        "lag_health_events": 15,
         "vulnerability_tag": "Elevated Healthcare Sensitivity & Humid Heat Spells",
         "default_temp": 36.5,
         "default_rh": 60.0,
@@ -141,11 +163,34 @@ MAJOR_AREAS = [
         "latitude": 21.1702,
         "longitude": 72.8311,
         "vulnerability_index": 33.0,
+        "historical_health_events": 18,
+        "lag_health_events": 15,
         "vulnerability_tag": "Industrial Workforce Concentration & Maritime Humidity",
         "default_temp": 34.0,
         "default_rh": 70.0,
     },
 ]
+
+def get_area_profile_for_coordinates(
+    lat: float,
+    lon: float,
+    tolerance: float = 0.01,
+) -> Dict[str, Any] | None:
+    """
+    Return the monitored-area profile matching the given coordinates.
+
+    A small coordinate tolerance allows frontend-selected coordinates
+    to match the corresponding monitored city without treating arbitrary
+    nearby locations as the same area.
+    """
+    for area in MAJOR_AREAS:
+        if (
+            abs(float(lat) - float(area["latitude"])) <= tolerance
+            and abs(float(lon) - float(area["longitude"])) <= tolerance
+        ):
+            return area
+
+    return None
 
 _AREAS_CACHE: Dict[str, Any] = {"data": None, "timestamp": 0.0}
 AREAS_CACHE_TTL = 120.0  # 2 minutes cache
@@ -154,10 +199,43 @@ AREAS_CACHE_TTL = 120.0  # 2 minutes cache
 async def get_location_risk(
     lat: float,
     lon: float,
-    vulnerability_index: float = 30.0,
-    historical_health_events: int = 17,
-    lag_health_events: int = 15
+    vulnerability_index: float | None = None,
+    historical_health_events: int | None = None,
+    lag_health_events: int | None = None,
 ):
+    area_profile = get_area_profile_for_coordinates(lat, lon)
+    if area_profile:
+        vulnerability_index = (
+            vulnerability_index
+            if vulnerability_index is not None
+            else float(area_profile["vulnerability_index"])
+        )
+        historical_health_events = (
+            historical_health_events
+            if historical_health_events is not None
+            else int(area_profile["historical_health_events"])
+        )
+        lag_health_events = (
+            lag_health_events
+            if lag_health_events is not None
+            else int(area_profile["lag_health_events"])
+        )
+    else:
+        vulnerability_index = (
+            vulnerability_index
+            if vulnerability_index is not None
+            else 30.0
+        )
+        historical_health_events = (
+            historical_health_events
+            if historical_health_events is not None
+            else 17
+        )
+        lag_health_events = (
+            lag_health_events
+            if lag_health_events is not None
+            else 15
+        )
     """
     Computes unified ML health risk for a geographic coordinate.
     Uses the authoritative thermal stress engine and ML prediction model.
@@ -224,8 +302,8 @@ async def _evaluate_single_area(area_cfg: Dict[str, Any]) -> Dict[str, Any]:
         temperature_c=temp,
         thermal_stress=thermal_stress,
         vulnerability_index=area_cfg["vulnerability_index"],
-        historical_health_events=18,
-        lag_health_events=15
+        historical_health_events=area_cfg["historical_health_events"],
+        lag_health_events=area_cfg["lag_health_events"],
     )
 
     risk_level = risk_result["risk_level"]

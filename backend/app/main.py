@@ -53,7 +53,11 @@ from app.database.models import Location, User, Risk, Alert, Intervention
 from app.database.connection import get_db, engine, Base, init_db
 
 from app.services.risk import predict_risk
-from app.services.map_services import get_location_risk, get_all_areas_risk_overview
+from app.services.map_services import (
+    get_location_risk,
+    get_all_areas_risk_overview,
+    get_area_profile_for_coordinates,
+)
 from app.services.intervention import generate_interventions
 from app.services.simulator import simulate_intervention
 from app.services.sms import send_sms
@@ -213,6 +217,8 @@ else:
     allowed_origins = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "https://thermo-shield-tau.vercel.app",
@@ -1032,11 +1038,17 @@ async def thermal(
 async def risk(
     lat: float,
     lon: float,
+<<<<<<< Updated upstream
     vulnerability_index: float = 30.0,
     historical_health_events: int = 17,
     lag_health_events: int = 15,
     email: Optional[str] = Query(None, description="Candidate or recipient email address for alerts"),
     phone_number: Optional[str] = Query(None, description="Recipient phone number for SMS alerts"),
+=======
+    vulnerability_index: Optional[float] = None,
+    historical_health_events: Optional[int] = None,
+    lag_health_events: Optional[int] = None,
+>>>>>>> Stashed changes
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional)
@@ -1101,6 +1113,41 @@ async def risk(
     # 5. RUN ML RISK MODEL
     # --------------------------------------------------
 
+    area_profile = get_area_profile_for_coordinates(lat, lon)
+
+    if area_profile:
+        vulnerability_index = (
+            vulnerability_index
+            if vulnerability_index is not None
+            else float(area_profile["vulnerability_index"])
+        )
+        historical_health_events = (
+            historical_health_events
+            if historical_health_events is not None
+            else int(area_profile["historical_health_events"])
+        )
+        lag_health_events = (
+            lag_health_events
+            if lag_health_events is not None
+            else int(area_profile["lag_health_events"])
+        )
+    else:
+        vulnerability_index = (
+            vulnerability_index
+            if vulnerability_index is not None
+            else 30.0
+        )
+        historical_health_events = (
+            historical_health_events
+            if historical_health_events is not None
+            else 17
+        )
+        lag_health_events = (
+            lag_health_events
+            if lag_health_events is not None
+            else 15
+        )
+
     risk_result = predict_risk(
         temperature_c=weather["temperature"],
         thermal_stress=thermal_stress,
@@ -1116,6 +1163,7 @@ async def risk(
     saved_risk = None
     alert = None
     user = None
+    location = None
     # Publish current risk to Firebase for real-time dashboard state
     firebase_live_risk = None
 
@@ -1404,7 +1452,11 @@ async def risk(
     # --------------------------------------------------
 
     return {
-        "location": weather_data["location"],
+        "location": {
+            **weather_data["location"],
+            "id": location.id if location is not None else None,
+            "name": location.name if location is not None else None,
+        },
 
         "weather": weather,
 
