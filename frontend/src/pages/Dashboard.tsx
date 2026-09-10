@@ -67,7 +67,7 @@ export const Dashboard: React.FC = () => {
       // Parallel fetch for thermal stress, ML risk, and map risk
       const [thermalRes, riskRes, mapRes] = await Promise.allSettled([
         api.getThermal(lat, lon),
-        api.getRisk(lat, lon),
+        api.getRisk(lat, lon, { email: user?.email }),
         api.getMapRisk([`${lat.toFixed(4)},${lon.toFixed(4)}`]),
       ]);
 

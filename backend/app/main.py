@@ -1043,17 +1043,11 @@ async def thermal(
 async def risk(
     lat: float,
     lon: float,
-<<<<<<< Updated upstream
-    vulnerability_index: float = 30.0,
-    historical_health_events: int = 17,
-    lag_health_events: int = 15,
+    vulnerability_index: Optional[float] = 30.0,
+    historical_health_events: Optional[int] = 17,
+    lag_health_events: Optional[int] = 15,
     email: Optional[str] = Query(None, description="Candidate or recipient email address for alerts"),
     phone_number: Optional[str] = Query(None, description="Recipient phone number for SMS alerts"),
-=======
-    vulnerability_index: Optional[float] = None,
-    historical_health_events: Optional[int] = None,
-    lag_health_events: Optional[int] = None,
->>>>>>> Stashed changes
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional)
