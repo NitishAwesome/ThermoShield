@@ -3,6 +3,7 @@ import smtplib
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formatdate, make_msgid
 
 from typing import Optional
 
@@ -17,7 +18,8 @@ def send_notification_email(
     """
     Dispatches notification email via SMTP to a dynamic recipient.
     The sender is always the configured MAIL_USERNAME from environment.
-    Supports both plain text and rich HTML email formatting.
+    Includes RFC 5322 compliant headers (Date, Message-ID, Reply-To, Auto-Submitted)
+    to maximize inbox deliverability and prevent automated spam classification.
     """
     sender_email = os.getenv("MAIL_USERNAME")
     sender_password = os.getenv("MAIL_PASSWORD")
@@ -33,10 +35,18 @@ def send_notification_email(
         logger.warning(f"Invalid or missing recipient email: '{to_email}'. Skipping dispatch.")
         return {"status": "skipped", "message": "Invalid recipient email"}
 
+    sender_domain = sender_email.split("@")[-1] if "@" in sender_email else "gmail.com"
+
     message = MIMEMultipart("alternative")
     message["From"] = f"ThermoShield Alerts <{sender_email}>"
     message["To"] = to_clean
+    message["Reply-To"] = sender_email
     message["Subject"] = subject
+    message["Date"] = formatdate(localtime=True)
+    message["Message-ID"] = make_msgid(domain=sender_domain)
+    message["Auto-Submitted"] = "auto-generated"
+    message["X-Mailer"] = "ThermoShield-Alert-System/1.0"
+    message["Precedence"] = "bulk"
 
     # Plaintext fallback
     message.attach(MIMEText(body, "plain"))

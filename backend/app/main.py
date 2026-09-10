@@ -625,21 +625,22 @@ def send_alert_email_direct_api(
         "Check on elderly individuals, children, and vulnerable family members."
     ]
 
-    subject = f"⚠️ ThermoShield Alert: {risk_level} Heat Health Risk in {location_name}"
+    subject = f"ThermoShield Alert: {risk_level} Heat Risk in {location_name}"
 
     # Plain text version
     bullet_points = "\n".join([f"• {item}" for item in interventions])
     plain_body = (
-        f"🚨 THERMOSHIELD CRITICAL HEAT ALERT 🚨\n\n"
+        f"ThermoShield Heat Health Advisory\n\n"
         f"Hello,\n\n"
         f"A {risk_level} heat-health risk alert has been issued for {location_name}.\n"
         f"• Risk Level: {risk_level}\n"
         f"• Risk Score: {risk_score}/100\n"
         f"• Current Temperature: {temp_str}\n\n"
-        f"RECOMMENDED SAFETY ACTIONS:\n"
+        f"Recommended Safety Actions:\n"
         f"{bullet_points}\n\n"
-        f"{payload.custom_note if payload.custom_note else 'Please take necessary safety measures immediately.'}\n\n"
-        f"— ThermoShield Civic Early Warning System"
+        f"{payload.custom_note if payload.custom_note else 'Please take necessary safety measures and stay hydrated.'}\n\n"
+        f"— ThermoShield Civic Early Warning System\n"
+        f"You received this automated advisory because this address is registered for civic heat defense alerts."
     )
 
     # HTML version
@@ -1374,7 +1375,7 @@ async def risk(
         # Dispatch automated notifications
         dispatched_count = 0
         loc_name = weather_data['location'].get('name', 'your monitored region')
-        subject = f"⚠️ AUTOMATED HEAT ALERT: {current_risk_level} Risk Level Detected in {loc_name}"
+        subject = f"ThermoShield Alert: {current_risk_level} Heat Risk in {loc_name}"
         interventions_html = "".join([f"<li style='margin-bottom:6px;'>{t.lstrip('- ')}</li>" for t in intervention_texts]) if intervention_texts else "<li>Stay hydrated and avoid direct sunlight.</li>"
 
         for citizen in citizens_to_notify:
