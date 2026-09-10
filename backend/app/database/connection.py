@@ -20,17 +20,11 @@ load_dotenv()
 # --------------------------------------------------
 # DATABASE URL CONFIGURATION
 # --------------------------------------------------
-NEON_CLOUD_DATABASE_URL = "postgresql://neondb_owner:npg_7oXuPzjQbDG0@ep-sweet-frost-a5jg8zz0-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require"
-
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL or DATABASE_URL.strip() == "":
-    if os.getenv("RENDER") or os.getenv("ENVIRONMENT", "").lower() == "production":
-        DATABASE_URL = NEON_CLOUD_DATABASE_URL
-        logger.info("DATABASE_URL not set in cloud environment; defaulting to Neon PostgreSQL.")
-    else:
-        sqlite_path = backend_dir / "thermoshield.db"
-        DATABASE_URL = f"sqlite:///{sqlite_path.as_posix()}"
-        logger.info(f"DATABASE_URL not set; using local SQLite database: {DATABASE_URL}")
+    sqlite_path = backend_dir / "thermoshield.db"
+    DATABASE_URL = f"sqlite:///{sqlite_path.as_posix()}"
+    logger.info(f"DATABASE_URL not set in environment; defaulting to local SQLite database: {DATABASE_URL}")
 elif DATABASE_URL.startswith("postgres://"):
     # SQLAlchemy 2.0 requires postgresql:// instead of legacy postgres://
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
