@@ -13,15 +13,20 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, Badge } from './ui';
 
+import { RiskFactorItem } from '../types';
+
 interface RiskDriversProps {
   temperature?: number;
   humidity?: number;
   windSpeed?: number;
   solarRadiation?: number;
+  apparentTemperature?: number;
+  uvIndex?: number;
   thermalScore?: number;
   riskLevel?: string;
   civicScore?: number;
   reason?: string;
+  riskFactors?: RiskFactorItem[];
   className?: string;
 }
 
@@ -30,10 +35,13 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
   humidity,
   windSpeed,
   solarRadiation,
+  apparentTemperature,
+  uvIndex,
   thermalScore,
   riskLevel = 'MODERATE',
   civicScore,
   reason,
+  riskFactors,
   className = '',
 }) => {
   // Qualitative classification of environmental drivers
@@ -109,8 +117,15 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
               <span className={`text-[10px] font-bold ${tempInfo.color}`}>{tempInfo.label}</span>
             </div>
             <div className="mt-2">
-              <div className="text-2xl font-black font-mono ts-text-primary">
-                {temperature !== undefined ? `${temperature.toFixed(1)}°C` : '—'}
+              <div className="flex items-baseline space-x-2">
+                <span className="text-2xl font-black font-mono ts-text-primary">
+                  {temperature !== undefined ? `${temperature.toFixed(1)}°C` : '—'}
+                </span>
+                {apparentTemperature !== undefined && (
+                  <span className="text-[11px] font-semibold text-orange-400">
+                    Feels {apparentTemperature.toFixed(1)}°C
+                  </span>
+                )}
               </div>
               <p className="text-[10.5px] ts-text-subtle mt-0.5 leading-tight">
                 Ambient thermodynamic baseline
@@ -152,7 +167,7 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
                 <span className="text-xs font-normal ts-text-muted ml-1">W/m²</span>
               </div>
               <p className="text-[10.5px] ts-text-subtle mt-0.5 leading-tight">
-                {solarInfo.desc}
+                {uvIndex !== undefined ? `UV ${uvIndex.toFixed(1)} • ${solarInfo.desc}` : solarInfo.desc}
               </p>
             </div>
           </div>
@@ -199,6 +214,42 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Calibrated Risk Factors Breakdown */}
+        {riskFactors && riskFactors.length > 0 && (
+          <div className="space-y-2.5 pt-1">
+            <div className="flex items-center justify-between text-xs font-semibold ts-text-muted">
+              <span className="flex items-center space-x-1.5">
+                <Flame className="w-3.5 h-3.5 text-orange-400" />
+                <span>Calibrated Risk Factor Weightings:</span>
+              </span>
+              <span className="text-[10.5px] ts-text-subtle font-normal">
+                Biometeorological Contribution Scale
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {riskFactors.map((rf, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 rounded-xl ts-card-subtle border ts-border flex flex-col justify-between space-y-1.5"
+                >
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold ts-text-primary truncate">{rf.factor}</span>
+                    <span className="font-mono text-xs font-bold text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20">
+                      +{rf.contribution} pts
+                    </span>
+                  </div>
+                  <p className="text-[11px] ts-text-subtle leading-tight">{rf.description}</p>
+                  {rf.observed_value && (
+                    <div className="text-[10.5px] ts-text-muted font-mono pt-0.5">
+                      Observed: <strong className="ts-text-primary">{rf.observed_value}</strong>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Model Transparency & Decision-Support Disclosure */}
         <div className="p-3 rounded-xl ts-card-subtle border ts-border text-[11px] ts-text-muted leading-relaxed flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">

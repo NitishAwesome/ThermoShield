@@ -10,6 +10,7 @@ export interface AuthContextType {
   error: string | null;
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (data: RegisterCredentials) => Promise<void>;
+  loginWithGoogle: (credential: string, role?: string) => Promise<void>;
   logout: () => void;
   clearError: () => void;
 }
@@ -132,6 +133,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithGoogle = async (credential: string, role: string = 'user') => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await api.loginWithGoogle(credential, role);
+      setToken(res.access_token);
+      setUser(res.user);
+      localStorage.setItem(TOKEN_STORAGE_KEY, res.access_token);
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(res.user));
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      const msg = Array.isArray(detail)
+        ? detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ')
+        : (typeof detail === 'string' ? detail : err?.response?.data?.message) ||
+          'Google authentication failed. Please try again.';
+      setError(msg);
+      throw new Error(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -142,6 +165,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         error,
         login,
         register,
+        loginWithGoogle,
         logout,
         clearError,
       }}

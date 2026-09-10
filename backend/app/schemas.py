@@ -107,6 +107,7 @@ class InterventionResponse(BaseModel):
 class PersonalRiskInput(BaseModel):
     age: int = Field(..., ge=1, le=120)
     smoking: bool = False
+    is_acclimatized: bool = True
     health_conditions: List[str] = []
     physical_activity: str = "moderate"
     is_pregnant: bool = False
@@ -117,6 +118,8 @@ class PersonalRiskInput(BaseModel):
     humidity_pct: float | None = None
     wbgt_c: float | None = None
     solar_radiation: float | None = None
+    uv_index: float | None = None
+    apparent_temperature_c: float | None = None
 
 
 class PersonalRiskFactorContribution(BaseModel):

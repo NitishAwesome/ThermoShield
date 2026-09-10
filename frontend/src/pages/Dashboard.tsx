@@ -292,10 +292,13 @@ export const Dashboard: React.FC = () => {
             humidity={thermalData?.weather?.humidity}
             windSpeed={thermalData?.weather?.wind_speed}
             solarRadiation={thermalData?.weather?.solar_radiation}
+            apparentTemperature={thermalData?.weather?.apparent_temperature}
+            uvIndex={thermalData?.weather?.uv_index}
             thermalScore={thermalData?.thermal?.risk_assessment?.score ? thermalData.thermal.risk_assessment.score * 100 : undefined}
             riskLevel={thermalData?.thermal?.risk_assessment?.level}
             civicScore={riskData?.risk?.risk_score}
             reason={thermalData?.thermal?.risk_assessment?.reason}
+            riskFactors={riskData?.risk_factors}
           />
 
           {/* Thermal Conditions & Physiological Indices Breakdown */}

@@ -195,6 +195,29 @@ class TestAuthSecurity(unittest.TestCase):
             self.assertNotIn(key, profile)
             self.assertNotIn(key.upper(), profile)
 
+    # 11. Google Sign-In returns valid JWT token and user profile
+    def test_11_google_login_success(self):
+        unique_suffix = uuid.uuid4().hex[:8]
+        test_email = f"google_user_{unique_suffix}@example.com"
+        res = self.client.post("/auth/google", json={"credential": f"dev_google_{test_email}"})
+        self.assertEqual(res.status_code, 200, res.text)
+        body = res.json()
+        self.assertIn("access_token", body)
+        self.assertEqual(body["token_type"], "bearer")
+        self.assertEqual(body["user"]["email"], test_email)
+
+        # Verify token works on protected route
+        headers = {"Authorization": f"Bearer {body['access_token']}"}
+        me_res = self.client.get("/auth/me", headers=headers)
+        self.assertEqual(me_res.status_code, 200)
+        self.assertEqual(me_res.json()["email"], test_email)
+
+    # 12. Google Sign-In rejects empty credential
+    def test_12_google_login_empty_credential(self):
+        res = self.client.post("/auth/google", json={"credential": ""})
+        self.assertIn(res.status_code, [400, 422])
+
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 def calculate_personal_risk(
     age: int,
     smoking: bool = False,
+    is_acclimatized: bool = True,
     health_conditions: Optional[List[str]] = None,
     physical_activity: str = "moderate",
     is_pregnant: bool = False,
@@ -14,11 +15,13 @@ def calculate_personal_risk(
     humidity_pct: Optional[float] = None,
     wbgt_c: Optional[float] = None,
     solar_radiation: Optional[float] = None,
+    uv_index: Optional[float] = None,
+    apparent_temperature_c: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Computes an individual physiological heat health risk assessment.
-    Combines personal biometrics, chronic health vulnerabilities, occupational
-    physical intensity, protective clothing, and environmental thermal stress (WBGT/Temp).
+    Combines personal biometrics, acclimatization status, chronic health vulnerabilities,
+    occupational physical intensity, protective clothing, and environmental thermal stress (WBGT/Temp/UV).
     """
     if health_conditions is None:
         health_conditions = []
@@ -81,7 +84,18 @@ def calculate_personal_risk(
             "description": "Peripheral vasoconstriction and reduced cardiovascular reserve during heat dissipation"
         })
 
-    # 4. CHRONIC HEALTH CONDITIONS
+    # 4. ACCLIMATIZATION FACTOR
+    if not is_acclimatized:
+        acclim_points = 12.0
+        total_score += acclim_points
+        breakdown.append({
+            "factor": "Unacclimatized to Heat",
+            "contribution": acclim_points,
+            "category": "Physiology",
+            "description": "Unaccustomed to extreme heat; delayed sweating latency and accelerated cardiac load"
+        })
+
+    # 5. CHRONIC HEALTH CONDITIONS
     condition_weights = {
         "heart_disease": (24.0, "Cardiovascular disease: Reduced stroke volume capacity during heat vasodilation"),
         "cardiovascular": (24.0, "Cardiovascular disease: High strain on cardiac output under heat stress"),
@@ -215,6 +229,17 @@ def calculate_personal_risk(
         "description": env_desc
     })
 
+    # 10. UV RADIATION FACTOR
+    if uv_index is not None and uv_index >= 6.0:
+        uv_pts = min(8.0, (uv_index - 5.0) * 1.5)
+        total_score += uv_pts
+        breakdown.append({
+            "factor": f"High UV Index ({uv_index:.1f})",
+            "contribution": round(uv_pts, 1),
+            "category": "Solar Radiation",
+            "description": "High solar UV flux accelerates skin temperature elevation and heat strain"
+        })
+
     # Normalize total score smoothly to 0 - 100
     risk_score = round(max(0.0, min(100.0, total_score)), 1)
 
@@ -253,6 +278,12 @@ def calculate_personal_risk(
     # Safety Recommendations
     recommendations: List[str] = []
     recommendations.append(f"Drink at least {water_intake_ml_hr} mL of water per hour (small sips every 15-20 minutes).")
+
+    if not is_acclimatized:
+        recommendations.append("You are unacclimatized to heat: Limit strenuous outdoor labor during your initial 7–14 days.")
+
+    if uv_index is not None and uv_index >= 6.0:
+        recommendations.append(f"UV Index is high ({uv_index:.1f}): Wear broad-spectrum SPF 30+ sunscreen and UV-blocking eyewear.")
 
     if risk_score >= 50 or is_pregnant or "kidney_disease" in [c.lower() for c in health_conditions]:
         recommendations.append("Incorporate Oral Rehydration Salts (ORS), coconut water, or electrolyte-replenishing drinks.")

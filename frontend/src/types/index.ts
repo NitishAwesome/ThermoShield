@@ -17,12 +17,23 @@ export interface WeatherCondition {
   wind_speed: number;
   solar_radiation: number | null;
   time: string;
+  apparent_temperature?: number;
+  uv_index?: number;
+  weather_code?: number;
+  weather_description?: string;
+  weather_icon?: string;
+  precipitation?: number;
+  wind_direction?: number;
 }
 
 export interface DailyForecast {
   dates: string[];
   max_temperature: number[];
   min_temperature: number[];
+  apparent_temperature_max?: number[];
+  apparent_temperature_min?: number[];
+  uv_index_max?: number[];
+  weather_code?: number[];
 }
 
 export interface WeatherResponse {
@@ -104,6 +115,14 @@ export interface MLRiskData {
   risk_level: RiskLevel;
 }
 
+export interface RiskFactorItem {
+  factor: string;
+  contribution: number;
+  observed_value?: string;
+  category: string;
+  description: string;
+}
+
 export interface RiskResponse {
   location: {
     id: number | null;
@@ -113,6 +132,7 @@ export interface RiskResponse {
   };
   weather?: WeatherCondition;
   risk: MLRiskData;
+  risk_factors?: RiskFactorItem[];
   thermal: {
     heat_index: number | null;
     thermal_stress: number;
@@ -186,6 +206,7 @@ export interface RegisterCredentials {
 export interface PersonalRiskRequest {
   age: number;
   smoking?: boolean;
+  is_acclimatized?: boolean;
   health_conditions?: string[];
   physical_activity?: 'sedentary' | 'light' | 'moderate' | 'heavy' | string;
   is_pregnant?: boolean;
@@ -196,6 +217,8 @@ export interface PersonalRiskRequest {
   humidity_pct?: number | null;
   wbgt_c?: number | null;
   solar_radiation?: number | null;
+  uv_index?: number | null;
+  apparent_temperature_c?: number | null;
 }
 
 export interface PersonalRiskFactorContribution {

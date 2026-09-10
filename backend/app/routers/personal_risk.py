@@ -15,6 +15,7 @@ def calculate_risk(data: PersonalRiskInput):
     result = calculate_personal_risk(
         age=data.age,
         smoking=data.smoking,
+        is_acclimatized=data.is_acclimatized,
         health_conditions=data.health_conditions,
         physical_activity=data.physical_activity,
         is_pregnant=data.is_pregnant,
@@ -25,6 +26,8 @@ def calculate_risk(data: PersonalRiskInput):
         humidity_pct=data.humidity_pct,
         wbgt_c=data.wbgt_c,
         solar_radiation=data.solar_radiation,
+        uv_index=data.uv_index,
+        apparent_temperature_c=data.apparent_temperature_c,
     )
 
     return result

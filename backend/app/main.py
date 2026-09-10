@@ -699,6 +699,11 @@ def send_alert_email_direct_api(
             status_code=500,
             detail=f"Failed to dispatch email alert: {res.get('message')}"
         )
+    elif res.get("status") == "skipped":
+        raise HTTPException(
+            status_code=500,
+            detail=f"Email dispatch skipped: {res.get('message')}"
+        )
 
     # Log/persist alert in DB if possible
     try:
@@ -1461,6 +1466,8 @@ async def risk(
         "weather": weather,
 
         "risk": risk_result,
+
+        "risk_factors": risk_result.get("risk_factors", []),
 
         "alert": (
             {

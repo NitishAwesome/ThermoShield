@@ -139,15 +139,16 @@ class TestWeatherService(unittest.IsolatedAsyncioTestCase):
         # Should successfully return stale cached data without crashing
         self.assertEqual(result["weather"]["temperature"], 31.5)
 
-    async def test_429_empty_cache_raises_503(self):
-        # Empty cache + 429 upstream
+    async def test_429_empty_cache_returns_regional_fallback(self):
+        # Empty cache + 429 upstream engages resilient regional weather fallback
         fake_client = FakeAsyncClient(FakeResponse({}, status_code=429))
 
         with patch("backend.app.services.weather.httpx.AsyncClient", return_value=fake_client):
-            with self.assertRaises(HTTPException) as cm:
-                await get_weather(28.6139, 77.2090)
+            result = await get_weather(28.6139, 77.2090)
 
-        self.assertEqual(cm.exception.status_code, 503)
+        self.assertIn("weather", result)
+        self.assertIn("temperature", result["weather"])
+        self.assertIn("forecast", result)
 
     async def test_nighttime_solar_radiation_clamped_to_zero(self):
         # Open-Meteo returns is_day: 0 at night

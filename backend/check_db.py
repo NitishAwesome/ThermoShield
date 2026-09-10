@@ -10,7 +10,7 @@ for p in (str(project_root), str(backend_dir)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-from app.database.connection import engine, DATABASE_URL, sqlite_url
+from app.database.connection import engine, DATABASE_URL
 
 
 def get_sanitized_backend_info():

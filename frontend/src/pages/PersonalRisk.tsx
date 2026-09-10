@@ -40,6 +40,7 @@ export const PersonalRisk: React.FC = () => {
   const [age, setAge] = useState<number>(34);
   const [smoking, setSmoking] = useState<boolean>(false);
   const [isPregnant, setIsPregnant] = useState<boolean>(false);
+  const [isAcclimatized, setIsAcclimatized] = useState<boolean>(true);
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   const [physicalActivity, setPhysicalActivity] = useState<string>('moderate');
   const [hydrationStatus, setHydrationStatus] = useState<string>('moderate');
@@ -48,8 +49,10 @@ export const PersonalRisk: React.FC = () => {
 
   // Weather Environmental Coupling
   const [temperature, setTemperature] = useState<number>(34.0);
+  const [apparentTemp, setApparentTemp] = useState<number>(36.5);
   const [humidity, setHumidity] = useState<number>(65.0);
   const [wbgt, setWbgt] = useState<number>(28.5);
+  const [uvIndex, setUvIndex] = useState<number>(7.5);
   const [isSyncingWeather, setIsSyncingWeather] = useState<boolean>(false);
 
   // Calculation Results
@@ -69,6 +72,12 @@ export const PersonalRisk: React.FC = () => {
       if (thermalRes?.weather) {
         setTemperature(thermalRes.weather.temperature);
         setHumidity(thermalRes.weather.humidity);
+        if (thermalRes.weather.apparent_temperature !== undefined) {
+          setApparentTemp(thermalRes.weather.apparent_temperature);
+        }
+        if (thermalRes.weather.uv_index !== undefined) {
+          setUvIndex(thermalRes.weather.uv_index);
+        }
       }
       if (thermalRes?.thermal?.indices?.wbgt_c) {
         setWbgt(thermalRes.thermal.indices.wbgt_c);
@@ -95,6 +104,7 @@ export const PersonalRisk: React.FC = () => {
     const payload: PersonalRiskRequest = {
       age,
       smoking,
+      is_acclimatized: isAcclimatized,
       health_conditions: selectedConditions,
       physical_activity: physicalActivity,
       is_pregnant: isPregnant,
@@ -104,6 +114,8 @@ export const PersonalRisk: React.FC = () => {
       temperature_c: temperature,
       humidity_pct: humidity,
       wbgt_c: wbgt,
+      uv_index: uvIndex,
+      apparent_temperature_c: apparentTemp,
     };
 
     try {
@@ -205,23 +217,23 @@ export const PersonalRisk: React.FC = () => {
                 </div>
               </div>
 
-              {/* Toggles: Pregnancy & Smoking */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              {/* Toggles: Pregnancy, Smoking, Acclimatization */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
                 <button
                   type="button"
                   onClick={() => setIsPregnant(!isPregnant)}
-                  className={`p-3 rounded-xl border text-left transition-all flex items-center justify-between ${
+                  className={`p-2.5 rounded-xl border text-left transition-all flex items-center justify-between ${
                     isPregnant
                       ? 'bg-pink-500/15 border-pink-500/40 text-pink-700 dark:text-pink-300'
                       : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary'
                   }`}
                 >
-                  <div className="text-xs font-bold flex items-center space-x-2">
+                  <div className="text-xs font-bold flex items-center space-x-1.5">
                     <span>🤰</span>
-                    <span>Currently Pregnant</span>
+                    <span>Pregnant</span>
                   </div>
                   <div
-                    className={`w-4 h-4 rounded-full border flex items-center justify-center text-[10px] ${
+                    className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center text-[9px] ${
                       isPregnant ? 'border-pink-400 bg-pink-500 text-white' : 'border-slate-600'
                     }`}
                   >
@@ -232,22 +244,44 @@ export const PersonalRisk: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setSmoking(!smoking)}
-                  className={`p-3 rounded-xl border text-left transition-all flex items-center justify-between ${
+                  className={`p-2.5 rounded-xl border text-left transition-all flex items-center justify-between ${
                     smoking
                       ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
                       : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary'
                   }`}
                 >
-                  <div className="text-xs font-bold flex items-center space-x-2">
+                  <div className="text-xs font-bold flex items-center space-x-1.5">
                     <span>🚬</span>
-                    <span>Smoking / Tobacco</span>
+                    <span>Smoker</span>
                   </div>
                   <div
-                    className={`w-4 h-4 rounded-full border flex items-center justify-center text-[10px] ${
+                    className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center text-[9px] ${
                       smoking ? 'border-amber-400 bg-amber-500 text-white' : 'border-slate-600'
                     }`}
                   >
                     {smoking ? '✓' : ''}
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsAcclimatized(!isAcclimatized)}
+                  className={`p-2.5 rounded-xl border text-left transition-all flex items-center justify-between ${
+                    !isAcclimatized
+                      ? 'bg-red-500/15 border-red-500/40 text-red-400'
+                      : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary'
+                  }`}
+                >
+                  <div className="text-xs font-bold flex items-center space-x-1.5">
+                    <span>🌍</span>
+                    <span>{!isAcclimatized ? 'Unacclimatized' : 'Acclimatized'}</span>
+                  </div>
+                  <div
+                    className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center text-[9px] ${
+                      !isAcclimatized ? 'border-red-400 bg-red-500 text-white' : 'border-slate-600'
+                    }`}
+                  >
+                    {!isAcclimatized ? '!' : '✓'}
                   </div>
                 </button>
               </div>

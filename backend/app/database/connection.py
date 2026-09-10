@@ -72,6 +72,7 @@ def _create_database_engine(url: str):
                 f"CRITICAL: Failed to connect to PostgreSQL database in production ({err}). "
                 "Silent SQLite fallback is disabled in production to prevent ephemeral data loss on Render."
             )
+        sqlite_url = os.getenv("SQLITE_FALLBACK_URL", "sqlite:///./thermoshield.db")
         logger.warning(
             f"PostgreSQL connection failed ({err}). "
             f"Development mode: Falling back to local SQLite at {sqlite_url}"
