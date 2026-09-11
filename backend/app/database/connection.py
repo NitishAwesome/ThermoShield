@@ -48,11 +48,13 @@ def _create_database_engine(url: str):
         return create_engine(url, pool_pre_ping=True, connect_args=connect_args)
 
     # PostgreSQL / Remote relational database connection
+    connect_args = {"connect_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "3"))}
     engine_kwargs = {
         "pool_pre_ping": True,
         "pool_size": int(os.getenv("DB_POOL_SIZE", "10")),
         "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "20")),
         "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "1800")),
+        "connect_args": connect_args,
     }
     eng = create_engine(url, **engine_kwargs)
 

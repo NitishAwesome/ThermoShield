@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
+import { HeatCopilot } from './components/HeatCopilot';
 import { Dashboard } from './pages/Dashboard';
 import { LoadingState } from './components/LoadingState';
 import { LocationProvider } from './context/LocationContext';
@@ -59,6 +60,9 @@ export const App: React.FC = () => {
                   </p>
                 </div>
               </footer>
+
+              {/* Global AI Heatwave Copilot Drawer */}
+              <HeatCopilot />
             </div>
           </Router>
         </LocationProvider>

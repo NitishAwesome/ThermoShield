@@ -213,6 +213,30 @@ export const api = {
     const res = await apiClient.post<{ status: string; message: string; email: string; is_new_citizen: boolean; auto_alert_active: boolean }>('/alerts/subscribe', data);
     return res.data;
   },
+
+  // Heatwave AI Copilot (Dr. ThermoShield)
+  chatWithCopilot: async (data: {
+    message: string;
+    location?: string;
+    temperature_c?: number;
+    humidity?: number;
+    risk_level?: string;
+    risk_score?: number;
+    user_role?: string;
+  }): Promise<{
+    reply: string;
+    suggested_questions: string[];
+    safety_tier: string;
+    timestamp: string;
+  }> => {
+    const res = await apiClient.post<{
+      reply: string;
+      suggested_questions: string[];
+      safety_tier: string;
+      timestamp: string;
+    }>('/copilot/chat', data);
+    return res.data;
+  },
 };
 
 

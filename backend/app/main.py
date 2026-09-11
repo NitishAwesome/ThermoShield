@@ -27,6 +27,7 @@ from app.auth.router import (
     hash_password,
 )
 from app.routers.personal_risk import router as personal_risk_router
+from app.routers.copilot import router as copilot_router
 from app.services.firebase_service import update_live_risk
 
 from fastapi import FastAPI, Query, Depends, HTTPException, BackgroundTasks
@@ -201,6 +202,7 @@ def on_startup():
         logger.warning(f"Database initialization warning: {e}")
 
 app.include_router(personal_risk_router)
+app.include_router(copilot_router, prefix="/copilot", tags=["AI Copilot"])
 # ==================================================
 # CORS CONFIGURATION
 # ==================================================
