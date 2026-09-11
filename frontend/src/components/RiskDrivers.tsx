@@ -12,8 +12,9 @@ import {
   Info,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, Badge } from './ui';
-
 import { RiskFactorItem } from '../types';
+import { useTranslation } from '../context/LanguageContext';
+import { translateReason, translateRiskLevel, translateRiskFactor } from '../utils/translationHelpers';
 
 interface RiskDriversProps {
   temperature?: number;
@@ -44,37 +45,39 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
   riskFactors,
   className = '',
 }) => {
+  const { t } = useTranslation();
+
   // Qualitative classification of environmental drivers
-  const getTempSeverity = (t?: number) => {
-    if (t === undefined) return { label: 'Normal', color: 'text-slate-600 dark:text-slate-300', level: 'normal' };
-    if (t >= 42) return { label: 'Extreme Heat', color: 'text-red-500 dark:text-red-400', level: 'extreme' };
-    if (t >= 38) return { label: 'Severe Heat', color: 'text-orange-500 dark:text-orange-400', level: 'high' };
-    if (t >= 33) return { label: 'Moderate Heat', color: 'text-amber-500 dark:text-amber-400', level: 'moderate' };
-    return { label: 'Mild / Normal', color: 'text-emerald-600 dark:text-emerald-400', level: 'low' };
+  const getTempSeverity = (tVal?: number) => {
+    if (tVal === undefined) return { label: t('risk.low', 'Normal'), color: 'text-slate-600 dark:text-slate-300', level: 'normal' };
+    if (tVal >= 42) return { label: t('riskDrivers.extremeHeat'), color: 'text-red-500 dark:text-red-400', level: 'extreme' };
+    if (tVal >= 38) return { label: t('riskDrivers.severeHeat'), color: 'text-orange-500 dark:text-orange-400', level: 'high' };
+    if (tVal >= 33) return { label: t('riskDrivers.moderateHeat'), color: 'text-amber-500 dark:text-amber-400', level: 'moderate' };
+    return { label: t('riskDrivers.mildHeat'), color: 'text-emerald-600 dark:text-emerald-400', level: 'low' };
   };
 
   const getHumiditySeverity = (h?: number) => {
-    if (h === undefined) return { label: 'Normal', color: 'text-slate-600 dark:text-slate-300', desc: 'Typical humidity' };
-    if (h >= 75) return { label: 'High Suppression', color: 'text-orange-500 dark:text-orange-400', desc: 'Sweat evaporation severely impaired' };
-    if (h >= 55) return { label: 'Elevated', color: 'text-amber-500 dark:text-amber-400', desc: 'Restricted evaporative cooling' };
-    if (h <= 20) return { label: 'Very Dry', color: 'text-sky-600 dark:text-sky-400', desc: 'Rapid dehydration risk' };
-    return { label: 'Optimal', color: 'text-emerald-600 dark:text-emerald-400', desc: 'Normal evaporative regulation' };
+    if (h === undefined) return { label: t('risk.low', 'Normal'), color: 'text-slate-600 dark:text-slate-300', desc: t('riskDrivers.tempBaselineDesc') };
+    if (h >= 75) return { label: t('riskDrivers.highSuppression'), color: 'text-orange-500 dark:text-orange-400', desc: t('thermalCard.humidityCooling', { rh: h.toFixed(0) }) };
+    if (h >= 55) return { label: t('riskDrivers.elevated'), color: 'text-amber-500 dark:text-amber-400', desc: t('thermalCard.humidityCooling', { rh: h.toFixed(0) }) };
+    if (h <= 20) return { label: t('riskDrivers.veryDry'), color: 'text-sky-600 dark:text-sky-400', desc: t('thermalCard.humidityCooling', { rh: h.toFixed(0) }) };
+    return { label: t('riskDrivers.optimal'), color: 'text-emerald-600 dark:text-emerald-400', desc: t('alertBanner.reasonNormal') };
   };
 
   const getSolarSeverity = (s?: number) => {
-    if (s === undefined || s === 0) return { label: 'No Solar Load', color: 'text-slate-500 dark:text-slate-400', desc: 'Night / Full Shade' };
-    if (s >= 700) return { label: 'Intense Radiant', color: 'text-red-500 dark:text-red-400', desc: 'Direct peak sunlight' };
-    if (s >= 400) return { label: 'Moderate Radiant', color: 'text-amber-500 dark:text-amber-400', desc: 'Significant radiant load' };
-    return { label: 'Low Radiant', color: 'text-emerald-600 dark:text-emerald-400', desc: 'Overcast or low angle' };
+    if (s === undefined || s === 0) return { label: t('riskDrivers.noSolar'), color: 'text-slate-500 dark:text-slate-400', desc: t('riskDrivers.noSolar') };
+    if (s >= 700) return { label: t('riskDrivers.intenseRadiant'), color: 'text-red-500 dark:text-red-400', desc: t('thermalCard.solarStrong', { solar: s.toFixed(0) }) };
+    if (s >= 400) return { label: t('riskDrivers.moderateRadiant'), color: 'text-amber-500 dark:text-amber-400', desc: t('thermalCard.solarRadiant', { solar: s.toFixed(0) }) };
+    return { label: t('riskDrivers.lowRadiant'), color: 'text-emerald-600 dark:text-emerald-400', desc: t('riskDrivers.lowRadiant') };
   };
 
-  const getWindSeverity = (w?: number, t?: number) => {
-    if (w === undefined) return { label: 'Calm', color: 'text-slate-600 dark:text-slate-300', desc: 'Stagnant airflow' };
-    if (w < 1.0) return { label: 'Stagnant Air', color: 'text-amber-500 dark:text-amber-400', desc: 'Traps convective boundary layer' };
-    if (t !== undefined && t > 37 && w > 4) {
-      return { label: 'Hot Convective', color: 'text-orange-500 dark:text-orange-400', desc: 'Hot breeze increases heat gain' };
+  const getWindSeverity = (w?: number, tVal?: number) => {
+    if (w === undefined) return { label: t('riskDrivers.calmAir'), color: 'text-slate-600 dark:text-slate-300', desc: t('thermalCard.windLow', { wind: '0' }) };
+    if (w < 1.0) return { label: t('riskDrivers.stagnantAir'), color: 'text-amber-500 dark:text-amber-400', desc: t('thermalCard.windLow', { wind: w.toFixed(1) }) };
+    if (tVal !== undefined && tVal > 37 && w > 4) {
+      return { label: t('riskDrivers.hotConvective'), color: 'text-orange-500 dark:text-orange-400', desc: t('riskDrivers.hotConvective') };
     }
-    return { label: 'Active Ventilation', color: 'text-emerald-600 dark:text-emerald-400', desc: 'Facilitates convective dissipation' };
+    return { label: t('riskDrivers.activeVentilation'), color: 'text-emerald-600 dark:text-emerald-400', desc: t('thermalCard.windCooling', { wind: (w || 0).toFixed(1) }) };
   };
 
   const tempInfo = getTempSeverity(temperature);
@@ -85,11 +88,11 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
   return (
     <Card className={`overflow-hidden ${className}`}>
       <CardHeader
-        title="Why This Rating? — Environmental Risk Drivers"
-        subtitle="Deconstruction of meteorological factors contributing to human thermal strain and civic risk."
+        title={t('riskDrivers.title')}
+        subtitle={t('riskDrivers.subtitle')}
         badge={
           <Badge variant="brand" size="sm">
-            Decision-Support Model
+            {t('riskDrivers.decisionSupport')}
           </Badge>
         }
       />
@@ -99,8 +102,8 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
           <div className="p-3.5 rounded-xl ts-card-subtle border ts-border flex items-start space-x-3">
             <Info className="w-4 h-4 text-orange-400 mt-0.5 flex-shrink-0" />
             <div className="text-xs ts-text-muted leading-relaxed">
-              <span className="font-bold ts-text-primary">Primary Assessment Driver: </span>
-              {reason}
+              <span className="font-bold ts-text-primary">{t('riskDrivers.primaryDriver')} </span>
+              {translateReason(reason, t)}
             </div>
           </div>
         )}
@@ -112,7 +115,7 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
             <div className="flex items-center justify-between text-xs ts-text-muted">
               <span className="font-semibold flex items-center gap-1.5">
                 <Thermometer className="w-3.5 h-3.5 text-orange-400" />
-                Air Temp
+                {t('riskDrivers.airTemp')}
               </span>
               <span className={`text-[10px] font-bold ${tempInfo.color}`}>{tempInfo.label}</span>
             </div>
@@ -123,12 +126,12 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
                 </span>
                 {apparentTemperature !== undefined && (
                   <span className="text-[11px] font-semibold text-orange-400">
-                    Feels {apparentTemperature.toFixed(1)}°C
+                    {t('weatherCard.feelsLike', { temp: apparentTemperature.toFixed(1) })}
                   </span>
                 )}
               </div>
               <p className="text-[10.5px] ts-text-subtle mt-0.5 leading-tight">
-                Ambient thermodynamic baseline
+                {t('riskDrivers.tempBaselineDesc')}
               </p>
             </div>
           </div>
@@ -138,7 +141,7 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
             <div className="flex items-center justify-between text-xs ts-text-muted">
               <span className="font-semibold flex items-center gap-1.5">
                 <Droplets className="w-3.5 h-3.5 text-sky-400" />
-                Humidity
+                {t('riskDrivers.humidity')}
               </span>
               <span className={`text-[10px] font-bold ${humInfo.color}`}>{humInfo.label}</span>
             </div>
@@ -157,7 +160,7 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
             <div className="flex items-center justify-between text-xs ts-text-muted">
               <span className="font-semibold flex items-center gap-1.5">
                 <Sun className="w-3.5 h-3.5 text-amber-400" />
-                Solar Flux
+                {t('riskDrivers.solarFlux')}
               </span>
               <span className={`text-[10px] font-bold ${solarInfo.color}`}>{solarInfo.label}</span>
             </div>
@@ -177,7 +180,7 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
             <div className="flex items-center justify-between text-xs ts-text-muted">
               <span className="font-semibold flex items-center gap-1.5">
                 <Wind className="w-3.5 h-3.5 text-teal-400" />
-                Wind Speed
+                {t('riskDrivers.windSpeed')}
               </span>
               <span className={`text-[10px] font-bold ${windInfo.color}`}>{windInfo.label}</span>
             </div>
@@ -197,10 +200,10 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
             <div className="flex items-center justify-between text-xs ts-text-muted">
               <span className="font-semibold flex items-center gap-1.5 text-orange-400">
                 <Activity className="w-3.5 h-3.5" />
-                Thermal Strain
+                {t('riskDrivers.thermalStrain')}
               </span>
               <Badge riskLevel={riskLevel} size="sm">
-                {riskLevel}
+                {translateRiskLevel(riskLevel, t)}
               </Badge>
             </div>
             <div className="mt-2">
@@ -209,7 +212,7 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
                 <span className="text-xs font-semibold ts-text-muted ml-1">/ 100</span>
               </div>
               <p className="text-[10.5px] ts-text-subtle mt-0.5 leading-tight">
-                Physiological heat stress load
+                {t('riskDrivers.thermalStressDesc')}
               </p>
             </div>
           </div>
@@ -221,10 +224,10 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
             <div className="flex items-center justify-between text-xs font-semibold ts-text-muted">
               <span className="flex items-center space-x-1.5">
                 <Flame className="w-3.5 h-3.5 text-orange-400" />
-                <span>Calibrated Risk Factor Weightings:</span>
+                <span>{t('riskDrivers.calibratedWeightings')}</span>
               </span>
               <span className="text-[10.5px] ts-text-subtle font-normal">
-                Biometeorological Contribution Scale
+                {t('riskDrivers.contribScale')}
               </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -234,15 +237,15 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
                   className="p-3 rounded-xl ts-card-subtle border ts-border flex flex-col justify-between space-y-1.5"
                 >
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold ts-text-primary truncate">{rf.factor}</span>
+                    <span className="font-semibold ts-text-primary truncate">{translateRiskFactor(rf.factor, t)}</span>
                     <span className="font-mono text-xs font-bold text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20">
                       +{rf.contribution} pts
                     </span>
                   </div>
-                  <p className="text-[11px] ts-text-subtle leading-tight">{rf.description}</p>
+                  <p className="text-[11px] ts-text-subtle leading-tight">{translateRiskFactor(rf.description, t)}</p>
                   {rf.observed_value && (
                     <div className="text-[10.5px] ts-text-muted font-mono pt-0.5">
-                      Observed: <strong className="ts-text-primary">{rf.observed_value}</strong>
+                      {t('riskDrivers.observedLabel')} <strong className="ts-text-primary">{rf.observed_value}</strong>
                     </div>
                   )}
                 </div>
@@ -254,19 +257,18 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
         {/* Model Transparency & Decision-Support Disclosure */}
         <div className="p-3 rounded-xl ts-card-subtle border ts-border text-[11px] ts-text-muted leading-relaxed flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center space-x-2">
-            <span className="font-bold ts-text-primary">Civic Health Readiness:</span>
+            <span className="font-bold ts-text-primary">{t('riskDrivers.civicHealthReadiness')}</span>
             <span>
-              The Civic Health Risk Score{' '}
+              {t('riskDrivers.civicScoreDesc')}{' '}
               {civicScore !== undefined ? (
                 <strong className="text-purple-600 dark:text-purple-400 font-mono">({civicScore.toFixed(1)}/100)</strong>
               ) : (
                 ''
-              )}{' '}
-              is a machine-learning decision-support index modeling municipal healthcare readiness.
+              )}
             </span>
           </div>
           <div className="flex-shrink-0 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ts-border ts-text-subtle">
-            Planning Estimate
+            {t('riskCard.planningEstimate')}
           </div>
         </div>
       </CardContent>

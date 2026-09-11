@@ -2,6 +2,8 @@ import React from 'react';
 import { AlertOctagon, AlertTriangle, ShieldCheck, Droplet, UserX, Clock } from 'lucide-react';
 import { RiskAssessment, HydrationGuidance, ActivityGuidance, VulnerablePopulationGuidance } from '../types';
 import { getRiskBadgeStyles } from '../utils/risk';
+import { useTranslation } from '../context/LanguageContext';
+import { translateReason, translateRiskLevel, translateVulnerableGroup } from '../utils/translationHelpers';
 
 interface AlertBannerProps {
   riskAssessment?: RiskAssessment;
@@ -16,6 +18,7 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
   activity,
   vulnerable,
 }) => {
+  const { t } = useTranslation();
   if (!riskAssessment) return null;
 
   const level = riskAssessment.level;
@@ -24,11 +27,11 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
 
   return (
     <div
-      className={`rounded-2xl border ${styles.border} ${styles.bg} p-5 shadow-lg backdrop-blur-md transition-all`}
+      className={`rounded-2xl border ${styles.border} ${styles.bg} p-4 sm:p-5 shadow-lg backdrop-blur-md transition-all`}
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         {/* Main Alert Message */}
-        <div className="flex items-start space-x-3.5">
+        <div className="flex items-start space-x-3.5 min-w-0">
           <div className="p-2 rounded-xl ts-card-elevated border ts-border mt-0.5 flex-shrink-0">
             {isElevated ? (
               <AlertOctagon className={`w-6 h-6 ${styles.text}`} />
@@ -38,18 +41,18 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
               <ShieldCheck className="w-6 h-6 text-emerald-400" />
             )}
           </div>
-          <div>
-            <div className="flex items-center space-x-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center space-x-2 flex-wrap gap-y-1">
               <span className={`px-2.5 py-0.5 rounded text-xs font-extrabold uppercase tracking-wider ${styles.badge}`}>
-                {level} RISK ALERT
+                {t('alertBanner.riskAlert', { level: translateRiskLevel(level, t) })}
               </span>
               <span className="text-xs ts-text-subtle font-mono">
-                Severity: {Math.round(riskAssessment.score * 100)}/100
+                {t('alertBanner.severity', { score: Math.round(riskAssessment.score * 100) })}
               </span>
             </div>
             <p className="mt-1 text-sm font-semibold ts-text-primary">
-              <span className="ts-text-muted font-normal">Why it matters: </span>
-              {riskAssessment.reason}
+              <span className="ts-text-muted font-normal">{t('alertBanner.whyItMatters')} </span>
+              {translateReason(riskAssessment.reason, t)}
             </p>
           </div>
         </div>
@@ -61,7 +64,10 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
               <Droplet className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400" />
               <span>
                 {hydration.approximate_amount_ml
-                  ? `Drink ~${hydration.approximate_amount_ml}mL (${hydration.recommended_interval})`
+                  ? t('alertBanner.drinkAmountInterval', {
+                      amount: hydration.approximate_amount_ml,
+                      interval: hydration.recommended_interval || '15-20 min'
+                    })
                   : hydration.recommended_interval}
               </span>
             </div>
@@ -69,7 +75,7 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
             {activity?.peak_heat_hours && (
               <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl ts-card-subtle border ts-border text-amber-700 dark:text-amber-300 font-semibold">
                 <Clock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
-                <span>Daily Peak Sun Window: {activity.peak_heat_hours}</span>
+                <span>{t('alertBanner.peakSunWindow', { hours: activity.peak_heat_hours })}</span>
               </div>
             )}
           </div>
@@ -81,8 +87,12 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
         <div className="mt-3 pt-3 border-t ts-border flex items-start space-x-2 text-xs text-orange-700 dark:text-orange-300">
           <UserX className="w-4 h-4 text-orange-500 dark:text-orange-400 flex-shrink-0 mt-0.5" />
           <div>
-            <span className="font-bold">What to do for Vulnerable Groups: </span>
-            <span>{vulnerable.groups?.join(', ')} should stay in ventilated indoor spaces. </span>
+            <span className="font-bold">{t('alertBanner.vulnerableNotice')} </span>
+            <span>
+              {t('alertBanner.stayVentilated', {
+                groups: vulnerable.groups?.map((g: string) => translateVulnerableGroup(g, t)).join(', ') || ''
+              })}{' '}
+            </span>
             <span className="ts-text-muted">{vulnerable.guidance}</span>
           </div>
         </div>

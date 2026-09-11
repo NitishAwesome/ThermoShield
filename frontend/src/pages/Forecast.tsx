@@ -9,8 +9,10 @@ import { formatTemperature } from '../utils/risk';
 import { getCachedData, setCachedData } from '../services/cache';
 import { useLocation } from '../context/LocationContext';
 import { Card, CardHeader, CardContent, Badge, EmptyState, Button } from '../components/ui';
+import { useTranslation } from '../context/LanguageContext';
 
 export const Forecast: React.FC = () => {
+  const { t, currentLanguage } = useTranslation();
   const { coords, locationName, isLocating, setLocation, detectMyLocation } = useLocation();
 
   const [forecastData, setForecastData] = useState<ForecastResponse | null>(null);
@@ -58,10 +60,10 @@ export const Forecast: React.FC = () => {
             </Badge>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold ts-text-primary font-sans mt-0.5">
-            5-Day Meteorological Forecast
+            {t('forecast.title', '5-Day Meteorological Forecast')}
           </h1>
           <p className="text-sm ts-text-muted mt-1">
-            Synoptic high and low temperature trajectories for proactive heat planning in {locationName}.
+            {t('forecast.subtitle', 'Synoptic high and low temperature trajectories for proactive heat planning in ' + locationName)}
           </p>
         </div>
       </div>
@@ -89,13 +91,13 @@ export const Forecast: React.FC = () => {
             onClick={fetchForecast}
             leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
           >
-            Retry
+            {t('common.retry', 'Retry')}
           </Button>
         </div>
       )}
 
       {isLoading && !forecastData ? (
-        <LoadingState message="Loading multi-day meteorological forecast..." />
+        <LoadingState message={t('common.loading', 'Loading multi-day meteorological forecast...')} />
       ) : forecastData ? (
         <div className="space-y-6">
           {/* Visual Trend Chart */}
@@ -107,7 +109,7 @@ export const Forecast: React.FC = () => {
               title={
                 <div className="flex items-center space-x-2">
                   <Calendar className="w-5 h-5 text-orange-400" />
-                  <span>5-Day Synoptic Outlook Matrix</span>
+                  <span>{t('forecast.outlookMatrix', '5-Day Synoptic Outlook Matrix')}</span>
                 </div>
               }
               subtitle="Daily high and low temperature limits. Data from validated synoptic meteorological feeds."
@@ -126,8 +128,9 @@ export const Forecast: React.FC = () => {
                   const isHigh = maxTemp >= 36.0 && maxTemp < 40.0;
 
                   const dateObj = new Date(dateStr);
-                  const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
-                  const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                  const localeCode = currentLanguage === 'en' ? 'en-US' : currentLanguage;
+                  const dayName = dateObj.toLocaleDateString(localeCode, { weekday: 'short' });
+                  const formattedDate = dateObj.toLocaleDateString(localeCode, { month: 'short', day: 'numeric' });
 
                   return (
                     <div
@@ -143,7 +146,7 @@ export const Forecast: React.FC = () => {
                       <div className="flex items-center justify-between mb-3 border-b ts-border pb-2">
                         <div>
                           <span className="text-xs font-bold uppercase tracking-wider ts-text-subtle block">
-                            {idx === 0 ? 'Day 1 (Today)' : `Day ${idx + 1} (${dayName})`}
+                            {idx === 0 ? t('forecast.today', 'Day 1 (Today)') : `Day ${idx + 1} (${dayName})`}
                           </span>
                           <span className="text-xs ts-text-primary font-medium">{formattedDate}</span>
                         </div>
@@ -160,7 +163,7 @@ export const Forecast: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <span className="text-xs ts-text-muted flex items-center space-x-1">
                             <Thermometer className="w-3.5 h-3.5 text-red-400" />
-                            <span>Max:</span>
+                            <span>{t('forecast.maxTemp', 'Max')}:</span>
                           </span>
                           <span
                             className={`text-base font-extrabold font-mono ${
@@ -174,7 +177,7 @@ export const Forecast: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <span className="text-xs ts-text-muted flex items-center space-x-1">
                             <Thermometer className="w-3.5 h-3.5 text-sky-400" />
-                            <span>Min:</span>
+                            <span>{t('forecast.minTemp', 'Min')}:</span>
                           </span>
                           <span className="text-sm font-semibold font-mono ts-text-muted">
                             {formatTemperature(minTemp)}
@@ -185,15 +188,15 @@ export const Forecast: React.FC = () => {
                         <div className="pt-2">
                           {isExtreme ? (
                             <Badge variant="extreme" size="sm" showIcon>
-                              Extreme Heat
+                              {t('forecast.extremeHeat', 'Extreme Heat')}
                             </Badge>
                           ) : isHigh ? (
                             <Badge variant="high" size="sm" showIcon>
-                              Elevated Heat
+                              {t('forecast.elevatedHeat', 'Elevated Heat')}
                             </Badge>
                           ) : (
                             <Badge variant="low" size="sm" showIcon>
-                              Normal Range
+                              {t('forecast.normalRange', 'Normal Range')}
                             </Badge>
                           )}
                         </div>

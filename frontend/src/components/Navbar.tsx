@@ -27,6 +27,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLocation } from '../context/LocationContext';
+import { useTranslation } from '../context/LanguageContext';
+import { LanguageSelector } from './LanguageSelector';
 
 export const Navbar: React.FC = () => {
   const [dropdownOpen, setDropdownOpen] = useState<boolean>(false);
@@ -41,6 +43,7 @@ export const Navbar: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const { locationName } = useLocation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const routerLocation = useRouterLocation();
 
@@ -67,56 +70,117 @@ export const Navbar: React.FC = () => {
     setMoreDropdownOpen(false);
   }, [routerLocation.pathname]);
 
-  // Primary navigation (always visible on desktop)
-  const primaryNavItems = [
-    { to: '/', label: 'Dashboard', icon: Activity },
-    { to: '/risk-details', label: 'Risk Analysis', icon: Layers },
-    { to: '/forecast', label: 'Forecast', icon: Calendar },
-    { to: '/personal-risk', label: 'Personal Risk', icon: HeartPulse, isPersonal: true },
-  ];
-
-  // Secondary navigation (accessible via clean "More" dropdown on desktop)
-  const secondaryNavItems = [
-    { to: '/matrix', label: 'Municipal Matrix', icon: Building2, description: 'Surveillance of all monitored municipal zones' },
-    { to: '/alerts', label: 'Alerts & Guidance', icon: Bell, description: 'Civic heatwave warnings & protection' },
-    { to: '/interventions', label: 'Intervention Simulator', icon: Sliders, description: 'Simulate cooling centers & work pacing' },
-  ];
-
-  const allNavItems = [...primaryNavItems, ...secondaryNavItems];
-
-  const isMoreActive = secondaryNavItems.some((item) => item.to === routerLocation.pathname);
-
   const getRoleBadge = (role?: string) => {
     switch (role?.toLowerCase()) {
       case 'official':
         return {
-          label: 'Health Official',
+          label: t('role.healthOfficial'),
           icon: Building2,
           classes: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
         };
       case 'responder':
         return {
-          label: 'Responder',
+          label: t('role.responder'),
           icon: Flame,
           classes: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
         };
       case 'analyst':
         return {
-          label: 'Analyst',
+          label: t('role.analyst'),
           icon: ActivitySquare,
           classes: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
         };
       default:
         return {
-          label: 'Citizen',
+          label: t('role.citizen'),
           icon: ShieldCheck,
           classes: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
         };
     }
   };
 
+  // Role-aware navigation: promote relevant tools to primary nav based on user role
+  const getNavConfig = () => {
+    const userRole = user?.role?.toLowerCase();
+
+    if (userRole === 'official') {
+      // Municipal Health Authority
+      return {
+        primaryNavItems: [
+          { to: '/', label: t('nav.dashboard'), shortLabel: t('nav.home'), icon: Activity },
+          { to: '/matrix', label: t('nav.municipalMatrix'), shortLabel: t('nav.matrix'), icon: Building2 },
+          { to: '/risk-details', label: t('nav.riskAnalysis'), shortLabel: t('nav.analysis'), icon: Layers },
+          { to: '/interventions', label: t('nav.interventions'), shortLabel: t('nav.actions'), icon: Sliders },
+        ],
+        secondaryNavItems: [
+          { to: '/forecast', label: t('nav.forecast'), icon: Calendar, description: '5-day thermal forecast outlook' },
+          { to: '/personal-risk', label: t('nav.personalRisk'), icon: HeartPulse, description: 'Individual heat exposure calculator' },
+          { to: '/alerts', label: t('nav.alertsAndGuidance'), icon: Bell, description: 'Civic heatwave warnings & protection' },
+        ],
+        moreLabel: t('nav.tools'),
+      };
+    }
+
+    if (userRole === 'analyst') {
+      // Climate & Data Analyst
+      return {
+        primaryNavItems: [
+          { to: '/', label: t('nav.dashboard'), shortLabel: t('nav.home'), icon: Activity },
+          { to: '/risk-details', label: t('nav.riskAnalysis'), shortLabel: t('nav.analysis'), icon: Layers },
+          { to: '/matrix', label: t('nav.municipalMatrix'), shortLabel: t('nav.matrix'), icon: Building2 },
+          { to: '/forecast', label: t('nav.forecast'), shortLabel: t('nav.forecast'), icon: Calendar },
+        ],
+        secondaryNavItems: [
+          { to: '/interventions', label: t('nav.interventions'), icon: Sliders, description: 'Simulate cooling centers & work pacing' },
+          { to: '/alerts', label: t('nav.alertsAndGuidance'), icon: Bell, description: 'Civic heatwave warnings & protection' },
+          { to: '/personal-risk', label: t('nav.personalRisk'), icon: HeartPulse, description: 'Individual heat exposure calculator' },
+        ],
+        moreLabel: t('nav.tools'),
+      };
+    }
+
+    if (userRole === 'responder') {
+      // Field Responder
+      return {
+        primaryNavItems: [
+          { to: '/', label: t('nav.dashboard'), shortLabel: t('nav.home'), icon: Activity },
+          { to: '/alerts', label: t('nav.alerts'), shortLabel: t('nav.alerts'), icon: Bell },
+          { to: '/interventions', label: t('nav.interventions'), shortLabel: t('nav.actions'), icon: Sliders },
+          { to: '/personal-risk', label: t('nav.personalRisk'), shortLabel: t('nav.myRisk'), icon: HeartPulse },
+        ],
+        secondaryNavItems: [
+          { to: '/risk-details', label: t('nav.riskAnalysis'), icon: Layers, description: 'Heat stress & ML risk details' },
+          { to: '/forecast', label: t('nav.forecast'), icon: Calendar, description: '5-day thermal forecast outlook' },
+          { to: '/matrix', label: t('nav.municipalMatrix'), icon: Building2, description: 'Surveillance of all monitored zones' },
+        ],
+        moreLabel: t('nav.more'),
+      };
+    }
+
+    // Default: Citizen / Public User
+    return {
+      primaryNavItems: [
+        { to: '/', label: t('nav.dashboard'), shortLabel: t('nav.home'), icon: Activity },
+        { to: '/personal-risk', label: t('nav.myHeatRisk'), shortLabel: t('nav.myRisk'), icon: HeartPulse },
+        { to: '/alerts', label: t('nav.alerts'), shortLabel: t('nav.alerts'), icon: Bell },
+        { to: '/forecast', label: t('nav.forecast'), shortLabel: t('nav.forecast'), icon: Calendar },
+      ],
+      secondaryNavItems: [
+        { to: '/risk-details', label: t('nav.riskAnalysis'), icon: Layers, description: 'Biometeorological & ML risk analysis' },
+        { to: '/matrix', label: t('nav.municipalMatrix'), icon: Building2, description: 'Surveillance of all monitored municipal zones' },
+        { to: '/interventions', label: t('nav.interventionSimulator'), icon: Sliders, description: 'Simulate cooling centers & work pacing' },
+      ],
+      moreLabel: t('nav.more'),
+    };
+  };
+
+  const { primaryNavItems, secondaryNavItems, moreLabel } = getNavConfig();
+  const allNavItems = [...primaryNavItems, ...secondaryNavItems];
+  const isMoreActive = secondaryNavItems.some((item) => item.to === routerLocation.pathname);
+
   const roleInfo = getRoleBadge(user?.role);
   const RoleIcon = roleInfo.icon;
+
 
   const renderThemeIcon = () => {
     if (theme === 'light') return <Sun className="w-4 h-4 text-amber-500" />;
@@ -137,7 +201,7 @@ export const Navbar: React.FC = () => {
                 <span className="text-base sm:text-lg font-bold tracking-tight ts-text-primary font-sans">
                   Thermo<span className="text-orange-500">Shield</span>
                 </span>
-                <span className="px-1 py-0.2 text-[9px] font-bold bg-orange-500/15 border border-orange-500/30 text-orange-400 rounded">
+                <span className="px-1 py-0.2 text-[9px] font-bold bg-orange-500/15 border border-orange-500/30 text-orange-400 rounded hidden min-[360px]:inline-block">
                   SIH26083
                 </span>
               </div>
@@ -180,14 +244,14 @@ export const Navbar: React.FC = () => {
                     : 'ts-text-muted hover:ts-text-primary hover:bg-slate-800/30'
                 }`}
               >
-                <span>More</span>
+                <span>{moreLabel}</span>
                 <ChevronDown className={`w-3 h-3 transition-transform ${moreDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {moreDropdownOpen && (
                 <div className="absolute left-0 mt-2 w-56 ts-card-elevated border ts-border rounded-xl shadow-2xl py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                   <div className="px-3 py-1 text-[10px] uppercase font-bold ts-text-subtle tracking-wider border-b ts-border mb-1">
-                    Civic Tools & Action
+                    Additional Features
                   </div>
                   {secondaryNavItems.map((item) => {
                     const Icon = item.icon;
@@ -217,27 +281,30 @@ export const Navbar: React.FC = () => {
             </div>
           </nav>
 
-          {/* Right Section: Compact Location, Theme Selector & User Auth (Unclipped) */}
-          <div className="flex items-center space-x-1.5 sm:space-x-2.5 flex-shrink-0">
+          {/* Right Section: Compact Location, Language, Theme Selector & User Auth (Unclipped) */}
+          <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
             {/* Active Location Indicator (Only on extra wide screens to avoid crowding) */}
             {locationName && (
               <div
-                className="hidden xl:flex items-center space-x-1 px-2.5 py-1 rounded-lg ts-card-subtle border ts-border text-xs ts-text-muted max-w-[150px] truncate flex-shrink-0"
-                title={`Active Zone: ${locationName}`}
+                className="hidden xl:flex items-center space-x-1 px-2.5 py-1 rounded-lg ts-card-subtle border ts-border text-xs ts-text-muted max-w-[140px] truncate flex-shrink-0"
+                title={`${t('nav.activeZone')}: ${locationName}`}
               >
                 <MapPin className="w-3 h-3 text-orange-400 flex-shrink-0" />
                 <span className="truncate text-[11px] font-medium">{locationName.split(',')[0]}</span>
               </div>
             )}
 
+            {/* Language Selector Dropdown */}
+            <LanguageSelector variant="navbar" />
+
             {/* Theme Switcher Button / Dropdown */}
             <div className="relative flex-shrink-0" ref={themeDropdownRef}>
               <button
                 type="button"
-                aria-label="Select theme mode"
+                aria-label={t('theme.displayTheme')}
                 onClick={() => setThemeDropdownOpen(!themeDropdownOpen)}
                 className="flex items-center space-x-1.5 p-2 rounded-lg ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary transition-all focus:outline-none"
-                title={`Theme: ${theme.toUpperCase()}`}
+                title={`${t('theme.displayTheme')}: ${theme.toUpperCase()}`}
               >
                 {renderThemeIcon()}
                 <span className="text-xs font-semibold capitalize hidden lg:inline">{theme}</span>
@@ -247,7 +314,7 @@ export const Navbar: React.FC = () => {
               {themeDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-44 ts-card-elevated border ts-border rounded-xl shadow-2xl py-1.5 z-50">
                   <div className="px-3 py-1 text-[10px] uppercase font-bold ts-text-subtle tracking-wider border-b ts-border mb-1">
-                    Display Theme
+                    {t('theme.displayTheme')}
                   </div>
                   <button
                     type="button"
@@ -262,7 +329,7 @@ export const Navbar: React.FC = () => {
                     }`}
                   >
                     <Moon className="w-3.5 h-3.5" />
-                    <span>Dark Mode</span>
+                    <span>{t('theme.darkMode')}</span>
                   </button>
                   <button
                     type="button"
@@ -277,7 +344,7 @@ export const Navbar: React.FC = () => {
                     }`}
                   >
                     <Sun className="w-3.5 h-3.5" />
-                    <span>Light Mode</span>
+                    <span>{t('theme.lightMode')}</span>
                   </button>
                 </div>
               )}
@@ -298,13 +365,11 @@ export const Navbar: React.FC = () => {
                     <div className="text-xs font-bold leading-tight max-w-[85px] lg:max-w-[110px] truncate ts-text-primary">
                       {user.name}
                     </div>
-                    <div className="text-[9px] ts-text-muted leading-none">
+                    <div className="text-[10px] text-orange-400 font-medium leading-none mt-0.5">
                       {roleInfo.label}
                     </div>
                   </div>
-                  <ChevronDown
-                    className={`w-3.5 h-3.5 text-slate-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}
-                  />
+                  <ChevronDown className="w-3 h-3 text-slate-400" />
                 </button>
 
                 {/* User Dropdown Menu */}
@@ -321,12 +386,20 @@ export const Navbar: React.FC = () => {
 
                     <div className="p-1">
                       <NavLink
-                        to="/personal-risk"
+                        to="/profile"
                         onClick={() => setDropdownOpen(false)}
                         className="flex items-center space-x-2.5 px-3 py-2 text-xs text-orange-400 hover:bg-orange-500/10 rounded-xl transition-colors font-semibold"
                       >
-                        <HeartPulse className="w-4 h-4" />
-                        <span>My Personal Heat Risk</span>
+                        <UserIcon className="w-4 h-4" />
+                        <span>{t('nav.myProfile')}</span>
+                      </NavLink>
+                      <NavLink
+                        to="/personal-risk"
+                        onClick={() => setDropdownOpen(false)}
+                        className="flex items-center space-x-2.5 px-3 py-2 text-xs ts-text-muted hover:ts-text-primary hover:bg-slate-800/60 rounded-xl transition-colors font-medium"
+                      >
+                        <HeartPulse className="w-4 h-4 text-rose-400" />
+                        <span>{t('nav.myHeatRisk')}</span>
                       </NavLink>
                       <NavLink
                         to="/alerts"
@@ -334,7 +407,7 @@ export const Navbar: React.FC = () => {
                         className="flex items-center space-x-2.5 px-3 py-2 text-xs ts-text-muted hover:ts-text-primary hover:bg-slate-800/60 rounded-xl transition-colors"
                       >
                         <Bell className="w-4 h-4 text-sky-400" />
-                        <span>Active Heat Alerts</span>
+                        <span>{t('nav.alerts')}</span>
                       </NavLink>
                       <button
                         type="button"
@@ -346,25 +419,26 @@ export const Navbar: React.FC = () => {
                         className="w-full flex items-center space-x-2.5 px-3 py-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors text-left font-semibold"
                       >
                         <LogOut className="w-4 h-4" />
-                        <span>Sign Out</span>
+                        <span>{t('auth.signOut')}</span>
                       </button>
                     </div>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="flex items-center space-x-1.5 flex-shrink-0">
+              <div className="flex items-center space-x-1 sm:space-x-1.5 flex-shrink-0">
                 <Link
                   to="/login"
-                  className="px-2.5 py-1.5 rounded-lg text-xs font-semibold ts-text-muted hover:ts-text-primary hover:bg-slate-800/60 transition-colors border border-transparent"
+                  className="px-2 py-1.5 rounded-lg text-xs font-semibold ts-text-muted hover:ts-text-primary hover:bg-slate-800/60 transition-colors border border-transparent whitespace-nowrap"
                 >
-                  <span>Sign In</span>
+                  <span>{t('auth.signIn')}</span>
                 </Link>
                 <Link
                   to="/register"
-                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-sm transition-all"
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-sm transition-all whitespace-nowrap"
                 >
-                  <span>Register</span>
+                  <span className="hidden min-[360px]:inline">{t('auth.register')}</span>
+                  <span className="min-[360px]:hidden">{t('auth.join')}</span>
                 </Link>
               </div>
             )}
@@ -373,21 +447,22 @@ export const Navbar: React.FC = () => {
       </div>
 
       {/* Mobile Bottom Navigation Bar: No horizontal scroll, touch-friendly, complete route access */}
-      <div className="md:hidden border-t ts-border ts-card-elevated px-2 py-1.5 flex items-center justify-around">
+      <div className="md:hidden border-t ts-border ts-card-elevated px-1.5 py-1.5 flex items-center justify-around">
         {primaryNavItems.map((item) => {
           const Icon = item.icon;
+          const displayLabel = (item as any).shortLabel || item.label;
           return (
             <NavLink
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `flex flex-col items-center justify-center p-1 rounded-lg text-xs transition-colors min-w-[54px] ${
+                `flex flex-col items-center justify-center p-1 rounded-lg text-xs transition-colors min-w-[48px] max-w-[62px] ${
                   isActive ? 'text-orange-400 font-bold' : 'ts-text-muted hover:ts-text-primary'
                 }`
               }
             >
-              <Icon className="w-4 h-4" />
-              <span className="text-[10px] mt-0.5">{item.label}</span>
+              <Icon className="w-4 h-4 flex-shrink-0" />
+              <span className="text-[10px] mt-0.5 truncate text-center w-full">{displayLabel}</span>
             </NavLink>
           );
         })}
@@ -396,21 +471,21 @@ export const Navbar: React.FC = () => {
         <button
           type="button"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className={`flex flex-col items-center justify-center p-1 rounded-lg text-xs transition-colors min-w-[54px] ${
+          className={`flex flex-col items-center justify-center p-1 rounded-lg text-xs transition-colors min-w-[48px] max-w-[62px] ${
             isMoreActive || mobileMenuOpen ? 'text-orange-400 font-bold' : 'ts-text-muted hover:ts-text-primary'
           }`}
         >
-          <MoreHorizontal className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">More</span>
+          <MoreHorizontal className="w-4 h-4 flex-shrink-0" />
+          <span className="text-[10px] mt-0.5 truncate text-center w-full">{t('nav.more')}</span>
         </button>
       </div>
 
       {/* Mobile Modal Drawer for Secondary Links when "More" is tapped */}
       {mobileMenuOpen && (
-        <div className="md:hidden ts-card-elevated border-t ts-border p-4 space-y-2 animate-in slide-in-from-bottom-2 duration-150">
+        <div className="md:hidden ts-card-elevated border-t ts-border p-4 space-y-3 animate-in slide-in-from-bottom-2 duration-150">
           <div className="flex items-center justify-between text-xs font-bold ts-text-subtle uppercase pb-2 border-b ts-border">
-            <span>Additional Civic Features</span>
-            <button type="button" onClick={() => setMobileMenuOpen(false)} className="ts-text-muted">
+            <span>{t('nav.additionalFeatures')}</span>
+            <button type="button" onClick={() => setMobileMenuOpen(false)} className="ts-text-muted" aria-label={t('common.close')}>
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -438,9 +513,12 @@ export const Navbar: React.FC = () => {
             );
           })}
 
+          {/* Mobile Drawer Language Selector */}
+          <LanguageSelector variant="drawer" className="pt-2 border-t ts-border" />
+
           {/* Mobile Drawer Theme Selector */}
           <div className="pt-3 mt-2 border-t ts-border flex items-center justify-between px-1">
-            <span className="text-xs font-semibold ts-text-muted">Display Theme:</span>
+            <span className="text-xs font-semibold ts-text-muted">{t('theme.displayTheme')}:</span>
             <div className="flex items-center space-x-1.5">
               <button
                 type="button"
@@ -452,7 +530,7 @@ export const Navbar: React.FC = () => {
                 }`}
               >
                 <Moon className="w-3.5 h-3.5" />
-                <span>Dark</span>
+                <span>{t('theme.dark')}</span>
               </button>
               <button
                 type="button"
@@ -464,7 +542,7 @@ export const Navbar: React.FC = () => {
                 }`}
               >
                 <Sun className="w-3.5 h-3.5" />
-                <span>Light</span>
+                <span>{t('theme.light')}</span>
               </button>
             </div>
           </div>

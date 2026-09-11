@@ -24,6 +24,7 @@ import {
   Globe,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../context/LanguageContext';
 
 interface AuthPageProps {
   initialMode?: 'login' | 'register';
@@ -69,6 +70,7 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, register, loginWithGoogle, isAuthenticated, error: authError, clearError } = useAuth();
+  const { t } = useTranslation();
 
   const [mode, setMode] = useState<'login' | 'register'>(() => {
     if (location.pathname.includes('register') || location.pathname.includes('signup')) {
@@ -131,7 +133,7 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
 
   // Compute password strength for registration
   const calculatePasswordStrength = (pass: string) => {
-    if (!pass) return { score: 0, label: 'None', color: 'bg-slate-700' };
+    if (!pass) return { score: 0, label: '', color: 'bg-slate-700' };
     let score = 0;
     if (pass.length >= 8) score += 1;
     if (/[A-Z]/.test(pass)) score += 1;
@@ -140,15 +142,15 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
 
     switch (score) {
       case 1:
-        return { score: 25, label: 'Weak', color: 'bg-red-500' };
+        return { score: 25, label: t('auth.strengthWeak'), color: 'bg-red-500' };
       case 2:
-        return { score: 50, label: 'Moderate', color: 'bg-amber-500' };
+        return { score: 50, label: t('auth.strengthModerate'), color: 'bg-amber-500' };
       case 3:
-        return { score: 75, label: 'Good', color: 'bg-blue-500' };
+        return { score: 75, label: t('auth.strengthGood'), color: 'bg-blue-500' };
       case 4:
-        return { score: 100, label: 'Strong & Secure', color: 'bg-emerald-500' };
+        return { score: 100, label: t('auth.strengthStrong'), color: 'bg-emerald-500' };
       default:
-        return { score: 15, label: 'Too short', color: 'bg-red-500' };
+        return { score: 15, label: t('auth.strengthTooShort'), color: 'bg-red-500' };
     }
   };
 
@@ -325,40 +327,40 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
   const roleOptions = [
     {
       id: 'user',
-      label: 'Citizen',
-      desc: 'Heat alerts, personalized safety & hydration advice',
+      label: t('roleBanner.citizenTitle'),
+      desc: t('roleBanner.citizenDesc'),
       icon: UserCheck,
-      badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+      badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
     },
     {
       id: 'official',
-      label: 'Health Official',
-      desc: 'City-level heat monitoring & medical surge alerts',
+      label: t('roleBanner.officialTitle'),
+      desc: t('roleBanner.officialDesc'),
       icon: Building2,
-      badgeColor: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
+      badgeColor: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30',
     },
     {
       id: 'responder',
-      label: 'Emergency Responder',
-      desc: 'Disaster response & cooling shelter dispatch',
+      label: t('roleBanner.responderTitle'),
+      desc: t('roleBanner.responderDesc'),
       icon: Flame,
-      badgeColor: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
+      badgeColor: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30',
     },
     {
       id: 'analyst',
-      label: 'Climate Analyst',
-      desc: 'Biometeorological modeling & heatwave simulations',
+      label: t('roleBanner.analystTitle'),
+      desc: t('roleBanner.analystDesc'),
       icon: ActivitySquare,
-      badgeColor: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+      badgeColor: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30',
     },
   ];
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center py-6 px-4">
+    <div className="min-h-[85vh] flex items-center justify-center py-4 sm:py-6 px-3 sm:px-4">
       <div className="w-full max-w-xl">
         {/* Top Google-style Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl shadow-blue-500/5 mb-3">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl ts-card shadow-xl shadow-blue-500/5 mb-3">
             {/* Google 4-Color 'G' Logo + ThermoShield Co-branding */}
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-md p-2">
@@ -382,31 +384,31 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
                 </svg>
               </div>
               <div className="text-left">
-                <span className="text-xs font-semibold uppercase tracking-widest text-[#8ab4f8] block">
+                <span className="text-xs font-semibold uppercase tracking-widest text-blue-600 dark:text-[#8ab4f8] block">
                   Google Identity
                 </span>
-                <span className="text-sm font-bold text-white tracking-tight">ThermoShield Gateway</span>
+                <span className="text-sm font-bold ts-text-primary tracking-tight">ThermoShield Gateway</span>
               </div>
             </div>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-            {mode === 'login' ? 'Sign in' : 'Create an Account'}
+          <h1 className="text-2xl sm:text-3xl font-bold ts-text-primary tracking-tight">
+            {mode === 'login' ? t('auth.loginTitle') : t('auth.registerTitle')}
           </h1>
-          <p className="text-sm text-slate-400 mt-1 max-w-md mx-auto">
+          <p className="text-sm text-slate-600 dark:text-slate-300 mt-1 max-w-md mx-auto">
             {mode === 'login'
-              ? 'to continue to ThermoShield Heatwave Early Warning System'
-              : 'Sign up to receive localized heatwave warnings and biometeorological alerts'}
+              ? t('auth.loginSubtitle')
+              : t('auth.registerSubtitle')}
           </p>
 
           {/* Security Assurance Badge */}
-          <div className="mt-2.5 inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[#8ab4f8] text-xs font-medium">
-            <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+          <div className="mt-2.5 inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 text-blue-700 dark:text-[#8ab4f8] text-xs font-medium">
+            <ShieldCheck className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
             <span>256-Bit Encrypted &amp; OAuth 2.0 Verified</span>
             <button
               type="button"
               onClick={() => setIsSecurityModalOpen(true)}
-              className="ml-1 underline hover:text-white transition-colors"
+              className="ml-1 underline hover:text-blue-900 dark:hover:text-white transition-colors cursor-pointer"
             >
               Details
             </button>
@@ -414,13 +416,13 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
         </div>
 
         {/* Main Google-styled Card */}
-        <div className="bg-slate-900/95 border border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-8 relative overflow-hidden backdrop-blur-xl">
+        <div className="ts-card rounded-3xl shadow-2xl p-4 sm:p-8 relative overflow-hidden backdrop-blur-xl">
           {/* Subtle Ambient Glow */}
           <div className="absolute -top-24 -right-24 w-52 h-52 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -left-24 w-52 h-52 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
 
           {/* Mode Switcher Tabs */}
-          <div className="grid grid-cols-2 p-1 bg-slate-950/90 rounded-2xl border border-slate-800 mb-6">
+          <div className="grid grid-cols-2 p-1 ts-card-subtle rounded-2xl mb-6">
             <button
               type="button"
               onClick={() => {
@@ -428,13 +430,13 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
                 setLocalError(null);
                 clearError();
               }}
-              className={`py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 ${
+              className={`py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 cursor-pointer ${
                 mode === 'login'
-                  ? 'bg-slate-800 text-white shadow-sm border border-slate-700/60'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-white dark:bg-slate-800 ts-text-primary shadow-sm border border-slate-200 dark:border-slate-700/60'
+                  : 'text-slate-600 dark:text-slate-400 hover:ts-text-primary'
               }`}
             >
-              <span>Sign In</span>
+              <span>{t('auth.signIn')}</span>
             </button>
             <button
               type="button"
@@ -443,13 +445,13 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
                 setLocalError(null);
                 clearError();
               }}
-              className={`py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 ${
+              className={`py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 cursor-pointer ${
                 mode === 'register'
-                  ? 'bg-slate-800 text-white shadow-sm border border-slate-700/60'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-white dark:bg-slate-800 ts-text-primary shadow-sm border border-slate-200 dark:border-slate-700/60'
+                  : 'text-slate-600 dark:text-slate-400 hover:ts-text-primary'
               }`}
             >
-              <span>Create Account</span>
+              <span>{t('auth.register')}</span>
             </button>
           </div>
 
@@ -508,7 +510,7 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
                 </div>
               )}
               <span className="text-slate-800 font-medium">
-                {mode === 'login' ? 'Continue with Google' : 'Sign up with Google'}
+                {mode === 'login' ? t('auth.continueWithGoogle') : t('auth.signUpWithGoogle')}
               </span>
               <span className="hidden sm:inline-block ml-auto text-[11px] font-semibold text-slate-500 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200">
                 SSO
@@ -518,11 +520,11 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
             {/* Google Divider */}
             <div className="relative my-5">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-800" />
+                <div className="w-full border-t ts-border" />
               </div>
               <div className="relative flex justify-center text-[11px] uppercase tracking-wider">
-                <span className="bg-slate-900 px-3 text-slate-400 font-medium">
-                  Or use {mode === 'login' ? 'ThermoShield credentials' : 'email sign up'}
+                <span className="bg-white dark:bg-slate-900 px-3 text-slate-500 dark:text-slate-400 font-semibold tracking-wider">
+                  {mode === 'login' ? t('auth.orUseCredentials') : t('auth.orUseEmail')}
                 </span>
               </div>
             </div>
@@ -533,8 +535,8 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
             {/* Full Name (Register Mode only) */}
             {mode === 'register' && (
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                  Full Name
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                  {t('auth.fullName')}
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
@@ -546,7 +548,7 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Dr. Ronit Sharma"
-                    className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#1a73e8] focus:ring-2 focus:ring-[#1a73e8]/20 transition-all"
+                    className="w-full ts-input pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#1a73e8] focus:ring-2 focus:ring-[#1a73e8]/20 transition-all"
                   />
                 </div>
               </div>
@@ -555,17 +557,17 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
             {/* Email Address */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                  {mode === 'login' ? 'Email or Registered Phone' : 'Email Address'}
+                <label className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  {mode === 'login' ? `${t('auth.email')} / Phone` : t('auth.email')}
                 </label>
                 {mode === 'login' && (
                   <span
                     onClick={() => {
                       setEmail('aarav.sharma@health.gov.in');
                     }}
-                    className="text-[11px] text-[#8ab4f8] hover:underline cursor-pointer"
+                    className="text-[11px] text-blue-600 dark:text-[#8ab4f8] font-medium hover:underline cursor-pointer"
                   >
-                    Forgot email?
+                    {t('auth.forgotEmail')}
                   </span>
                 )}
               </div>
@@ -579,7 +581,7 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={mode === 'login' ? 'name@example.com or +91...' : 'name@example.com'}
-                  className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#1a73e8] focus:ring-2 focus:ring-[#1a73e8]/20 transition-all"
+                  className="w-full ts-input pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#1a73e8] focus:ring-2 focus:ring-[#1a73e8]/20 transition-all"
                 />
               </div>
             </div>
@@ -587,8 +589,8 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
             {/* Phone Number (Register Mode only) */}
             {mode === 'register' && (
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                  Phone Number (For SMS &amp; WhatsApp Alerts)
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                  {t('auth.phone')}
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
@@ -600,7 +602,7 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
                     placeholder="+91 98765 43210"
-                    className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#1a73e8] focus:ring-2 focus:ring-[#1a73e8]/20 transition-all"
+                    className="w-full ts-input pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#1a73e8] focus:ring-2 focus:ring-[#1a73e8]/20 transition-all"
                   />
                 </div>
               </div>
@@ -609,15 +611,15 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
             {/* Password */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                  Password
+                <label className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  {t('auth.password')}
                 </label>
                 {mode === 'login' && (
                   <span
                     onClick={() => setPassword('demo12345')}
-                    className="text-[11px] text-[#8ab4f8] hover:underline cursor-pointer"
+                    className="text-[11px] text-blue-600 dark:text-[#8ab4f8] font-medium hover:underline cursor-pointer"
                   >
-                    Use demo password?
+                    {t('auth.useDemoPassword')}
                   </span>
                 )}
               </div>
@@ -631,12 +633,12 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={mode === 'login' ? '••••••••' : 'Minimum 8 characters'}
-                  className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl pl-10 pr-11 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#1a73e8] focus:ring-2 focus:ring-[#1a73e8]/20 transition-all"
+                  className="w-full ts-input pl-10 pr-11 py-2.5 text-sm focus:outline-none focus:border-[#1a73e8] focus:ring-2 focus:ring-[#1a73e8]/20 transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-200 transition-colors"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -646,10 +648,10 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
               {mode === 'register' && password && (
                 <div className="mt-2">
                   <div className="flex items-center justify-between text-[11px] mb-1">
-                    <span className="text-slate-400">Password strength:</span>
-                    <span className="font-semibold text-slate-300">{passStrength.label}</span>
+                    <span className="ts-text-subtle">{t('auth.passwordStrength')}:</span>
+                    <span className="font-semibold ts-text-primary">{passStrength.label}</span>
                   </div>
-                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                     <div
                       className={`h-full ${passStrength.color} transition-all duration-300`}
                       style={{ width: `${passStrength.score}%` }}
@@ -662,8 +664,8 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
             {/* Role Selection (Register Mode only) */}
             {mode === 'register' && (
               <div className="pt-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-                  Select User Role
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
+                  {t('auth.role')}
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {roleOptions.map((opt) => {
@@ -675,8 +677,8 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
                         onClick={() => setRole(opt.id as any)}
                         className={`p-3 rounded-xl border cursor-pointer transition-all ${
                           isSelected
-                            ? 'bg-slate-800 border-[#1a73e8] ring-1 ring-[#1a73e8]/50'
-                            : 'bg-slate-950/60 border-slate-800/80 hover:bg-slate-800/40 hover:border-slate-700'
+                            ? 'bg-blue-50 dark:bg-slate-800 border-[#1a73e8] ring-1 ring-[#1a73e8]/50'
+                            : 'ts-card-subtle hover:border-slate-400 dark:hover:border-slate-700'
                         }`}
                       >
                         <div className="flex items-center space-x-2.5">
@@ -684,8 +686,8 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
                             <Icon className="w-4 h-4" />
                           </div>
                           <div>
-                            <div className="text-xs font-bold text-slate-200">{opt.label}</div>
-                            <div className="text-[10px] text-slate-400 leading-tight">{opt.desc}</div>
+                            <div className="text-xs font-bold ts-text-primary">{opt.label}</div>
+                            <div className="text-[10px] ts-text-muted leading-tight">{opt.desc}</div>
                           </div>
                         </div>
                       </div>
@@ -700,16 +702,16 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 text-white font-semibold text-sm rounded-xl shadow-lg shadow-blue-600/25 flex items-center justify-center space-x-2 transition-all duration-200 hover:scale-[1.005] active:scale-[0.995] disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 text-white font-semibold text-sm rounded-xl shadow-lg shadow-blue-600/25 flex items-center justify-center space-x-2 transition-all duration-200 hover:scale-[1.005] active:scale-[0.995] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
               >
                 {isSubmitting ? (
                   <span className="inline-flex items-center space-x-2">
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Verifying...</span>
+                    <span>{t('auth.verifying')}</span>
                   </span>
                 ) : (
                   <>
-                    <span>{mode === 'login' ? 'Sign In' : 'Create Account'}</span>
+                    <span>{mode === 'login' ? t('auth.signIn') : t('auth.register')}</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -718,55 +720,55 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
           </form>
 
           {/* Quick Demo Credentials */}
-          <div className="mt-6 pt-4 border-t border-slate-800/90">
+          <div className="mt-6 pt-4 border-t ts-border">
             <div className="flex items-center justify-between mb-2.5">
-              <span className="text-xs font-semibold text-slate-400 flex items-center space-x-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Quick 1-Click Demo Profiles:</span>
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center space-x-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+                <span>{t('auth.demoPersonasTitle')}</span>
               </span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 type="button"
                 onClick={() => handleDemoFill('user')}
-                className="px-2.5 py-1.5 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-emerald-400 text-xs rounded-lg text-center transition-colors"
+                className="px-2.5 py-1.5 ts-card-subtle border ts-border hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium hover:text-emerald-600 dark:hover:text-emerald-400 text-xs rounded-lg text-center transition-colors cursor-pointer"
               >
-                👤 Citizen
+                👤 {t('role.citizen')}
               </button>
               <button
                 type="button"
                 onClick={() => handleDemoFill('official')}
-                className="px-2.5 py-1.5 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-cyan-400 text-xs rounded-lg text-center transition-colors"
+                className="px-2.5 py-1.5 ts-card-subtle border ts-border hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium hover:text-cyan-600 dark:hover:text-cyan-400 text-xs rounded-lg text-center transition-colors cursor-pointer"
               >
-                🏥 Official
+                🏥 {t('role.healthOfficial')}
               </button>
               <button
                 type="button"
                 onClick={() => handleDemoFill('responder')}
-                className="px-2.5 py-1.5 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-orange-400 text-xs rounded-lg text-center transition-colors"
+                className="px-2.5 py-1.5 ts-card-subtle border ts-border hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium hover:text-orange-600 dark:hover:text-orange-400 text-xs rounded-lg text-center transition-colors cursor-pointer"
               >
-                🚒 Responder
+                🚒 {t('role.responder')}
               </button>
               <button
                 type="button"
                 onClick={() => handleDemoFill('analyst')}
-                className="px-2.5 py-1.5 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-purple-400 text-xs rounded-lg text-center transition-colors"
+                className="px-2.5 py-1.5 ts-card-subtle border ts-border hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium hover:text-purple-600 dark:hover:text-purple-400 text-xs rounded-lg text-center transition-colors cursor-pointer"
               >
-                📊 Analyst
+                📊 {t('role.analyst')}
               </button>
             </div>
           </div>
 
           {/* Security & Compliance Footer */}
-          <div className="mt-5 pt-3.5 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-2">
+          <div className="mt-5 pt-3.5 border-t ts-border flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 gap-2">
             <div className="flex items-center space-x-2">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
               <span>TLS 1.3 • OAuth 2.0 PKCE • Bcrypt-12</span>
             </div>
             <button
               type="button"
               onClick={() => setIsSecurityModalOpen(true)}
-              className="text-[#8ab4f8] hover:underline flex items-center space-x-1"
+              className="text-blue-600 dark:text-[#8ab4f8] font-medium hover:underline flex items-center space-x-1 cursor-pointer"
             >
               <span>Security Architecture</span>
               <ExternalLink className="w-3 h-3" />
@@ -778,9 +780,9 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
         <div className="text-center mt-4">
           <Link
             to="/"
-            className="text-xs text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center space-x-1"
+            className="text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium transition-colors inline-flex items-center space-x-1"
           >
-            <span>← Return to Public Heatwave Dashboard</span>
+            <span>← {t('auth.returnToDashboard')}</span>
           </Link>
         </div>
       </div>

@@ -15,6 +15,8 @@ import {
 import { RiskAssessment } from '../types';
 import { Card, Badge, MetricDisplay } from './ui';
 import { formatTemperature } from '../utils/risk';
+import { useTranslation } from '../context/LanguageContext';
+import { translateRiskLevel, translateAlertReason } from '../utils/translationHelpers';
 
 interface RiskCardProps {
   riskAssessment?: RiskAssessment;
@@ -43,6 +45,7 @@ export const RiskCard: React.FC<RiskCardProps> = ({
   timestamp,
   className = '',
 }) => {
+  const { t } = useTranslation();
   const level = (riskAssessment?.level || 'LOW').toUpperCase();
   const score = riskAssessment?.score !== undefined ? riskAssessment.score : 0;
   const scorePercent = Math.min(100, Math.max(0, Math.round(score * 100)));
@@ -50,7 +53,7 @@ export const RiskCard: React.FC<RiskCardProps> = ({
   // Freshness timestamp formatting
   const formattedTime = timestamp
     ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : 'Live telemetry';
+    : t('riskCard.liveTelemetry');
 
   const getBorderHighlight = () => {
     switch (level) {
@@ -69,7 +72,7 @@ export const RiskCard: React.FC<RiskCardProps> = ({
     <Card
       variant="elevated"
       highlightBorder={getBorderHighlight()}
-      className={`relative overflow-hidden flex flex-col justify-between p-6 ${className}`}
+      className={`relative overflow-hidden flex flex-col justify-between p-4 sm:p-6 ${className}`}
     >
       {/* Background ambient gradient glow */}
       <div
@@ -84,13 +87,13 @@ export const RiskCard: React.FC<RiskCardProps> = ({
         }`}
       />
 
-      <div className="space-y-5">
+      <div className="space-y-4 sm:space-y-5">
         {/* Top bar: Location & Freshness */}
         <div className="flex flex-wrap items-center justify-between gap-2 border-b ts-border pb-3">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 min-w-0">
             <MapPin className="w-4 h-4 text-orange-400 flex-shrink-0" />
-            <span className="text-sm font-bold ts-text-primary truncate max-w-[240px]">
-              {locationName || 'Current Location'}
+            <span className="text-sm font-bold ts-text-primary truncate max-w-[160px] sm:max-w-[240px]">
+              {locationName || t('riskCard.currentLocation')}
             </span>
           </div>
 
@@ -104,21 +107,21 @@ export const RiskCard: React.FC<RiskCardProps> = ({
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <span className="text-xs font-bold uppercase tracking-wider ts-text-subtle">
-              Current Heat Risk Assessment
+              {t('riskCard.title')}
             </span>
             <h2 className="text-xl sm:text-2xl font-black ts-text-primary font-sans mt-0.5">
               {level === 'EXTREME'
-                ? 'Extreme Thermal Hazard'
+                ? t('riskCard.extremeHazard')
                 : level === 'HIGH'
-                ? 'High Thermal Strain'
+                ? t('riskCard.highStrain')
                 : level === 'MODERATE'
-                ? 'Moderate Thermal Burden'
-                : 'Low Heat Risk'}
+                ? t('riskCard.moderateBurden')
+                : t('riskCard.lowRisk')}
             </h2>
           </div>
 
           <Badge riskLevel={level} size="lg" showDot showIcon>
-            {level}
+            {translateRiskLevel(level, t)}
           </Badge>
         </div>
 
@@ -129,7 +132,7 @@ export const RiskCard: React.FC<RiskCardProps> = ({
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-bold uppercase tracking-wider ts-text-muted flex items-center gap-1.5">
                 <Activity className="w-4 h-4 text-orange-400" />
-                Heat Strain Index
+                {t('riskCard.heatStrainIndex')}
               </span>
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border ts-border ts-text-subtle font-mono">
                 {riskAssessment?.primary_index || 'WBGT'}
@@ -169,7 +172,7 @@ export const RiskCard: React.FC<RiskCardProps> = ({
               />
             </div>
             <p className="text-[11px] ts-text-subtle mt-1.5 leading-tight">
-              Biometeorological physiological strain on human body.
+              {t('riskCard.physiologicalStrain')}
             </p>
           </div>
 
@@ -178,10 +181,10 @@ export const RiskCard: React.FC<RiskCardProps> = ({
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300 flex items-center gap-1.5">
                 <Cpu className="w-4 h-4 text-purple-500 dark:text-purple-400" />
-                Civic Health Risk
+                {t('riskCard.civicHealthRisk')}
               </span>
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-purple-500/40 text-purple-700 dark:text-purple-300 font-mono">
-                PLANNING ESTIMATE
+                {t('riskCard.planningEstimate')}
               </span>
             </div>
 
@@ -208,7 +211,7 @@ export const RiskCard: React.FC<RiskCardProps> = ({
               />
             </div>
             <p className="text-[11px] ts-text-subtle mt-1.5 leading-tight">
-              Estimated municipal healthcare demand to guide clinical readiness.
+              {t('riskCard.healthcareDemand')}
             </p>
           </div>
         </div>
@@ -218,7 +221,7 @@ export const RiskCard: React.FC<RiskCardProps> = ({
           <div className="p-2.5 rounded-xl ts-card-subtle border ts-border text-center">
             <div className="flex items-center justify-center space-x-1 text-xs ts-text-muted mb-0.5">
               <Thermometer className="w-3.5 h-3.5 text-orange-400" />
-              <span>Temp</span>
+              <span>{t('weather.temperature')}</span>
             </div>
             <div className="text-base sm:text-lg font-black font-mono ts-text-primary">
               {temperature !== undefined ? `${temperature.toFixed(1)}°C` : '—'}
@@ -228,7 +231,7 @@ export const RiskCard: React.FC<RiskCardProps> = ({
           <div className="p-2.5 rounded-xl ts-card-subtle border ts-border text-center">
             <div className="flex items-center justify-center space-x-1 text-xs ts-text-muted mb-0.5">
               <Droplets className="w-3.5 h-3.5 text-sky-400" />
-              <span>Humidity</span>
+              <span>{t('weather.humidity')}</span>
             </div>
             <div className="text-base sm:text-lg font-black font-mono ts-text-primary">
               {humidity !== undefined ? `${Math.round(humidity)}%` : '—'}
@@ -238,7 +241,7 @@ export const RiskCard: React.FC<RiskCardProps> = ({
           <div className="p-2.5 rounded-xl ts-card-subtle border ts-border text-center">
             <div className="flex items-center justify-center space-x-1 text-xs ts-text-muted mb-0.5">
               <Wind className="w-3.5 h-3.5 text-teal-400" />
-              <span>Wind</span>
+              <span>{t('weather.windSpeed')}</span>
             </div>
             <div className="text-base sm:text-lg font-black font-mono ts-text-primary">
               {windSpeed !== undefined ? `${windSpeed.toFixed(1)} m/s` : '—'}
@@ -255,8 +258,8 @@ export const RiskCard: React.FC<RiskCardProps> = ({
           <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
         )}
         <p className="leading-relaxed">
-          <strong className="ts-text-primary">Assessment Reason: </strong>
-          {riskAssessment?.reason || 'Calculated thermal strain and meteorological evaluation.'}
+          <strong className="ts-text-primary">{t('riskCard.assessmentReason')} </strong>
+          {translateAlertReason(riskAssessment?.reason, t) || t('riskDetails.conditionsComfortable')}
         </p>
       </div>
     </Card>

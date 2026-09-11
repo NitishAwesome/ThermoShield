@@ -25,8 +25,26 @@ import { getCachedData, setCachedData } from '../services/cache';
 import { useLocation } from '../context/LocationContext';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardHeader, CardContent, Badge, Button, EmptyState } from '../components/ui';
+import { useTranslation } from '../context/LanguageContext';
+import {
+  translateAlertTier,
+  translateAlertReason,
+  translateRiskLevel,
+  translateVulnerableGroup,
+  translateAlertPriority,
+  translateHydrationInterval,
+  translateHydrationGuidance,
+  translateHydrationBasis,
+  translateActivityOutdoor,
+  translateHeavyPhysicalWork,
+  translatePeakHeatHours,
+  translateRestGuidance,
+  translateVulnerableGuidance,
+  translateCivicAdvisory,
+} from '../utils/translationHelpers';
 
 export const Alerts: React.FC = () => {
+  const { t } = useTranslation();
   const { coords, locationName, isLocating, setLocation, detectMyLocation } = useLocation();
   const { user } = useAuth();
 
@@ -200,10 +218,10 @@ export const Alerts: React.FC = () => {
           </Badge>
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold ts-text-primary font-sans mt-0.5">
-          Public Heat Alerts & Guidance
+          {t('alerts.title', 'Public Heat Alerts & Guidance')}
         </h1>
         <p className="text-sm ts-text-muted mt-1">
-          Operational heatwave alerts, hydration protocols, work-rest cycles, and protection guidelines for people needing extra care in {locationName}.
+          {t('alerts.subtitle', 'Operational heatwave alerts, hydration protocols, work-rest cycles, and protection guidelines for vulnerable groups.')}
         </p>
       </div>
 
@@ -218,12 +236,12 @@ export const Alerts: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <LoadingState message="Compiling public health advisories..." />
+        <LoadingState message={t('common.loading', 'Compiling public health advisories...')} />
       ) : error ? (
         <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 flex items-center justify-between text-sm">
           <span>{error}</span>
           <Button variant="outline" size="sm" onClick={fetchAlerts} leftIcon={<RefreshCw className="w-3.5 h-3.5" />}>
-            Retry
+            {t('common.retry', 'Retry')}
           </Button>
         </div>
       ) : thermalData ? (
@@ -231,7 +249,7 @@ export const Alerts: React.FC = () => {
           {/* Active Alert Banner Card */}
           <Card
             variant="elevated"
-            className={`p-6 border-l-4 ${
+            className={`p-4 sm:p-6 border-l-4 ${
               level === 'EXTREME'
                 ? 'border-l-red-500 bg-red-500/5'
                 : level === 'HIGH'
@@ -245,9 +263,9 @@ export const Alerts: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <Bell className={`w-5 h-5 ${level === 'EXTREME' || level === 'HIGH' ? 'text-red-400 animate-pulse' : 'text-orange-400'}`} />
                 <h2 className="text-lg font-bold ts-text-primary">
-                  Heat Threat Advisory Status:{' '}
+                  {t('alerts.activeThreatBanner', 'Heat Threat Advisory Status')}:{' '}
                   <span className={level === 'EXTREME' ? 'text-red-400' : level === 'HIGH' ? 'text-orange-400' : 'text-emerald-400'}>
-                    {level}
+                    {translateRiskLevel(level, t)}
                   </span>
                 </h2>
               </div>
@@ -258,68 +276,68 @@ export const Alerts: React.FC = () => {
                     ? 'bg-red-500/15 text-red-700 dark:text-red-300 border border-red-500/30'
                     : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
                 }`}>
-                  {isActiveAlert ? 'ACTIVE ALERT' : 'ROUTINE MONITORING'}
+                  {isActiveAlert ? t('status.active', 'ACTIVE ALERT') : t('status.complete', 'ROUTINE MONITORING')}
                 </span>
                 <Badge riskLevel={level} size="sm">
-                  {risk?.alert_category || level} TIER
+                  {translateAlertTier(risk?.alert_category || `${level} TIER`, t)}
                 </Badge>
               </div>
             </div>
 
             <div className="mt-4 space-y-2">
               <p className="text-sm ts-text-primary leading-relaxed font-medium">
-                {risk?.reason || 'Calculated thermal strain and meteorological parameters evaluated.'}
+                {translateAlertReason(risk?.reason, t) || t('alerts.calculatedThermalStrain', {}, 'Calculated thermal strain and meteorological parameters evaluated.')}
               </p>
 
               <div className="flex flex-wrap items-center gap-4 text-xs ts-text-muted pt-1">
                 <div className="flex items-center space-x-1.5">
                   <MapPin className="w-3.5 h-3.5 text-orange-400" />
-                  <span>Location: <strong className="ts-text-primary">{locationName}</strong></span>
+                  <span>{t('alerts.location', 'Location')}: <strong className="ts-text-primary">{locationName}</strong></span>
                 </div>
                 <div className="flex items-center space-x-1.5">
                   <Clock className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Telemetry: <span className="font-mono">{formattedTimestamp}</span></span>
+                  <span>{t('alerts.telemetry', 'Telemetry')}: <span className="font-mono">{formattedTimestamp}</span></span>
                 </div>
               </div>
             </div>
           </Card>
 
           {/* Automated Citizen Heat Defense Network Card */}
-          <Card variant="elevated" className="p-5 sm:p-6 bg-gradient-to-r from-slate-900 via-slate-900/95 to-slate-900 border border-orange-500/30 overflow-hidden relative shadow-xl">
+          <Card variant="elevated" className="p-4 sm:p-6 ts-card-elevated border border-orange-500/30 dark:border-orange-500/40 bg-gradient-to-r from-orange-500/5 via-amber-500/5 to-transparent dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-900 overflow-hidden relative shadow-xl">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
               <div className="space-y-2 max-w-xl">
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-orange-400">
                     <Radio className="w-4 h-4 animate-pulse" />
                   </div>
-                  <span className="text-xs font-bold uppercase tracking-wider text-orange-400">
-                    Automated Citizen Heat Defense Network
+                  <span className="text-xs font-bold uppercase tracking-wider text-orange-500 dark:text-orange-400">
+                    {t('alerts.networkTitle')}
                   </span>
-                  <Badge variant="brand" size="sm" className="text-[10px] bg-emerald-500/20 border-emerald-500/40 text-emerald-300">
-                    Auto-Broadcast Active
+                  <Badge variant="brand" size="sm" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
+                    {t('alerts.autoBroadcastActive')}
                   </Badge>
-                  <Badge variant="neutral" size="sm" className="text-[10px] text-slate-400 border-slate-700">
-                    30m Cooldown Guard
+                  <Badge variant="neutral" size="sm" className="text-[10px] text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700">
+                    {t('alerts.cooldownGuard')}
                   </Badge>
                 </div>
                 
                 <h3 className="text-lg font-bold ts-text-primary flex items-center gap-2">
-                  Automatic Early-Warning Citizen Dispatch
+                  {t('alerts.autoDispatchHeading')}
                 </h3>
                 
-                <p className="text-xs ts-text-muted leading-relaxed">
-                  No manual entry required on every visit. Whenever <span className="text-rose-400 font-semibold">HIGH</span> or <span className="text-purple-400 font-semibold">EXTREME</span> heat risk triggers in <span className="text-orange-400 font-semibold">{locationName}</span>, all enrolled citizens are instantly alerted with medical-grade hydration and WBGT work-rest safety directives.
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  {t('alerts.autoDispatchDescription', { location: locationName })}
                 </p>
 
                 {user ? (
-                  <div className="flex items-center gap-2 pt-1 text-xs text-emerald-400 font-medium bg-emerald-950/40 border border-emerald-500/30 px-3 py-1.5 rounded-lg w-fit">
+                  <div className="flex items-center gap-2 pt-1 text-xs text-emerald-700 dark:text-emerald-400 font-medium bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/30 px-3 py-1.5 rounded-lg w-fit">
                     <ShieldCheck className="w-4 h-4 flex-shrink-0" />
-                    <span>Enrolled Citizen: <strong>{user.name || 'Resident'}</strong> ({user.email})</span>
+                    <span>{t('role.citizen')}: <strong>{user.name || 'Resident'}</strong> ({user.email})</span>
                   </div>
                 ) : (
-                  <div className="text-[11px] text-slate-400 flex items-center gap-1.5 pt-1">
+                  <div className="text-[11px] ts-text-subtle flex items-center gap-1.5 pt-1">
                     <Info className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
-                    <span>Enter your email once below to register your local citizen zone for autonomous heat warnings.</span>
+                    <span>{t('alerts.enterEmailAutonomous')}</span>
                   </div>
                 )}
               </div>
@@ -332,14 +350,14 @@ export const Alerts: React.FC = () => {
                     <input
                       type="email"
                       required
-                      placeholder="Citizen email address..."
+                      placeholder={t('alerts.citizenEmailPlaceholder')}
                       value={recipientEmail}
                       onChange={(e) => {
                         setRecipientEmail(e.target.value);
                         setEmailErrorMsg(null);
                         setEmailSuccessMsg(null);
                       }}
-                      className="w-full sm:w-64 pl-9 pr-3 py-2 text-xs rounded-xl bg-slate-800/90 border border-slate-700 ts-text-primary placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                      className="w-full sm:w-64 pl-9 pr-3 py-2 text-xs rounded-xl ts-input ts-text-primary placeholder:ts-text-subtle focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                     />
                   </div>
                   <Button
@@ -354,9 +372,9 @@ export const Alerts: React.FC = () => {
                         <Shield className="w-3.5 h-3.5" />
                       )
                     }
-                    className="whitespace-nowrap font-bold text-xs"
+                    className="whitespace-nowrap font-bold text-xs cursor-pointer"
                   >
-                    {isSendingEmail ? 'Enrolling...' : 'Enroll Citizen'}
+                    {isSendingEmail ? t('common.loading', 'Enrolling...') : t('alerts.subscribeBtn', 'Dispatch Alert to Email')}
                   </Button>
                 </form>
 
@@ -372,29 +390,29 @@ export const Alerts: React.FC = () => {
                       isSendingEmail ? (
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                       ) : (
-                        <Zap className="w-3.5 h-3.5 text-amber-400" />
+                        <Zap className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
                       )
                     }
-                    className="text-xs border-slate-700 hover:border-orange-500/50 hover:bg-orange-500/10 text-slate-300"
+                    className="text-xs border-slate-300 dark:border-slate-700 hover:border-orange-500/50 hover:bg-orange-500/10 text-slate-700 dark:text-slate-300 hover:ts-text-primary cursor-pointer"
                   >
-                    ⚡ Test Emergency Auto-Alert
+                    ⚡ {t('alerts.testEmergency', 'Test Emergency Auto-Alert')}
                   </Button>
-                  <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">From: ronit.jagdale.39@gmail.com</span>
+                  <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">{t('alerts.fromSender')}</span>
                 </div>
               </div>
             </div>
 
             {/* Status Feedback Messages */}
             {emailSuccessMsg && (
-              <div className="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center space-x-2 animate-fadeIn">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+              <div className="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs flex items-center space-x-2 animate-fadeIn">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />
                 <span className="font-medium">{emailSuccessMsg}</span>
               </div>
             )}
 
             {emailErrorMsg && (
-              <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center space-x-2 animate-fadeIn">
-                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+              <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-xs flex items-center space-x-2 animate-fadeIn">
+                <AlertTriangle className="w-4 h-4 text-red-500 dark:text-red-400 flex-shrink-0" />
                 <span>{emailErrorMsg}</span>
               </div>
             )}
@@ -410,42 +428,42 @@ export const Alerts: React.FC = () => {
                   title={
                     <div className="flex items-center space-x-2 text-sky-600 dark:text-sky-400 text-sm font-bold">
                       <Droplet className="w-4 h-4" />
-                      <span>Hydration Protocol</span>
+                      <span>{t('alerts.hydrationProtocol', 'Hydration Protocol')}</span>
                     </div>
                   }
                   badge={
                     <Badge variant="brand" size="sm">
-                      {hydration?.priority || 'STANDARD'} PRIORITY
+                      {translateAlertPriority(hydration?.priority, t)} {t('alerts.priorityBadge')}
                     </Badge>
                   }
                 />
                 <CardContent className="space-y-3 text-xs">
                   <div className="p-3 rounded-xl ts-card-subtle border ts-border">
-                    <span className="ts-text-muted block font-semibold">Recommended Intake:</span>
-                    <span className="text-base font-bold text-sky-400 mt-0.5 block font-mono">
+                    <span className="ts-text-muted block font-semibold">{t('alerts.hydrationProtocol')}:</span>
+                    <span className="text-base font-bold text-sky-600 dark:text-sky-400 mt-0.5 block font-mono">
                       {hydration?.approximate_amount_ml
-                        ? `~${hydration.approximate_amount_ml} mL (${hydration.recommended_interval})`
-                        : hydration?.recommended_interval || '1 glass every 20 mins'}
+                        ? `~${hydration.approximate_amount_ml} mL (${translateHydrationInterval(hydration.recommended_interval, t)})`
+                        : translateHydrationInterval(hydration?.recommended_interval, t) || '1 glass every 20 mins'}
                     </span>
                   </div>
 
                   <div className="p-3 rounded-xl ts-card-subtle border ts-border">
-                    <span className="ts-text-muted block font-semibold">Electrolytes:</span>
+                    <span className="ts-text-muted block font-semibold">{t('matrix.publicAction')}:</span>
                     <span className="text-xs font-semibold ts-text-primary mt-0.5 block">
                       {hydration?.electrolytes_recommended
-                        ? 'Recommended (ORS / electrolyte fluids for outdoor work)'
-                        : 'Standard drinking water sufficient'}
+                        ? t('alerts.orsRecommended')
+                        : t('alerts.waterSufficient')}
                     </span>
                   </div>
 
                   <p className="ts-text-muted leading-relaxed pt-1">
-                    {hydration?.guidance}
+                    {translateHydrationGuidance(hydration?.guidance, t)}
                   </p>
                 </CardContent>
               </div>
 
               <div className="p-4 border-t ts-border text-[11px] ts-text-subtle">
-                Source Basis: {hydration?.basis || 'ISO 7243 Hydration Framework'}
+                {t('alerts.sourceBasis', { basis: translateHydrationBasis(hydration?.basis, t) })}
               </div>
             </Card>
 
@@ -454,50 +472,46 @@ export const Alerts: React.FC = () => {
               <div>
                 <CardHeader
                   title={
-                    <div className="flex items-center space-x-2 text-orange-400 text-sm font-bold">
+                    <div className="flex items-center space-x-2 text-orange-500 dark:text-orange-400 text-sm font-bold">
                       <Activity className="w-4 h-4" />
-                      <span>Activity & Pacing</span>
+                      <span>{t('alerts.activityPacing', 'Activity & Pacing')}</span>
                     </div>
                   }
                   badge={
                     <Badge variant="high" size="sm">
-                      Work / Rest
+                      {t('alerts.workRest')}
                     </Badge>
                   }
                 />
                 <CardContent className="space-y-3 text-xs">
                   <div className="p-3 rounded-xl ts-card-subtle border ts-border">
-                    <span className="ts-text-muted block font-semibold">Outdoor Activities & Sports:</span>
+                    <span className="ts-text-muted block font-semibold">{t('alerts.activityPacing')}:</span>
                     <span className="text-xs font-medium ts-text-primary mt-0.5 block">
-                      {activity?.outdoor_activity?.includes('Normal outdoor recreation')
-                        ? 'Normal outdoor activities can continue. Use basic sun and hydration precautions.'
-                        : activity?.outdoor_activity || 'Limit high-intensity outdoor drills during peak daylight.'}
+                      {translateActivityOutdoor(activity?.outdoor_activity, t)}
                     </span>
                   </div>
 
                   <div className="p-3 rounded-xl ts-card-subtle border ts-border">
-                    <span className="ts-text-muted block font-semibold">Outdoor Work & Labor:</span>
+                    <span className="ts-text-muted block font-semibold">{t('profile.exposureWorkTab')}:</span>
                     <span className="text-xs font-medium ts-text-primary mt-0.5 block">
-                      {activity?.heavy_physical_work?.includes('Standard occupational pacing')
-                        ? 'Normal work can continue, with regular water and rest breaks.'
-                        : activity?.heavy_physical_work || 'Mandate shaded rest breaks and frequent fluid replenishment.'}
+                      {translateHeavyPhysicalWork(activity?.heavy_physical_work, t)}
                     </span>
                   </div>
 
                   <div className="p-3 rounded-xl ts-card-subtle border ts-border">
-                    <span className="ts-text-muted block font-semibold">Hottest Hours of Day:</span>
-                    <span className="text-xs font-bold text-orange-400 mt-0.5 block font-mono">
-                      {activity?.peak_heat_hours ? `Peak Heat: ${activity.peak_heat_hours}` : '12:00 PM – 3:00 PM'}
+                    <span className="ts-text-muted block font-semibold">{t('dashboard.peakHeatWindow')}:</span>
+                    <span className="text-xs font-bold text-orange-500 dark:text-orange-400 mt-0.5 block font-mono">
+                      {activity?.peak_heat_hours ? `Peak Heat: ${translatePeakHeatHours(activity.peak_heat_hours, t)}` : '12:00 PM – 3:00 PM'}
                     </span>
                     <span className="text-[11px] ts-text-subtle block mt-0.5">
-                      Take extra care during peak hours. Stay hydrated and avoid unnecessary direct sun.
+                      {t('alerts.takeExtraCarePeak')}
                     </span>
                   </div>
                 </CardContent>
               </div>
 
               <div className="p-4 border-t ts-border text-[11px] ts-text-subtle">
-                Rest Requirement: {activity?.rest_guidance || 'Cool shaded respite required.'}
+                {t('alerts.restRequirement', { guidance: translateRestGuidance(activity?.rest_guidance, t) })}
               </div>
             </Card>
 
@@ -508,39 +522,38 @@ export const Alerts: React.FC = () => {
                   title={
                     <div className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 text-sm font-bold">
                       <HeartHandshake className="w-4 h-4" />
-                      <span>People Needing Extra Protection</span>
+                      <span>{t('alerts.vulnerableProtection', 'People Needing Extra Protection')}</span>
                     </div>
                   }
                   badge={
                     <Badge variant={vulnerable?.priority ? 'extreme' : 'neutral'} size="sm">
-                      {vulnerable?.priority ? 'Priority Attention' : 'Routine'}
+                      {translateAlertPriority(vulnerable?.priority ? 'Priority Attention' : 'Routine', t)}
                     </Badge>
                   }
                 />
                 <CardContent className="space-y-3 text-xs">
                   <div className="p-3 rounded-xl ts-card-subtle border ts-border">
-                    <span className="ts-text-muted block font-semibold mb-1">Target Cohorts:</span>
+                    <span className="ts-text-muted block font-semibold mb-1">{t('alerts.vulnerableProtection')}:</span>
                     <div className="flex flex-wrap gap-1.5">
                       {vulnerable?.groups?.map((g, idx) => (
                         <span
                           key={idx}
                           className="px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20 text-purple-700 dark:text-purple-300 font-semibold text-[11px] capitalize"
                         >
-                          {g}
+                          {translateVulnerableGroup(g, t)}
                         </span>
                       ))}
                     </div>
                   </div>
 
                   <p className="ts-text-muted leading-relaxed pt-1">
-                    {vulnerable?.guidance ||
-                      'Keep vulnerable community members in well-ventilated, shaded spaces with frequent wellness checks.'}
+                    {translateVulnerableGuidance(vulnerable?.guidance, t)}
                   </p>
                 </CardContent>
               </div>
 
               <div className="p-4 border-t ts-border text-[11px] ts-text-subtle">
-                Directive: Municipal welfare checks and public water station access prioritized.
+                {t('alerts.directiveWelfareChecks')}
               </div>
             </Card>
           </div>
@@ -550,11 +563,11 @@ export const Alerts: React.FC = () => {
             <CardHeader
               title={
                 <div className="flex items-center space-x-2">
-                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                  <span>Standardized Heat Safety Directives</span>
+                  <ShieldCheck className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />
+                  <span>{t('alerts.standardDirectives', 'Standardized Heat Safety Directives')}</span>
                 </div>
               }
-              subtitle="Evidence-based instructions for civic workers and residents."
+              subtitle={t('alerts.directivesSubtitle')}
             />
             <CardContent>
               {advisories.length > 0 ? (
@@ -565,13 +578,13 @@ export const Alerts: React.FC = () => {
                       className="p-3.5 rounded-xl ts-card-subtle border ts-border flex items-start space-x-3 text-xs ts-text-primary"
                     >
                       <span className="w-2 h-2 rounded-full bg-orange-400 mt-1.5 flex-shrink-0" />
-                      <span className="leading-relaxed">{advisory}</span>
+                      <span className="leading-relaxed">{translateCivicAdvisory(advisory, t)}</span>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-xs ts-text-muted p-4 text-center">
-                  Standard baseline safety precautions apply. No elevated advisories triggered at this hour.
+                  {t('alerts.noElevatedAdvisories')}
                 </div>
               )}
             </CardContent>

@@ -5,6 +5,7 @@ import L from 'leaflet';
 import { RiskLevel, MapLocationRisk } from '../types';
 import { getRiskColor } from '../utils/risk';
 import { Card, CardHeader, CardContent, Badge } from './ui';
+import { useTranslation } from '../context/LanguageContext';
 
 // Fix leaflet default marker icon in React
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -66,13 +67,14 @@ export const RiskMap: React.FC<RiskMapProps> = ({
   onMapClick,
   className = '',
 }) => {
+  const { t } = useTranslation();
   const currentRiskColor = getRiskColor(riskLevel);
 
   return (
     <Card className={`overflow-hidden ${className}`}>
       <CardHeader
-        title="Geospatial Heat Strain Layer"
-        subtitle="Interactive spatial distribution of biometeorological thermal strain across municipal coordinates."
+        title={t('matrix.title')}
+        subtitle={t('matrix.subtitle')}
         badge={
           <Badge variant="brand" size="sm">
             Live GIS
@@ -82,22 +84,23 @@ export const RiskMap: React.FC<RiskMapProps> = ({
           <div className="flex items-center space-x-2 sm:space-x-3 text-xs">
             <span className="flex items-center space-x-1">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-              <span className="ts-text-muted text-[11px] font-semibold hidden xs:inline">LOW</span>
+              <span className="ts-text-muted text-[11px] font-semibold hidden xs:inline">{t('riskCard.lowRisk')}</span>
             </span>
             <span className="flex items-center space-x-1">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-              <span className="ts-text-muted text-[11px] font-semibold hidden xs:inline">MODERATE</span>
+              <span className="ts-text-muted text-[11px] font-semibold hidden xs:inline">{t('riskCard.moderateBurden')}</span>
             </span>
             <span className="flex items-center space-x-1">
               <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
-              <span className="ts-text-muted text-[11px] font-semibold hidden xs:inline">HIGH</span>
+              <span className="ts-text-muted text-[11px] font-semibold hidden xs:inline">{t('riskCard.highStrain')}</span>
             </span>
             <span className="flex items-center space-x-1">
               <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-red-400 text-[11px] font-bold">EXTREME</span>
+              <span className="text-red-400 text-[11px] font-bold">{t('riskCard.extremeHazard')}</span>
             </span>
           </div>
         }
+
       />
       <CardContent className="space-y-3">
         {/* Map Error Banner if /map/risk fails */}
@@ -153,31 +156,31 @@ export const RiskMap: React.FC<RiskMapProps> = ({
                   <div className="space-y-1.5 text-xs ts-text-muted">
                     {riskScore !== undefined && (
                       <div className="flex justify-between">
-                        <span className="ts-text-subtle">Strain Score:</span>
+                        <span className="ts-text-subtle">{t('riskMap.strainScore')}:</span>
                         <span className="font-bold ts-text-primary">{riskScore.toFixed(2)} / 1.00</span>
                       </div>
                     )}
                     {temperature !== undefined && (
                       <div className="flex justify-between">
-                        <span className="ts-text-subtle">Air Temperature:</span>
+                        <span className="ts-text-subtle">{t('riskMap.airTemp')}:</span>
                         <span className="font-bold ts-text-primary">{temperature.toFixed(1)}°C</span>
                       </div>
                     )}
                     {humidity !== undefined && (
                       <div className="flex justify-between">
-                        <span className="ts-text-subtle">Relative Humidity:</span>
+                        <span className="ts-text-subtle">{t('riskMap.relativeHumidity')}:</span>
                         <span className="font-bold ts-text-primary">{Math.round(humidity)}%</span>
                       </div>
                     )}
                     <div className="pt-1.5 border-t ts-border text-[11px] text-orange-400">
-                      <strong>Action: </strong>
+                      <strong>{t('riskMap.action')}: </strong>
                       {riskLevel === 'EXTREME' || riskLevel === 'HIGH'
-                        ? 'Hydrate frequently and limit unshaded direct labor.'
-                        : 'Routine hydration recommended.'}
+                        ? t('riskMap.actionHigh')
+                        : t('riskMap.actionRoutine')}
                     </div>
                     {wbgt !== undefined && (
                       <div className="pt-1 text-[10px] ts-text-subtle">
-                        Estimated WBGT: {wbgt.toFixed(1)}°C
+                        {t('riskMap.estimatedWbgt')}: {wbgt.toFixed(1)}°C
                       </div>
                     )}
                   </div>
@@ -216,7 +219,7 @@ export const RiskMap: React.FC<RiskMapProps> = ({
                         </div>
                         <div className="text-xs ts-text-muted space-y-1">
                           <div className="flex justify-between">
-                            <span className="ts-text-subtle">Civic Risk Score:</span>
+                            <span className="ts-text-subtle">{t('riskMap.civicRiskScore')}:</span>
                             <span className="font-mono font-bold ts-text-primary">
                               {loc.risk_score.toFixed(1)} / 100
                             </span>
@@ -235,9 +238,9 @@ export const RiskMap: React.FC<RiskMapProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] ts-text-muted pt-1">
           <div className="flex items-center space-x-1.5">
             <Info className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
-            <span>Click any coordinate on the map to recalculate local thermal stress and civic risk.</span>
+            <span>{t('riskMap.clickToRecalculate')}</span>
           </div>
-          <span className="ts-text-subtle">Map telemetry © OpenStreetMap</span>
+          <span className="ts-text-subtle">{t('riskMap.mapTelemetry')}</span>
         </div>
       </CardContent>
     </Card>

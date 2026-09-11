@@ -259,3 +259,68 @@ export interface AreasRiskOverviewResponse {
   updated_at: string;
   areas: AreaRiskItem[];
 }
+
+export interface UserHealthProfile {
+  conditions: string[]; // e.g. 'heart_disease', 'asthma', 'diabetes', 'kidney_disease', 'hypertension', 'mobility'
+  isPregnant: boolean;
+  isOlderAdult: boolean;
+  isChild: boolean;
+  isOutdoorWorker: boolean;
+  hasHeatIllnessHistory: boolean;
+  takesMedication: boolean;
+  smoking: boolean;
+  notes?: string;
+}
+
+export interface UserExposureProfile {
+  dailyOutdoorTime: 'mostly_indoors' | 'mixed' | 'mostly_outdoors';
+  activityLevel: 'sedentary' | 'light' | 'moderate' | 'heavy';
+  typicalPeakExposure: 'morning' | 'afternoon' | 'evening' | 'multiple';
+  coolingAccess: 'reliable' | 'limited' | 'none';
+  clothingType: 'light' | 'standard' | 'heavy_protective';
+  isAcclimatized: boolean;
+  hydrationHabit: 'well_hydrated' | 'moderate' | 'dehydrated';
+}
+
+export interface UserEmergencyPreparedness {
+  hasDrinkingWaterAccess: boolean;
+  hasCoolingAccess: boolean;
+  hasShadeAccess: boolean;
+  knowsCoolingCenter: boolean;
+}
+
+export interface UserPreferences {
+  preferredLanguage: string;
+  autoSyncLocation: boolean;
+  emailAlerts: boolean;
+}
+
+export interface UserProfile {
+  id?: number | string;
+  email: string;
+  fullName: string;
+  phoneNumber?: string;
+  age: number | null;
+  gender?: string;
+  role: 'user' | 'official' | 'responder' | 'analyst' | string;
+  
+  // Primary Location
+  city: string;
+  state: string;
+  district?: string;
+  latitude?: number;
+  longitude?: number;
+
+  // Professional context for officials/responders/analysts
+  organization?: string;
+  jurisdiction?: string;
+  department?: string;
+
+  // Citizen health & daily exposure
+  health: UserHealthProfile;
+  exposure: UserExposureProfile;
+  preparedness: UserEmergencyPreparedness;
+  preferences: UserPreferences;
+
+  updatedAt?: string;
+}

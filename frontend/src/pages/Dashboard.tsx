@@ -15,18 +15,24 @@ import { RiskMap } from '../components/RiskMap';
 import { ForecastChart } from '../components/ForecastChart';
 import { AlertBanner } from '../components/AlertBanner';
 import { LoadingState } from '../components/LoadingState';
-import { AlertCircle, RefreshCw, HeartPulse, Sparkles, ArrowRight, Sliders, Building2 } from 'lucide-react';
+import { AlertCircle, RefreshCw, HeartPulse, Sparkles, ArrowRight, Sliders, Building2, Flame, BarChart2, Zap, Layers, Bell, Calendar, ShieldCheck } from 'lucide-react';
 import { getCachedData, setCachedData } from '../services/cache';
 import { useLocation } from '../context/LocationContext';
 import { useAuth } from '../context/AuthContext';
+import { useProfile } from '../context/ProfileContext';
 import { AreaRiskShowcase } from '../components/AreaRiskShowcase';
+import { PersonalizedDashboardSummary } from '../components/PersonalizedDashboardSummary';
 import { Link } from 'react-router-dom';
 import { Button, Card, EmptyState } from '../components/ui';
 import { subscribeToLiveRisk, type LiveRisk } from "../services/liveRisk";
+import { RoleWelcomeBanner } from '../components/RoleWelcomeBanner';
+import { useTranslation } from '../context/LanguageContext';
 
 export const Dashboard: React.FC = () => {
+  const { t } = useTranslation();
   const { coords, locationName, isLocating, setLocation, setCoordsAndName, detectMyLocation } = useLocation();
   const { user, isAuthenticated } = useAuth();
+  const { profile } = useProfile();
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,8 +100,10 @@ export const Dashboard: React.FC = () => {
         setRiskData(riskRes.value);
       } else {
         console.warn('ML Risk model currently unavailable:', riskRes.reason);
-        setRiskData(null);
-        setMlRiskError('Decision-support health risk proxy currently calculating.');
+        if (!cached?.risk) {
+          setRiskData(null);
+        }
+        setMlRiskError('Civic health risk estimate currently calculating.');
       }
 
       // 3. Map Risk Geospatial Layer (Non-blocking fallback)
@@ -105,7 +113,9 @@ export const Dashboard: React.FC = () => {
         setMapError(null);
       } else {
         console.warn('Map risk layer failed to load:', mapRes.reason);
-        setMapLocations([]);
+        if (!cached?.mapLocations || cached.mapLocations.length === 0) {
+          setMapLocations([]);
+        }
         setMapError('Geospatial risk layer service temporarily busy');
       }
 
@@ -113,8 +123,8 @@ export const Dashboard: React.FC = () => {
       if (updatedThermal) {
         setCachedData(lat, lon, {
           thermal: updatedThermal,
-          risk: updatedRisk,
-          mapLocations: updatedMap,
+          risk: updatedRisk || cached?.risk,
+          mapLocations: updatedMap.length > 0 ? updatedMap : (cached?.mapLocations || []),
         });
       }
 
@@ -166,47 +176,122 @@ export const Dashboard: React.FC = () => {
     setCoordsAndName({ lat, lon }, `Custom (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`);
   };
 
+  // Role-aware header and contextual actions config
+  const getRoleHeader = () => {
+    const role = user?.role?.toLowerCase();
+    switch (role) {
+      case 'official':
+        return {
+          badge: t('role.healthOfficial', 'Municipal Health Authority'),
+          icon: Building2,
+          color: 'text-cyan-400',
+          bg: 'bg-cyan-500/10 border-cyan-500/30',
+          title: t('dashboard.roleOfficialTitle', 'Municipal Command Center: Heat Surveillance & Action Planning'),
+          subtitle: t('dashboard.roleOfficialSubtitle', 'Monitor area-level heat risk across municipal wards, understand civic health demand, and evaluate intervention responses.'),
+          actions: [
+            { to: '/matrix', label: t('nav.matrix', 'Municipal Matrix'), icon: Building2, primary: false },
+            { to: '/risk-details', label: t('nav.analysis', 'Risk Analysis'), icon: Layers, primary: false },
+            { to: '/interventions', label: t('nav.interventions', 'Plan Response'), icon: Sliders, primary: true },
+          ],
+        };
+      case 'responder':
+        return {
+          badge: t('role.responder', 'Emergency Field Responder'),
+          icon: Flame,
+          color: 'text-orange-400',
+          bg: 'bg-orange-500/10 border-orange-500/30',
+          title: t('dashboard.roleResponderTitle', 'Field Response Command: Heat Hazard & Alert Operations'),
+          subtitle: t('dashboard.roleResponderSubtitle', 'Operational surveillance: active alerts, areas needing attention, heat conditions, people needing extra protection, and response measures.'),
+          actions: [
+            { to: '/alerts', label: t('nav.alerts', 'Active Alerts'), icon: Bell, primary: true },
+            { to: '/interventions', label: t('nav.interventions', 'Response Measures'), icon: Sliders, primary: false },
+            { to: '/personal-risk', label: t('nav.personalRisk', 'Field Worker Safety'), icon: HeartPulse, primary: false },
+          ],
+        };
+      case 'analyst':
+        return {
+          badge: t('role.analyst', 'Climate & Data Analyst'),
+          icon: BarChart2,
+          color: 'text-purple-400',
+          bg: 'bg-purple-500/10 border-purple-500/30',
+          title: t('dashboard.roleAnalystTitle', 'Climate Intelligence & Multi-Index Risk Analytics'),
+          subtitle: t('dashboard.roleAnalystSubtitle', 'Biometeorological modeling: analyze WBGT, multi-index heat stress, predictive ML risk factors, and cross-zone surveillance.'),
+          actions: [
+            { to: '/risk-details', label: t('nav.riskAnalysis', 'Risk Analysis'), icon: Layers, primary: true },
+            { to: '/matrix', label: t('nav.municipalMatrix', 'Municipal Matrix'), icon: Building2, primary: false },
+            { to: '/forecast', label: t('nav.forecast', '5-Day Forecast'), icon: Calendar, primary: false },
+          ],
+        };
+      default: // Citizen / Public User
+        return {
+          badge: t('role.citizen', 'Citizen Safety View'),
+          icon: ShieldCheck,
+          color: 'text-emerald-400',
+          bg: 'bg-emerald-500/10 border-emerald-500/30',
+          title: t('dashboard.title', "Today's Heat Conditions & Personal Safety"),
+          subtitle: t('dashboard.subtitle', 'Real-time local heat risk monitoring, personalized safety precautions, weather updates, and early warning protection for you and your family.'),
+          actions: [
+            { to: '/personal-risk', label: t('nav.myHeatRisk', 'My Heat Risk'), icon: HeartPulse, primary: true },
+            { to: '/alerts', label: t('nav.alerts', 'View Alerts'), icon: Bell, primary: false },
+          ],
+        };
+    }
+  };
+  const roleHeader = getRoleHeader();
+  const RoleHeaderIcon = roleHeader.icon;
+
   return (
     <div className="space-y-6 pb-12">
-      {/* Platform Mission Header for Instant SIH Judge Recognition */}
+      {/* Platform Mission Header for Instant Recognition */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b ts-border pb-5">
         <div>
           <div className="flex items-center space-x-2 flex-wrap gap-y-1">
             <span className="text-xs font-black uppercase tracking-wider text-orange-500">
-              Extreme Heatwave Early Warning System
+              {t('dashboard.extremeHeatwaveEarlyWarning')}
             </span>
             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-500/15 text-orange-400 border border-orange-500/30">
-              SIH26083 Decision Support
+              {t('dashboard.decisionSupportBadge')}
+            </span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border flex items-center space-x-1 ${roleHeader.bg}`}>
+              <RoleHeaderIcon className={`w-3 h-3 ${roleHeader.color}`} />
+              <span className={roleHeader.color}>{roleHeader.badge}</span>
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black ts-text-primary tracking-tight font-sans mt-1">
-            Command Center: Heat Stress & Civic Risk Surveillance
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black ts-text-primary tracking-tight font-sans mt-1">
+            {roleHeader.title}
           </h1>
           <p className="text-xs sm:text-sm ts-text-muted mt-1 max-w-3xl leading-relaxed">
-            Real-time multi-dimensional surveillance: combining atmospheric weather, physiological wet-bulb (WBGT) strain, community healthcare demand, and municipal mitigation planning.
+            {roleHeader.subtitle}
           </p>
         </div>
 
-        <div className="flex items-center space-x-2 flex-shrink-0">
-          <Link
-            to="/matrix"
-            className="px-3.5 py-2 rounded-xl text-xs font-bold ts-text-muted hover:ts-text-primary ts-card-subtle border ts-border transition-all flex items-center space-x-1.5"
-          >
-            <Building2 className="w-3.5 h-3.5 text-orange-400" />
-            <span>All Areas Matrix</span>
-          </Link>
-          <Link
-            to="/interventions"
-            className="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 transition-all flex items-center space-x-1.5 shadow-sm"
-          >
-            <Sliders className="w-3.5 h-3.5" />
-            <span>Simulate Actions</span>
-          </Link>
+        {/* Dynamic Contextual Next Actions for Current Role */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          {roleHeader.actions.map((act) => {
+            const ActIcon = act.icon;
+            return (
+              <Link
+                key={act.to + act.label}
+                to={act.to}
+                className={`px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm ${
+                  act.primary
+                    ? 'text-white bg-orange-500 hover:bg-orange-600'
+                    : 'ts-text-muted hover:ts-text-primary ts-card-subtle border ts-border'
+                }`}
+              >
+                {ActIcon && <ActIcon className="w-3.5 h-3.5" />}
+                <span>{act.label}</span>
+              </Link>
+            );
+          })}
         </div>
       </div>
 
+      {/* Role Welcome Banner (Landing page default: full details view, expandable / collapsible) */}
+      <RoleWelcomeBanner user={user} initialMode="full" />
+
       {/* Top Controls: Search Bar & Location Detect */}
-      <div className="relative z-40 ts-card p-4 shadow-lg">
+      <div className="relative z-10 ts-card p-3 sm:p-4 shadow-lg">
         <LocationSearch
           currentLocationName={locationName}
           onSelectLocation={setLocation}
@@ -221,7 +306,7 @@ export const Dashboard: React.FC = () => {
           <div className="flex items-start space-x-3">
             <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="font-bold text-sm text-red-900 dark:text-red-200">Telemetry Connection Warning</p>
+              <p className="font-bold text-sm text-red-900 dark:text-red-200">{t('common.error')}: {t('weatherCard.telemetryInactive')}</p>
               <p className="text-xs text-red-700 dark:text-red-300 mt-0.5">{error}</p>
             </div>
           </div>
@@ -231,15 +316,23 @@ export const Dashboard: React.FC = () => {
             onClick={() => fetchData(coords.lat, coords.lon)}
             leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
           >
-            Retry
+            {t('common.retry', 'Retry')}
           </Button>
         </div>
       )}
 
       {isLoading && !thermalData ? (
-        <LoadingState message="Connecting to ThermoShield Heat Health Engine..." />
+        <LoadingState message={t('common.loading', 'Loading...')} />
       ) : (
         <>
+          {/* Personalized Health Situation Summary */}
+          <PersonalizedDashboardSummary
+            user={user}
+            profile={profile}
+            locationName={locationName}
+            thermalData={thermalData}
+          />
+
           {/* Prominent Alert Banner (When available) */}
           {thermalData?.thermal?.risk_assessment && (
             <AlertBanner
@@ -268,21 +361,14 @@ export const Dashboard: React.FC = () => {
             <WeatherCard weather={thermalData?.weather || weatherData?.weather} />
           </div>
 
-          {/* TEMPORARY FIREBASE LIVE-RISK VERIFICATION */}
+          {/* Live Firebase Risk Sync Indicator */}
           {liveRisk && (
-            <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span className="font-semibold">Firebase Live Risk</span>
-              </div>
-
-              <div className="mt-2 text-sm">
-                <p>Location: {liveRisk.location}</p>
-                <p>Risk Score: {liveRisk.risk_score.toFixed(2)}</p>
-                <p>Risk Level: {liveRisk.risk_level}</p>
-                <p>Thermal Risk: {liveRisk.thermal_risk_level}</p>
-                <p>Status: {liveRisk.status}</p>
-              </div>
+            <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 w-fit">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+              <Zap className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+              <span className="text-[11px] font-semibold text-emerald-400">
+                Live Firebase Sync — {liveRisk.risk_level} ({liveRisk.risk_score.toFixed(2)})
+              </span>
             </div>
           )}
 
@@ -317,17 +403,17 @@ export const Dashboard: React.FC = () => {
                 <div>
                   <div className="flex items-center space-x-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-orange-400">
-                      Personalized Heat Intelligence
+                      {t('dashboard.personalizedIntelligence')}
                     </span>
                     <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-orange-500/20 text-orange-300 border border-orange-500/30">
                       {user.role?.toUpperCase()}
                     </span>
                   </div>
                   <h3 className="text-base font-bold ts-text-primary mt-0.5">
-                    Welcome, {user.name}! Assess your individual heat exposure for {locationName.split(',')[0]}
+                    {t('dashboard.welcomeUser', { name: user.name, city: locationName.split(',')[0] })}
                   </h3>
                   <p className="text-xs ts-text-muted mt-0.5 max-w-2xl">
-                    Calibrate current ambient load ({thermalData?.weather?.temperature ? `${thermalData.weather.temperature.toFixed(1)}°C` : 'Live'}) with your biometrics, hydration level, and exposure schedule.
+                    {t('dashboard.calibrateAmbientLoad', { temp: thermalData?.weather?.temperature ? thermalData.weather.temperature.toFixed(1) : '29.1' })}
                   </p>
                 </div>
               </div>
@@ -338,7 +424,7 @@ export const Dashboard: React.FC = () => {
                   className="w-full md:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold text-xs shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center space-x-2"
                 >
                   <Sparkles className="w-4 h-4" />
-                  <span>Open Personal Risk Calculator</span>
+                  <span>{t('dashboard.openRiskCalc')}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
@@ -352,12 +438,8 @@ export const Dashboard: React.FC = () => {
               onSelectArea={() => {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              title={!isAuthenticated ? 'Guest Showcase: Regional Heat Risk Across Major Metros' : 'All-Area Municipal Heat Risk Matrix'}
-              subtitle={
-                !isAuthenticated
-                  ? 'Viewing real-time heat health risks for major Indian municipal regions. Sign in to calculate your individual personal risk.'
-                  : 'Compare real-time thermal strain and civic risk levels across all monitored municipal hubs.'
-              }
+              title={t('matrix.title', 'All-Area Municipal Heat Risk Matrix')}
+              subtitle={t('matrix.subtitle', 'Multi-city surveillance: Track which municipal zones face acute heat stress, why the risk exists, and immediate public safety actions.')}
             />
           )}
 

@@ -13,6 +13,7 @@ export interface AuthContextType {
   loginWithGoogle: (credential: string, role?: string) => Promise<void>;
   logout: () => void;
   clearError: () => void;
+  switchRole: (role: string) => void;
 }
 
 const TOKEN_STORAGE_KEY = 'thermoshield_token';
@@ -59,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let isMounted = true;
 
     const verifySession = async () => {
-      if (!token) {
+      if (!token || token === 'mock-demo-token') {
         setIsLoading(false);
         return;
       }
@@ -72,7 +73,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (err: any) {
         console.warn('Session verification failed or expired:', err?.response?.data || err?.message);
-        if (isMounted) {
+        // Only log out if it was an explicit 401 unauthorized from the backend for a real token
+        if (isMounted && err?.response?.status === 401) {
           logout();
         }
       } finally {
@@ -155,6 +157,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const switchRole = useCallback((newRole: string) => {
+    const roleNormalized = newRole.toLowerCase();
+    if (user) {
+      const updated: User = { ...user, role: roleNormalized };
+      setUser(updated);
+      try {
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to save updated role to localStorage', e);
+      }
+    } else {
+      const roleNames: Record<string, string> = {
+        official: 'Dr. Aarav Sharma',
+        responder: 'Rajesh Verma',
+        analyst: 'Pooja Iyer',
+        user: 'Siddharth Patel',
+        citizen: 'Siddharth Patel',
+      };
+      const roleIdMap: Record<string, number> = {
+        official: 101,
+        responder: 102,
+        analyst: 103,
+        user: 104,
+        citizen: 104,
+      };
+      const guestUser: User = {
+        id: roleIdMap[roleNormalized] || 999,
+        name: roleNames[roleNormalized] || 'ThermoShield User',
+        phone_number: '+91 98765 43210',
+        email: `${roleNormalized}@thermoshield.demo`,
+        role: roleNormalized,
+      };
+      setUser(guestUser);
+      setToken('mock-demo-token');
+      try {
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(guestUser));
+        localStorage.setItem(TOKEN_STORAGE_KEY, 'mock-demo-token');
+      } catch (e) {
+        console.warn('Failed to save guest role to localStorage', e);
+      }
+    }
+  }, [user]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -168,6 +213,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loginWithGoogle,
         logout,
         clearError,
+        switchRole,
       }}
     >
       {children}

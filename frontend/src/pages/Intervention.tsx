@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import { InterventionResponse, SimulationResponse } from '../types';
 import { useLocation } from '../context/LocationContext';
+import { useTranslation } from '../context/LanguageContext';
 import {
   Sliders,
   Sparkles,
@@ -35,30 +36,33 @@ interface GroupedDirective {
   }[];
 }
 
-const groupRecommendations = (recs: string[]): GroupedDirective[] => {
+const groupRecommendations = (
+  recs: string[],
+  t: (key: string, params?: Record<string, string | number>, fallback?: string) => string
+): GroupedDirective[] => {
   const groups: { [key: string]: GroupedDirective } = {
     hydration: {
-      category: 'Hydration & Fluid Intake',
+      category: t('intervention.categoryHydration'),
       icon: <Droplets className="w-4 h-4 text-sky-400" />,
-      badge: 'Hydration',
+      badge: t('intervention.badgeHydration'),
       items: [],
     },
     work: {
-      category: 'Work & Outdoor Exposure',
+      category: t('intervention.categoryWork'),
       icon: <Clock className="w-4 h-4 text-amber-400" />,
-      badge: 'Exposure Limits',
+      badge: t('intervention.badgeExposure'),
       items: [],
     },
     protocols: {
-      category: 'Public Health & Civic Directives',
+      category: t('intervention.categoryProtocols'),
       icon: <ShieldAlert className="w-4 h-4 text-orange-400" />,
-      badge: 'Emergency Action',
+      badge: t('intervention.badgeEmergency'),
       items: [],
     },
     vulnerable: {
-      category: 'Priority & Vulnerable Groups',
+      category: t('intervention.categoryVulnerable'),
       icon: <Users className="w-4 h-4 text-emerald-400" />,
-      badge: 'Targeted Protection',
+      badge: t('intervention.badgeProtection'),
       items: [],
     },
   };
@@ -66,11 +70,11 @@ const groupRecommendations = (recs: string[]): GroupedDirective[] => {
   recs.forEach((rec) => {
     const lower = rec.toLowerCase();
     if (lower.includes('hydration') || lower.includes('evaporative cooling')) {
-      let explanation = 'Provide readily accessible drinking water and enforce regular hydration breaks.';
+      let explanation = t('intervention.actionHydrationBreak');
       if (lower.includes('evaporative cooling')) {
-        explanation = 'High atmospheric moisture slows sweat evaporation. Increase electrolyte fluid intake.';
+        explanation = t('intervention.actionEvaporativeCooling');
       } else if (lower.includes('facilities')) {
-        explanation = 'Establish public water distribution points and ORS booths across transit hubs.';
+        explanation = t('intervention.actionWaterFacilities');
       }
       groups.hydration.items.push({
         raw: rec,
@@ -83,11 +87,11 @@ const groupRecommendations = (recs: string[]): GroupedDirective[] => {
       lower.includes('activities') ||
       lower.includes('exposure')
     ) {
-      let explanation = 'Minimize continuous time under direct sunlight during peak afternoon heat.';
+      let explanation = t('intervention.actionSunExposure');
       if (lower.includes('11 am and 4 pm') || lower.includes('11') || lower.includes('4')) {
-        explanation = 'Hottest hours of the day: Reschedule heavy physical labor and non-essential outdoor work.';
+        explanation = t('intervention.actionPeakHeatHours');
       } else if (lower.includes('non-essential')) {
-        explanation = 'Postpone non-critical outdoor labor until ambient temperatures drop.';
+        explanation = t('intervention.actionNonEssentialLabor');
       }
       groups.work.items.push({
         raw: rec,
@@ -98,14 +102,14 @@ const groupRecommendations = (recs: string[]): GroupedDirective[] => {
       groups.vulnerable.items.push({
         raw: rec,
         action: rec,
-        explanation: 'Conduct active outreach for seniors, young children, pregnant individuals, and daily wage workers.',
+        explanation: t('intervention.actionVulnerableOutreach'),
       });
     } else {
-      let explanation = 'Deploy municipal heat action plan standard operating protocols.';
+      let explanation = t('intervention.actionStandardProtocols');
       if (lower.includes('cooling centres') || lower.includes('cooling centers')) {
-        explanation = 'Activate air-conditioned community cooling shelters and public refuge facilities.';
+        explanation = t('intervention.actionCoolingShelters');
       } else if (lower.includes('critical') || lower.includes('high')) {
-        explanation = 'Alert hospital emergency units, first responders, and municipal disaster coordination.';
+        explanation = t('intervention.actionEmergencyAlert');
       }
       groups.protocols.items.push({
         raw: rec,
@@ -120,6 +124,7 @@ const groupRecommendations = (recs: string[]): GroupedDirective[] => {
 
 export const Intervention: React.FC = () => {
   const { coords, locationName } = useLocation();
+  const { t } = useTranslation();
 
   // Simulator inputs (All 5 interactive scenario sliders)
   const [baselineRiskScore, setBaselineRiskScore] = useState<number>(37.4);
@@ -268,7 +273,7 @@ export const Intervention: React.FC = () => {
       : 'LOW';
 
   const groupedDirectives = interventionData?.recommendations
-    ? groupRecommendations(interventionData.recommendations)
+    ? groupRecommendations(interventionData.recommendations, t)
     : [];
 
   return (
@@ -278,26 +283,28 @@ export const Intervention: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2">
             <span className="text-xs font-bold uppercase tracking-wider text-orange-400">
-              Decision Support Engine
+              {t('intervention.decisionSupportEngine')}
             </span>
             <Badge variant="brand" size="sm">
-              Policy Simulator
+              {t('intervention.policySimulatorBadge')}
             </Badge>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold ts-text-primary font-sans mt-0.5">
-            Civic Heat Mitigation & Intervention Simulator
+            {t('intervention.title')}
           </h1>
           <p className="text-sm ts-text-muted mt-1">
-            Simulate municipal heat countermeasures, quantify projected risk reduction, and view structured heat action directives.
+            {t('intervention.subtitle')}
           </p>
         </div>
 
         {/* Active City Location Badge & Sync Button */}
-        <div className="flex items-center space-x-2 ts-card-elevated border ts-border px-3.5 py-2 rounded-xl">
-          <MapPin className="w-4 h-4 text-orange-400 flex-shrink-0" />
-          <div className="text-xs">
-            <span className="ts-text-subtle block text-[11px]">Active Zone:</span>
-            <span className="font-semibold ts-text-primary">{locationName.split(',')[0]}</span>
+        <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2 ts-card-elevated border ts-border px-3 sm:px-3.5 py-2 rounded-xl">
+          <div className="flex items-center space-x-2">
+            <MapPin className="w-4 h-4 text-orange-400 flex-shrink-0" />
+            <div className="text-xs">
+              <span className="ts-text-subtle block text-[11px]">{t('nav.activeZone')}:</span>
+              <span className="font-semibold ts-text-primary">{locationName.split(',')[0]}</span>
+            </div>
           </div>
           <Button
             variant="ghost"
@@ -305,9 +312,9 @@ export const Intervention: React.FC = () => {
             onClick={handleSyncLive}
             disabled={isSyncing}
             leftIcon={<Zap className={`w-3.5 h-3.5 text-orange-400 ${isSyncing ? 'animate-bounce' : ''}`} />}
-            className="ml-1 text-xs"
+            className="ml-auto sm:ml-1 text-xs cursor-pointer"
           >
-            {isSyncing ? 'Syncing...' : 'Sync Live'}
+            {isSyncing ? t('common.loading') : t('intervention.syncLiveBtn')}
           </Button>
         </div>
       </div>
@@ -320,7 +327,7 @@ export const Intervention: React.FC = () => {
             <p className="text-sm">{error}</p>
           </div>
           <Button variant="outline" size="sm" onClick={handleSyncLive} leftIcon={<RefreshCw className="w-3.5 h-3.5" />}>
-            Retry
+            {t('common.retry')}
           </Button>
         </div>
       )}
@@ -329,8 +336,8 @@ export const Intervention: React.FC = () => {
       <div className="p-4 rounded-xl ts-card-subtle border ts-border text-xs ts-text-muted flex items-start space-x-3">
         <Info className="w-4 h-4 text-orange-400 mt-0.5 flex-shrink-0" />
         <p className="leading-relaxed">
-          <strong className="ts-text-primary">Decision-Support Scenario Tool: </strong>
-          Quantifies simulated policy impact and modeled risk reduction for municipal heat action planning. Estimates scenario responses to public interventions; does not represent a guarantee of clinical outcomes.
+          <strong className="ts-text-primary">{t('intervention.disclaimerTitle')}: </strong>
+          {t('intervention.disclaimerText')}
         </p>
       </div>
 
@@ -340,17 +347,17 @@ export const Intervention: React.FC = () => {
         {/* LEFT COLUMN: SCENARIO PARAMETERS & POLICY COUNTERMEASURES (5 cols) */}
         <div className="lg:col-span-5 space-y-6">
           
-          {/* Section 1: Baseline Condition Sliders (All 5 sliders restored with original tick marks) */}
+          {/* Section 1: Baseline Scenario Conditions */}
           <Card>
             <CardHeader
-              title="1. Baseline Scenario Parameters"
-              subtitle="Drag sliders to test arbitrary heatwave scenarios."
+              title={t('intervention.section1Title')}
+              subtitle={t('intervention.section1Subtitle')}
             />
             <CardContent className="space-y-4">
               {/* Current Civic Risk Slider */}
               <div>
                 <div className="flex justify-between text-xs font-semibold ts-text-muted mb-1.5">
-                  <span>Current Civic Risk:</span>
+                  <span>{t('intervention.baselineRisk')}:</span>
                   <span className="font-mono text-sm font-bold text-amber-400">
                     {baselineRiskScore.toFixed(1)} / 100
                   </span>
@@ -365,16 +372,16 @@ export const Intervention: React.FC = () => {
                   className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-orange-500"
                 />
                 <div className="flex justify-between text-[10px] ts-text-subtle font-mono mt-1">
-                  <span>0 (Low)</span>
-                  <span>50 (High)</span>
-                  <span>100 (Extreme)</span>
+                  <span>0 ({t('intervention.tickLow')})</span>
+                  <span>50 ({t('intervention.tickHigh')})</span>
+                  <span>100 ({t('intervention.tickExtreme')})</span>
                 </div>
               </div>
 
               {/* Ambient Air Temperature Slider */}
               <div>
                 <div className="flex justify-between text-xs font-semibold ts-text-muted mb-1.5">
-                  <span>Ambient Air Temperature:</span>
+                  <span>{t('matrix.airTemp')}:</span>
                   <span className="text-orange-400 font-mono text-sm font-bold">{temperature.toFixed(1)}°C</span>
                 </div>
                 <input
@@ -387,16 +394,16 @@ export const Intervention: React.FC = () => {
                   className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-orange-500"
                 />
                 <div className="flex justify-between text-[10px] ts-text-subtle font-mono mt-1">
-                  <span>10°C (Cold)</span>
-                  <span>35°C (Warm)</span>
-                  <span>55°C (Extreme)</span>
+                  <span>10°C</span>
+                  <span>35°C</span>
+                  <span>55°C</span>
                 </div>
               </div>
 
               {/* Relative Humidity Slider */}
               <div>
                 <div className="flex justify-between text-xs font-semibold ts-text-muted mb-1.5">
-                  <span>Relative Humidity:</span>
+                  <span>{t('matrix.humidity')}:</span>
                   <span className="text-teal-400 font-mono text-sm font-bold">{humidity.toFixed(0)}%</span>
                 </div>
                 <input
@@ -409,16 +416,16 @@ export const Intervention: React.FC = () => {
                   className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-teal-500"
                 />
                 <div className="flex justify-between text-[10px] ts-text-subtle font-mono mt-1">
-                  <span>5% (Dry)</span>
-                  <span>50% (Comfort)</span>
-                  <span>100% (Saturated)</span>
+                  <span>5% ({t('intervention.tickDry')})</span>
+                  <span>50% ({t('intervention.tickComfort')})</span>
+                  <span>100% ({t('intervention.tickSaturated')})</span>
                 </div>
               </div>
 
               {/* Time of Day Slider */}
               <div>
                 <div className="flex justify-between text-xs font-semibold ts-text-muted mb-1.5">
-                  <span>Time of Day (Hour):</span>
+                  <span>{t('intervention.timeOfDay')}:</span>
                   <span className="text-purple-400 font-mono text-sm font-bold">{hour}:00 hrs</span>
                 </div>
                 <input
@@ -431,16 +438,16 @@ export const Intervention: React.FC = () => {
                   className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
                 />
                 <div className="flex justify-between text-[10px] ts-text-subtle font-mono mt-1">
-                  <span>00:00 (Midnight)</span>
-                  <span>12:00 (Noon)</span>
-                  <span>23:00 (Night)</span>
+                  <span>00:00 ({t('intervention.timeMidnight')})</span>
+                  <span>12:00 ({t('intervention.timeNoon')})</span>
+                  <span>23:00 ({t('intervention.timeNight')})</span>
                 </div>
               </div>
 
-              {/* Vulnerable Population Ratio Slider */}
+              {/* People Needing Extra Protection Slider */}
               <div>
                 <div className="flex justify-between text-xs font-semibold ts-text-muted mb-1.5">
-                  <span>Vulnerable Population Ratio:</span>
+                  <span>{t('intervention.vulnerablePopulation')}:</span>
                   <span className="text-amber-400 font-mono text-sm font-bold">{Math.round(vulnerablePopRatio * 100)}%</span>
                 </div>
                 <input
@@ -453,22 +460,22 @@ export const Intervention: React.FC = () => {
                   className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
                 />
                 <div className="flex justify-between text-[10px] ts-text-subtle font-mono mt-1">
-                  <span>5% (Low)</span>
-                  <span>30% (Threshold)</span>
-                  <span>80% (High)</span>
+                  <span>5% ({t('intervention.tickLow')})</span>
+                  <span>30% ({t('intervention.tickThreshold')})</span>
+                  <span>80% ({t('intervention.tickHigh')})</span>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Section 2: Public Health Interventions */}
+          {/* Section 2: Response Measures */}
           <Card className="border-orange-500/30">
             <CardHeader
-              title="2. Public Health Interventions"
-              subtitle="Select municipal countermeasures to simulate."
+              title={t('intervention.section2Title')}
+              subtitle={t('intervention.section2Subtitle')}
               badge={
                 <Badge variant="brand" size="sm">
-                  {activeCount} of 3 Selected
+                  {t('intervention.selectedCount', { count: activeCount })}
                 </Badge>
               }
             />
@@ -490,8 +497,8 @@ export const Intervention: React.FC = () => {
                     <Building2 className="w-4 h-4" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold ts-text-primary">Activate Community Cooling Centers</p>
-                    <p className="text-[11px] ts-text-subtle">Modeled reduction: ~10 pts</p>
+                    <p className="text-xs font-bold ts-text-primary">{t('intervention.coolingCentersToggle')}</p>
+                    <p className="text-[11px] ts-text-subtle">{t('intervention.modeledReduction', { pts: 10 })}</p>
                   </div>
                 </div>
                 <input
@@ -519,8 +526,8 @@ export const Intervention: React.FC = () => {
                     <Ban className="w-4 h-4" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold ts-text-primary">Outdoor Heavy Labor Suspension</p>
-                    <p className="text-[11px] ts-text-subtle">Modeled reduction: ~15 pts</p>
+                    <p className="text-xs font-bold ts-text-primary">{t('intervention.workSuspensionToggle')}</p>
+                    <p className="text-[11px] ts-text-subtle">{t('intervention.modeledReduction', { pts: 15 })}</p>
                   </div>
                 </div>
                 <input
@@ -548,8 +555,8 @@ export const Intervention: React.FC = () => {
                     <GlassWater className="w-4 h-4" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold ts-text-primary">Civic ORS & Hydration Hubs</p>
-                    <p className="text-[11px] ts-text-subtle">Modeled reduction: ~8 pts</p>
+                    <p className="text-xs font-bold ts-text-primary">{t('intervention.hydrationHubsToggle')}</p>
+                    <p className="text-[11px] ts-text-subtle">{t('intervention.modeledReduction', { pts: 8 })}</p>
                   </div>
                 </div>
                 <input
@@ -567,9 +574,9 @@ export const Intervention: React.FC = () => {
                 onClick={() => executeSimulation()}
                 isLoading={isLoading}
                 leftIcon={<Sparkles className="w-4 h-4" />}
-                className="w-full mt-2"
+                className="w-full mt-2 cursor-pointer"
               >
-                {isLoading ? 'Simulating Policy Impact...' : 'Apply & Run Policy Simulation'}
+                {isLoading ? t('intervention.simulating') : t('intervention.applySimulation')}
               </Button>
             </CardContent>
           </Card>
@@ -580,11 +587,11 @@ export const Intervention: React.FC = () => {
           {/* Section 3: Simulated Intervention Impact (Scenario Estimate) */}
           <Card variant="elevated">
             <CardHeader
-              title="Simulated Intervention Impact (Scenario Estimate)"
-              subtitle="Quantified civic health risk reduction from active interventions."
+              title={t('intervention.impactTitle')}
+              subtitle={t('intervention.impactSubtitle')}
               badge={
                 <Badge variant="brand" size="sm">
-                  Scenario Estimate
+                  {t('intervention.scenarioEstimateBadge')}
                 </Badge>
               }
             />
@@ -593,7 +600,7 @@ export const Intervention: React.FC = () => {
                 {/* Baseline Card */}
                 <div className="p-4 rounded-xl ts-card-subtle border ts-border text-center flex flex-col justify-between">
                   <span className="text-[11px] font-semibold ts-text-subtle uppercase tracking-wider block">
-                    Current Civic Risk
+                    {t('intervention.baselineRisk')}
                   </span>
                   <span className="text-3xl font-extrabold my-2 block font-mono ts-text-primary">
                     {simulationData?.current_risk.toFixed(1) ?? baselineRiskScore.toFixed(1)}
@@ -608,7 +615,7 @@ export const Intervention: React.FC = () => {
                 {/* Total Impact Reduction */}
                 <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center flex flex-col justify-between">
                   <span className="text-[11px] font-bold uppercase text-emerald-400 tracking-wider block">
-                    Modeled Reduction
+                    {t('intervention.simulatedReduction')}
                   </span>
                   <div className="flex items-center justify-center my-2 text-emerald-400 font-black text-3xl font-mono">
                     <span>-</span>
@@ -616,14 +623,14 @@ export const Intervention: React.FC = () => {
                     <span className="text-sm font-semibold ml-1">pts</span>
                   </div>
                   <span className="text-[11px] text-emerald-300/80 font-medium">
-                    {activeCount === 0 ? 'No Policies Active' : `${activeCount} Policies Active`}
+                    {activeCount === 0 ? t('intervention.noPoliciesActive') : t('intervention.policiesActive', { count: activeCount })}
                   </span>
                 </div>
 
                 {/* Projected Card */}
                 <div className="p-4 rounded-xl ts-card-subtle border ts-border text-center flex flex-col justify-between">
                   <span className="text-[11px] font-semibold ts-text-subtle uppercase tracking-wider block">
-                    Projected Civic Risk
+                    {t('intervention.projectedRisk')}
                   </span>
                   <span className="text-3xl font-extrabold my-2 block font-mono text-emerald-400">
                     {simulationData?.projected_risk.toFixed(1) ?? baselineRiskScore.toFixed(1)}
@@ -641,14 +648,14 @@ export const Intervention: React.FC = () => {
           {/* Section 4: Recommended Heat Actions (Intelligently Grouped, Complete Output) */}
           <Card>
             <CardHeader
-              title="Recommended Heat Actions"
-              subtitle="Targeted municipal guidelines triggered by current scenario parameters."
+              title={t('intervention.recommendedActions')}
+              subtitle={t('intervention.recommendedActionsSubtitle')}
               badge={
                 <Badge
                   variant={interventionData?.priority === 'CRITICAL' ? 'extreme' : 'brand'}
                   size="sm"
                 >
-                  {interventionData?.priority || 'MODERATE'} PRIORITY
+                  {interventionData?.priority || 'MODERATE'} {t('alerts.priorityBadge')}
                 </Badge>
               }
             />
@@ -693,9 +700,9 @@ export const Intervention: React.FC = () => {
               ) : (
                 <div className="p-6 text-center ts-card-subtle rounded-xl border ts-border">
                   <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2 opacity-80" />
-                  <p className="text-xs font-semibold ts-text-primary">Conditions Stable</p>
+                  <p className="text-xs font-semibold ts-text-primary">{t('intervention.conditionsStable')}</p>
                   <p className="text-[11px] ts-text-subtle mt-1">
-                    No emergency municipal directives currently triggered for this scenario.
+                    {t('intervention.conditionsStableDesc')}
                   </p>
                 </div>
               )}

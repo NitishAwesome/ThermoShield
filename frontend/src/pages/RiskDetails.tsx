@@ -24,6 +24,7 @@ import {
 import { formatTemperature, formatPercent, formatSpeed } from '../utils/risk';
 import { getCachedData, setCachedData } from '../services/cache';
 import { useLocation } from '../context/LocationContext';
+import { useTranslation } from '../context/LanguageContext';
 import { Card, CardHeader, CardContent, Badge, Button } from '../components/ui';
 
 // Utility for natural, clear plain-language phrasing
@@ -47,6 +48,7 @@ const toPlainLanguage = (text?: string): string => {
 
 export const RiskDetails: React.FC = () => {
   const { coords, locationName, isLocating, setLocation, detectMyLocation } = useLocation();
+  const { t } = useTranslation();
 
   const [thermalData, setThermalData] = useState<ThermalResponse | null>(null);
   const [riskData, setRiskData] = useState<RiskResponse | null>(null);
@@ -115,15 +117,15 @@ export const RiskDetails: React.FC = () => {
   // Calm Risk Badge Title
   const getActionBadge = () => {
     if (level === 'LOW') {
-      return { text: 'Normal Conditions', variant: 'low' as const };
+      return { text: t('riskCard.lowRisk'), variant: 'low' as const };
     }
     if (level === 'MODERATE') {
-      return { text: 'General Precautions', variant: 'moderate' as const };
+      return { text: t('riskCard.moderateBurden'), variant: 'moderate' as const };
     }
     if (level === 'HIGH') {
-      return { text: 'Action Recommended', variant: 'high' as const };
+      return { text: t('riskCard.highStrain'), variant: 'high' as const };
     }
-    return { text: 'Emergency Action Required', variant: 'extreme' as const };
+    return { text: t('riskCard.extremeHazard'), variant: 'extreme' as const };
   };
 
   const actionBadge = getActionBadge();
@@ -134,17 +136,17 @@ export const RiskDetails: React.FC = () => {
       <div>
         <div className="flex items-center space-x-2">
           <span className="text-xs font-bold uppercase tracking-wider text-orange-400">
-            Heat Intelligence
+            {t('nav.activeZone')}
           </span>
           <Badge variant="brand" size="sm">
-            Risk Analysis
+            {t('nav.riskAnalysis')}
           </Badge>
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold ts-text-primary font-sans mt-0.5">
-          Heat & Health Risk Analysis
+          {t('riskDetails.title')}
         </h1>
         <p className="text-sm ts-text-muted mt-1">
-          Understand today's heat conditions, physical thermal strain, and recommended safety measures for {locationName}.
+          {t('riskDetails.subtitle')} ({locationName})
         </p>
       </div>
 
@@ -159,7 +161,7 @@ export const RiskDetails: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <LoadingState message="Computing thermal indices and public health risk assessments..." />
+        <LoadingState message={t('common.loading')} />
       ) : error ? (
         <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-sm">
           {error}
@@ -169,39 +171,42 @@ export const RiskDetails: React.FC = () => {
           {/* SECTION 1: TODAY'S HEAT RISK */}
           <Card
             variant="elevated"
-            className="p-6 border-l-4 border-l-orange-500 relative overflow-hidden"
+            className="p-4 sm:p-6 border-l-4 border-l-orange-500 relative overflow-hidden"
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider ts-text-subtle block">
-                  Today's Risk Summary
+                  {t('riskDetails.todayRiskSummary')}
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-black ts-text-primary font-sans mt-1">
-                  Today's Heat Risk: {level}
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-black ts-text-primary font-sans mt-1">
+                  {t('riskDetails.todayHeatRisk')}: {level}
                 </h2>
                 <p className="text-xs sm:text-sm ts-text-muted mt-1 max-w-2xl leading-relaxed">
                   {toPlainLanguage(risk?.reason) ||
-                    'Current outdoor conditions are generally safe for normal activity, with standard heat precautions recommended.'}
+                    t('riskDetails.safeBaseline')}
                 </p>
               </div>
 
               <div className="flex items-center space-x-3 flex-shrink-0">
                 <Badge riskLevel={level} size="lg" showDot showIcon>
-                  {level} RISK
+                  {level} {t('alerts.title')}
                 </Badge>
               </div>
             </div>
           </Card>
 
           {/* SECTION 2: WHAT IS DRIVING THE RISK? */}
+          <div className="mb-2">
+            <h2 className="text-lg font-bold ts-text-primary">{t('riskDetails.primaryDrivers')}</h2>
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Heat Stress on the Body */}
-            <Card variant="elevated" className="p-6 flex flex-col justify-between">
+            <Card variant="elevated" className="p-4 sm:p-6 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between border-b ts-border pb-3">
                   <span className="text-xs font-bold uppercase tracking-wider ts-text-muted flex items-center gap-1.5">
                     <Activity className="w-4 h-4 text-orange-400" />
-                    Heat Stress on the Body
+                    {t('riskDetails.heatStressBody')}
                   </span>
                   <Badge riskLevel={level} size="sm">
                     {level}
@@ -218,13 +223,14 @@ export const RiskDetails: React.FC = () => {
                     </span>
                   </div>
                   <div className="text-right">
-                    <span className="text-xs ts-text-subtle block font-semibold">Strain Score</span>
+                    <span className="text-xs ts-text-subtle block font-semibold">{t('riskCard.heatStrainIndex')}</span>
                     <span className="text-2xl font-black font-mono ts-text-primary">
                       {risk?.score !== undefined ? `${Math.round(risk.score * 100)}` : '—'}
                       <span className="text-xs ts-text-muted font-normal ml-0.5">/100</span>
                     </span>
                   </div>
                 </div>
+
 
                 <p className="text-xs ts-text-muted mt-4 leading-relaxed ts-card-subtle p-3 rounded-xl border ts-border">
                   Direct physical heat stress experienced outdoors, factoring in ambient temperature, humidity, direct sunlight, and wind cooling.
@@ -238,10 +244,10 @@ export const RiskDetails: React.FC = () => {
                 <div className="flex items-center justify-between border-b ts-border pb-3">
                   <span className="text-xs font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300 flex items-center gap-1.5">
                     <Cpu className="w-4 h-4 text-purple-500 dark:text-purple-400" />
-                    Estimated Community Health Risk
+                    {t('riskCard.civicHealthRisk')}
                   </span>
                   <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-700 dark:text-purple-300 text-[10px] font-mono font-bold border border-purple-500/30">
-                    Planning Estimate
+                    {t('riskCard.planningEstimate')}
                   </span>
                 </div>
 
@@ -254,12 +260,12 @@ export const RiskDetails: React.FC = () => {
                       <span className="text-base font-semibold ts-text-muted ml-1">/ 100</span>
                     </div>
                     <span className="text-xs ts-text-muted font-semibold mt-1 block">
-                      Civic Health Risk Score
+                      {t('riskCard.civicHealthRisk')}
                     </span>
                   </div>
 
                   <div className="text-right">
-                    <span className="text-xs ts-text-subtle block font-semibold">Estimated Health Service Demand</span>
+                    <span className="text-xs ts-text-subtle block font-semibold">{t('riskCard.healthcareDemand')}</span>
                     <span className="text-sm font-bold text-purple-700 dark:text-purple-300 font-mono">
                       {riskData?.risk?.predicted_health_impact_proxy !== undefined
                         ? `~${riskData.risk.predicted_health_impact_proxy.toFixed(1)} cases/ward`
@@ -269,7 +275,7 @@ export const RiskDetails: React.FC = () => {
                 </div>
 
                 <p className="text-xs ts-text-muted mt-4 leading-relaxed ts-card-subtle p-3 rounded-xl border ts-border">
-                  <strong className="text-purple-700 dark:text-purple-300">Planning Estimate: </strong>
+                  <strong className="text-purple-700 dark:text-purple-300">{t('riskCard.planningEstimate')}: </strong>
                   Helps municipal authorities anticipate clinic pressure and prepare early relief. This is a planning model, not a medical diagnosis.
                 </p>
               </div>
@@ -279,11 +285,11 @@ export const RiskDetails: React.FC = () => {
           {/* SECTION 3: CURRENT CONDITIONS */}
           <Card>
             <CardHeader
-              title="Current Conditions"
-              subtitle="Live local meteorological readings informing the thermal model."
+              title={t('dashboard.currentThermalMetrics')}
+              subtitle={t('weatherCard.subtitle')}
               badge={
                 <Badge variant="brand" size="sm">
-                  Live Telemetry
+                  {t('riskCard.liveTelemetry')}
                 </Badge>
               }
             />
@@ -292,46 +298,46 @@ export const RiskDetails: React.FC = () => {
                 <div className="p-3.5 rounded-xl ts-card-subtle border ts-border">
                   <div className="flex items-center space-x-1.5 ts-text-muted text-xs mb-1">
                     <Thermometer className="w-3.5 h-3.5 text-orange-400" />
-                    <span>Air Temperature</span>
+                    <span>{t('dashboard.temperature')}</span>
                   </div>
                   <div className="text-2xl font-black font-mono ts-text-primary">
                     {formatTemperature(weather?.temperature)}
                   </div>
-                  <span className="text-[10.5px] ts-text-subtle block mt-0.5">Shaded dry-bulb</span>
+                  <span className="text-[10.5px] ts-text-subtle block mt-0.5">{t('weatherCard.dryBulb')}</span>
                 </div>
 
                 <div className="p-3.5 rounded-xl ts-card-subtle border ts-border">
                   <div className="flex items-center space-x-1.5 ts-text-muted text-xs mb-1">
                     <Droplets className="w-3.5 h-3.5 text-sky-400" />
-                    <span>Relative Humidity</span>
+                    <span>{t('dashboard.humidity')}</span>
                   </div>
                   <div className="text-2xl font-black font-mono ts-text-primary">
                     {formatPercent(weather?.humidity)}
                   </div>
-                  <span className="text-[10.5px] ts-text-subtle block mt-0.5">Atmospheric moisture</span>
+                  <span className="text-[10.5px] ts-text-subtle block mt-0.5">{t('matrix.humidity')}</span>
                 </div>
 
                 <div className="p-3.5 rounded-xl ts-card-subtle border ts-border">
                   <div className="flex items-center space-x-1.5 ts-text-muted text-xs mb-1">
                     <Wind className="w-3.5 h-3.5 text-teal-400" />
-                    <span>Wind Velocity</span>
+                    <span>{t('dashboard.windSpeed')}</span>
                   </div>
                   <div className="text-2xl font-black font-mono ts-text-primary">
                     {formatSpeed(weather?.wind_speed)}
                   </div>
-                  <span className="text-[10.5px] ts-text-subtle block mt-0.5">Convective cooling airflow</span>
+                  <span className="text-[10.5px] ts-text-subtle block mt-0.5">{t('dashboard.windSpeed')}</span>
                 </div>
 
                 <div className="p-3.5 rounded-xl ts-card-subtle border ts-border">
                   <div className="flex items-center space-x-1.5 ts-text-muted text-xs mb-1">
                     <Sun className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Solar Radiation</span>
+                    <span>{t('weatherCard.solarFlux')}</span>
                   </div>
                   <div className="text-2xl font-black font-mono ts-text-primary">
                     {weather?.solar_radiation ? `${Math.round(weather.solar_radiation)}` : '0'}
                     <span className="text-xs font-normal ts-text-muted ml-1">W/m²</span>
                   </div>
-                  <span className="text-[10.5px] ts-text-subtle block mt-0.5">Direct and diffuse sunlight</span>
+                  <span className="text-[10.5px] ts-text-subtle block mt-0.5">{t('weatherCard.solarFlux')}</span>
                 </div>
               </div>
             </CardContent>
@@ -340,33 +346,33 @@ export const RiskDetails: React.FC = () => {
           {/* SECTION 4: UNDERSTANDING THE HEAT (Thermal Metrics Comparison) */}
           <Card>
             <CardHeader
-              title="Understanding the Heat"
-              subtitle="Comparing the major physiological and sensory indices on an identical scale."
+              title={t('thermalCard.title')}
+              subtitle={t('thermalCard.subtitle')}
             />
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                 {/* WBGT (Dominant) */}
                 <div className="p-4 rounded-xl ts-card-subtle border border-orange-500/40 bg-orange-500/5">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-orange-400">Wet-Bulb Globe (WBGT)</span>
+                    <span className="font-bold text-orange-400">{t('thermalCard.wbgtPrimary')}</span>
                     <span className="text-[10px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded font-bold">
-                      Primary
+                      WBGT
                     </span>
                   </div>
                   <div className="text-3xl font-black font-mono text-orange-400 mt-2">
                     {formatTemperature(indices?.wbgt_c)}
                   </div>
                   <p className="text-xs ts-text-muted mt-2 leading-relaxed">
-                    Combines temperature, humidity, wind, and solar load for human heat stress.
+                    {t('thermalCard.wbgtDesc')}
                   </p>
                 </div>
 
                 {/* Heat Index */}
                 <div className="p-4 rounded-xl ts-card-subtle border ts-border">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold ts-text-primary">NOAA Heat Index</span>
+                    <span className="font-bold ts-text-primary">{t('thermalCard.heatIndexShaded')}</span>
                     <span className="text-[10px] bg-slate-800 ts-text-muted px-1.5 py-0.5 rounded">
-                      Shade Index
+                      NOAA
                     </span>
                   </div>
                   <div className="text-3xl font-black font-mono ts-text-primary mt-2">
@@ -375,39 +381,39 @@ export const RiskDetails: React.FC = () => {
                       : 'N/A'}
                   </div>
                   <p className="text-xs ts-text-muted mt-2 leading-relaxed">
-                    How hot it feels in the shade when high humidity impedes perspiration.
+                    {t('thermalCard.heatIndexDesc')}
                   </p>
                 </div>
 
                 {/* Apparent Temp */}
                 <div className="p-4 rounded-xl ts-card-subtle border ts-border">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold ts-text-primary">Apparent Temperature</span>
+                    <span className="font-bold ts-text-primary">{t('thermalCard.apparentConvective')}</span>
                     <span className="text-[10px] bg-slate-800 ts-text-muted px-1.5 py-0.5 rounded">
-                      Sensory
+                      AT
                     </span>
                   </div>
                   <div className="text-3xl font-black font-mono ts-text-primary mt-2">
                     {formatTemperature(indices?.apparent_temperature_c)}
                   </div>
                   <p className="text-xs ts-text-muted mt-2 leading-relaxed">
-                    Perceived temperature factoring in wind cooling and water vapor.
+                    {t('thermalCard.apparentDesc')}
                   </p>
                 </div>
 
                 {/* Natural Wet-Bulb */}
                 <div className="p-4 rounded-xl ts-card-subtle border ts-border">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold ts-text-primary">Natural Wet-Bulb</span>
+                    <span className="font-bold ts-text-primary">{t('thermalCard.wetBulbEvaporative')}</span>
                     <span className="text-[10px] bg-slate-800 ts-text-muted px-1.5 py-0.5 rounded">
-                      Thermodynamic
+                      NWB
                     </span>
                   </div>
                   <div className="text-3xl font-black font-mono ts-text-primary mt-2">
                     {formatTemperature(indices?.wet_bulb_temp_c)}
                   </div>
                   <p className="text-xs ts-text-muted mt-2 leading-relaxed">
-                    Lowest temperature achievable solely through sweat evaporative cooling.
+                    {t('thermalCard.wetBulbDesc')}
                   </p>
                 </div>
               </div>
@@ -417,15 +423,15 @@ export const RiskDetails: React.FC = () => {
           {/* SECTION 5: WHY ARE WE SEEING THIS RISK? */}
           <Card>
             <CardHeader
-              title="Why Are We Seeing This Risk?"
-              subtitle="What is contributing to today's heat conditions?"
+              title={t('riskDrivers.title')}
+              subtitle={t('riskDrivers.subtitle')}
             />
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl ts-card-subtle border ts-border">
                   <div className="flex items-center space-x-2 text-orange-400 font-bold text-xs mb-3">
                     <Shield className="w-4 h-4" />
-                    <span>Contributing Risk Factors</span>
+                    <span>{t('thermalCard.riskBasisTitle')}</span>
                   </div>
                   <ul className="space-y-2.5">
                     {risk?.risk_basis && risk.risk_basis.length > 0 ? (
@@ -445,7 +451,7 @@ export const RiskDetails: React.FC = () => {
                     ) : (
                       <li className="text-xs ts-text-muted flex items-center space-x-2">
                         <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                        <span>Heat stress is currently within a safe, manageable baseline range.</span>
+                        <span>{t('riskDetails.safeBaseline')}</span>
                       </li>
                     )}
                   </ul>
@@ -454,7 +460,7 @@ export const RiskDetails: React.FC = () => {
                 <div className="p-4 rounded-xl ts-card-subtle border ts-border">
                   <div className="flex items-center space-x-2 text-sky-400 font-bold text-xs mb-3">
                     <Info className="w-4 h-4" />
-                    <span>Environmental Observations</span>
+                    <span>{t('thermalCard.envObsTitle')}</span>
                   </div>
                   <ul className="space-y-2.5">
                     {risk?.environmental_factors && risk.environmental_factors.length > 0 ? (
@@ -474,7 +480,7 @@ export const RiskDetails: React.FC = () => {
                     ) : (
                       <li className="text-xs ts-text-muted flex items-center space-x-2">
                         <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                        <span>Ambient temperature and humidity levels remain within comfortable thresholds.</span>
+                        <span>{t('riskDetails.conditionsComfortable')}</span>
                       </li>
                     )}
                   </ul>
@@ -486,8 +492,8 @@ export const RiskDetails: React.FC = () => {
           {/* SECTION 6: RECOMMENDED ACTIONS */}
           <Card className="border-orange-500/30">
             <CardHeader
-              title="Recommended Actions"
-              subtitle="Public health advice adapted to today's heat conditions."
+              title={t('alerts.safetyProtocols')}
+              subtitle={t('alerts.subtitle')}
               badge={
                 <Badge variant={actionBadge.variant} size="sm">
                   {actionBadge.text}
@@ -499,7 +505,7 @@ export const RiskDetails: React.FC = () => {
                 {/* Hydration */}
                 <div className="p-4 rounded-xl ts-card-subtle border ts-border">
                   <span className="text-xs font-bold uppercase tracking-wider text-orange-400 block mb-1">
-                    Hydration Guidance
+                    {t('alerts.hydrationProtocol')}
                   </span>
                   <p className="text-xs ts-text-muted leading-relaxed">
                     {toPlainLanguage(thermalData?.thermal?.hydration?.guidance) ||
@@ -510,7 +516,7 @@ export const RiskDetails: React.FC = () => {
                 {/* Outdoor Activities */}
                 <div className="p-4 rounded-xl ts-card-subtle border ts-border">
                   <span className="text-xs font-bold uppercase tracking-wider text-amber-400 block mb-1">
-                    Outdoor Activities & Work
+                    {t('alerts.activityPacing')}
                   </span>
                   <p className="text-xs ts-text-muted leading-relaxed">
                     {toPlainLanguage(
@@ -523,7 +529,7 @@ export const RiskDetails: React.FC = () => {
                 {/* People Who Need Extra Protection */}
                 <div className="p-4 rounded-xl ts-card-subtle border ts-border">
                   <span className="text-xs font-bold uppercase tracking-wider text-sky-400 block mb-1">
-                    People Needing Extra Protection
+                    {t('alerts.vulnerableProtection')}
                   </span>
                   <p className="text-xs ts-text-muted leading-relaxed">
                     {toPlainLanguage(thermalData?.thermal?.vulnerable_population?.guidance) ||
@@ -537,32 +543,33 @@ export const RiskDetails: React.FC = () => {
           {/* SECTION 7: SCIENTIFIC DETAILS (Progressive Disclosure) */}
           <Card>
             <div
-              className="p-5 flex items-center justify-between cursor-pointer hover:bg-white/[0.02] transition-colors"
+              className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
               onClick={() => setShowScientificDetails(!showScientificDetails)}
             >
               <div className="flex items-center space-x-3">
                 <BookOpen className="w-5 h-5 text-orange-400 flex-shrink-0" />
                 <div>
                   <h3 className="text-sm font-bold ts-text-primary">
-                    Scientific Details & Methodology
+                    {t('riskDetails.scientificMethodology')}
                   </h3>
                   <p className="text-xs ts-text-muted mt-0.5">
-                    ISO 7243 algorithms, Stull (2011) thermodynamic models, and epidemiological citations.
+                    {t('riskDetails.scientificDesc')}
                   </p>
                 </div>
               </div>
-              <Button variant="ghost" size="sm" className="ts-text-muted">
+              <Button variant="ghost" size="sm" className="ts-text-muted self-start sm:self-auto flex-shrink-0">
                 {showScientificDetails ? (
                   <span className="flex items-center gap-1 text-xs">
-                    Collapse <ChevronUp className="w-4 h-4" />
+                    {t('riskDetails.collapse')} <ChevronUp className="w-4 h-4" />
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 text-xs">
-                    Inspect Scientific Reference <ChevronDown className="w-4 h-4" />
+                    {t('riskDetails.inspectScientific')} <ChevronDown className="w-4 h-4" />
                   </span>
                 )}
               </Button>
             </div>
+
 
             {showScientificDetails && (
               <CardContent className="border-t ts-border pt-5 space-y-4">

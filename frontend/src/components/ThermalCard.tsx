@@ -3,6 +3,8 @@ import { Flame, Shield, Info, ChevronDown, ChevronUp, BookOpen, Sun, Wind, Dropl
 import { ThermalIndices, RiskAssessment } from '../types';
 import { formatTemperature } from '../utils/risk';
 import { Card, CardHeader, CardContent, Badge } from './ui';
+import { useTranslation } from '../context/LanguageContext';
+import { translateExplainabilityFactor } from '../utils/translationHelpers';
 
 interface ThermalCardProps {
   indices?: ThermalIndices;
@@ -15,6 +17,7 @@ export const ThermalCard: React.FC<ThermalCardProps> = ({
   riskAssessment,
   className = '',
 }) => {
+  const { t } = useTranslation();
   const [showTechnicalDetails, setShowTechnicalDetails] = useState<boolean>(false);
 
   if (!indices) return null;
@@ -34,10 +37,10 @@ export const ThermalCard: React.FC<ThermalCardProps> = ({
   // Qualitative severity for WBGT
   const getWbgtSeverity = (w?: number) => {
     if (w === undefined) return { label: 'Normal', color: 'text-slate-600 dark:text-slate-300' };
-    if (w >= 32.2) return { label: 'Extreme Strain', color: 'text-red-500 dark:text-red-400' };
-    if (w >= 30.1) return { label: 'High Strain', color: 'text-orange-500 dark:text-orange-400' };
-    if (w >= 27.8) return { label: 'Moderate Strain', color: 'text-amber-500 dark:text-amber-400' };
-    return { label: 'Low Strain', color: 'text-emerald-600 dark:text-emerald-400' };
+    if (w >= 32.2) return { label: t('riskCard.extremeHazard'), color: 'text-red-500 dark:text-red-400' };
+    if (w >= 30.1) return { label: t('riskCard.highStrain'), color: 'text-orange-500 dark:text-orange-400' };
+    if (w >= 27.8) return { label: t('riskCard.moderateBurden'), color: 'text-amber-500 dark:text-amber-400' };
+    return { label: t('riskCard.lowRisk'), color: 'text-emerald-600 dark:text-emerald-400' };
   };
 
   const wbgtSev = getWbgtSeverity(indices.wbgt_c);
@@ -45,25 +48,31 @@ export const ThermalCard: React.FC<ThermalCardProps> = ({
   return (
     <Card className={className}>
       <CardHeader
-        title="Thermal Conditions & Biometeorological Indices"
-        subtitle="Multi-parameter thermal stress breakdown calibrated for human physiological strain."
+        title={t('thermalCard.title')}
+        subtitle={t('thermalCard.subtitle')}
         badge={
           <Badge variant="brand" size="sm">
-            Biometeorological Engine
+            {t('thermalCard.engineBadge')}
           </Badge>
         }
         action={
           <button
             type="button"
             onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary text-xs font-semibold transition-colors"
+            className="flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary text-xs font-semibold transition-colors flex-shrink-0"
           >
-            <BookOpen className="w-3.5 h-3.5 text-orange-400" />
-            <span>{showTechnicalDetails ? 'Simple View' : 'Scientific References'}</span>
+            <BookOpen className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+            <span>
+              {showTechnicalDetails ? (
+                t('thermalCard.simpleView')
+              ) : (
+                t('thermalCard.scientificReferences')
+              )}
+            </span>
             {showTechnicalDetails ? (
-              <ChevronUp className="w-3 h-3 ml-0.5" />
+              <ChevronUp className="w-3 h-3 ml-0.5 flex-shrink-0" />
             ) : (
-              <ChevronDown className="w-3 h-3 ml-0.5" />
+              <ChevronDown className="w-3 h-3 ml-0.5 flex-shrink-0" />
             )}
           </button>
         }
@@ -79,7 +88,7 @@ export const ThermalCard: React.FC<ThermalCardProps> = ({
                 WBGT
               </span>
               <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-700 dark:text-orange-300 text-[10px] rounded font-mono font-bold">
-                PRIMARY
+                {t('thermalCard.wbgtPrimary')}
               </span>
             </div>
             <div className="mt-2">
@@ -90,7 +99,7 @@ export const ThermalCard: React.FC<ThermalCardProps> = ({
                 {wbgtSev.label}
               </div>
               <p className="text-[10.5px] ts-text-subtle mt-1 leading-snug">
-                Outdoor heat stress including direct sun exposure and wind airflow.
+                {t('thermalCard.wbgtDesc')}
               </p>
             </div>
           </div>
@@ -113,10 +122,10 @@ export const ThermalCard: React.FC<ThermalCardProps> = ({
                 {getHeatIndexDisplay()}
               </div>
               <div className="text-[11px] font-bold text-amber-400 mt-0.5">
-                Shaded Perceived Heat
+                {t('thermalCard.heatIndexShaded')}
               </div>
               <p className="text-[10.5px] ts-text-subtle mt-1 leading-snug">
-                What the temperature feels like in the shade combining air heat and moisture.
+                {t('thermalCard.heatIndexDesc')}
               </p>
             </div>
           </div>
@@ -135,10 +144,10 @@ export const ThermalCard: React.FC<ThermalCardProps> = ({
                 {formatTemperature(indices.apparent_temperature_c)}
               </div>
               <div className="text-[11px] font-bold text-teal-400 mt-0.5">
-                Convective Feel
+                {t('thermalCard.apparentConvective')}
               </div>
               <p className="text-[10.5px] ts-text-subtle mt-1 leading-snug">
-                Comprehensive body comfort factoring vapor pressure and skin cooling.
+                {t('thermalCard.apparentDesc')}
               </p>
             </div>
           </div>
@@ -157,10 +166,10 @@ export const ThermalCard: React.FC<ThermalCardProps> = ({
                 {formatTemperature(indices.wet_bulb_temp_c)}
               </div>
               <div className="text-[11px] font-bold text-sky-400 mt-0.5">
-                Evaporative Boundary
+                {t('thermalCard.wetBulbEvaporative')}
               </div>
               <p className="text-[10.5px] ts-text-subtle mt-1 leading-snug">
-                The lowest temperature reachable through natural evaporative sweat cooling.
+                {t('thermalCard.wetBulbDesc')}
               </p>
             </div>
           </div>
@@ -171,31 +180,31 @@ export const ThermalCard: React.FC<ThermalCardProps> = ({
           <div className="p-4 rounded-xl ts-card-subtle border ts-border text-xs ts-text-muted space-y-3">
             <div className="flex items-center space-x-2 font-bold ts-text-primary border-b ts-border pb-2">
               <BookOpen className="w-4 h-4 text-orange-400" />
-              <span>Scientific Biometeorological Formulations & ISO Standards</span>
+              <span>{t('thermalCard.scientificStandardsTitle')}</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
               <div className="p-3 rounded-lg ts-card border ts-border">
                 <strong className="ts-text-primary block mb-0.5">ISO 7243 / ACGIH WBGT:</strong>
                 <span>
-                  Estimates outdoor occupational thermal burden by weighting natural wet-bulb temperature, solar radiation, and air temperature.
+                  {t('thermalCard.isoDesc')}
                 </span>
               </div>
               <div className="p-3 rounded-lg ts-card border ts-border">
                 <strong className="ts-text-primary block mb-0.5">NOAA Rothfusz (1990) Heat Index:</strong>
                 <span>
-                  9-parameter polynomial regression measuring apparent human discomfort under shaded humidity conditions.
+                  {t('thermalCard.noaaDesc')}
                 </span>
               </div>
               <div className="p-3 rounded-lg ts-card border ts-border">
                 <strong className="ts-text-primary block mb-0.5">Steadman (1984) Apparent Temperature:</strong>
                 <span>
-                  Convective physiological model incorporating dry air temperature, ambient water vapor pressure, and wind cooling.
+                  {t('thermalCard.steadmanDesc')}
                 </span>
               </div>
               <div className="p-3 rounded-lg ts-card border ts-border">
                 <strong className="ts-text-primary block mb-0.5">Stull (2011) Wet-Bulb (Tw):</strong>
                 <span>
-                  Empirical thermodynamic equation computing the physical lower bound for human evaporative sweat dissipation.
+                  {t('thermalCard.stullDesc')}
                 </span>
               </div>
             </div>
@@ -208,17 +217,17 @@ export const ThermalCard: React.FC<ThermalCardProps> = ({
             <div className="ts-card-subtle p-4 rounded-xl border ts-border">
               <div className="flex items-center space-x-1.5 text-xs font-bold text-orange-400 mb-2">
                 <Shield className="w-4 h-4" />
-                <span>Direct Risk Basis (Threshold Triggers):</span>
+                <span>{t('thermalCard.riskBasisTitle')}</span>
               </div>
               <ul className="space-y-1.5">
                 {riskAssessment.risk_basis?.map((rb, idx) => (
                   <li key={idx} className="text-xs ts-text-muted flex items-start space-x-2">
                     <span className="text-orange-400 mt-0.5">•</span>
-                    <span>{rb}</span>
+                    <span>{translateExplainabilityFactor(rb, t)}</span>
                   </li>
                 ))}
                 {(!riskAssessment.risk_basis || riskAssessment.risk_basis.length === 0) && (
-                  <li className="text-xs ts-text-subtle">Standard baseline conditions.</li>
+                  <li className="text-xs ts-text-subtle">{t('thermalCard.baselineStandard')}</li>
                 )}
               </ul>
             </div>
@@ -226,17 +235,17 @@ export const ThermalCard: React.FC<ThermalCardProps> = ({
             <div className="ts-card-subtle p-4 rounded-xl border ts-border">
               <div className="flex items-center space-x-1.5 text-xs font-bold text-sky-400 mb-2">
                 <Info className="w-4 h-4" />
-                <span>Environmental Observations:</span>
+                <span>{t('thermalCard.envObsTitle')}</span>
               </div>
               <ul className="space-y-1.5">
                 {riskAssessment.environmental_factors?.map((ef, idx) => (
                   <li key={idx} className="text-xs ts-text-muted flex items-start space-x-2">
                     <span className="text-sky-400 mt-0.5">•</span>
-                    <span>{ef}</span>
+                    <span>{translateExplainabilityFactor(ef, t)}</span>
                   </li>
                 ))}
                 {(!riskAssessment.environmental_factors || riskAssessment.environmental_factors.length === 0) && (
-                  <li className="text-xs ts-text-subtle">Normal meteorological parameters.</li>
+                  <li className="text-xs ts-text-subtle">{t('thermalCard.baselineNormal')}</li>
                 )}
               </ul>
             </div>

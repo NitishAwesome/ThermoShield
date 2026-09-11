@@ -113,27 +113,78 @@ html.light .bg-slate-900,
 html.light .bg-slate-900\/95,
 html.light .bg-slate-900\/90,
 html.light .bg-slate-900\/80,
+html.light .bg-slate-900\/70,
 html.light .bg-slate-900\/60,
 html.light .bg-slate-900\/50,
 html.light .bg-slate-900\/40,
+html.light .bg-slate-900\/30,
+html.light .bg-slate-900\/20,
 html.light .bg-slate-950,
+html.light .bg-slate-950\/95,
+html.light .bg-slate-950\/90,
+html.light .bg-slate-950\/85,
+html.light .bg-slate-950\/80,
+html.light .bg-slate-950\/70,
 html.light .bg-slate-950\/60,
+html.light .bg-slate-950\/50,
 html.light .bg-slate-950\/40,
+html.light .bg-slate-950\/30,
+html.light .bg-slate-950\/20,
 html.light .bg-slate-800,
+html.light .bg-slate-800\/95,
 html.light .bg-slate-800\/90,
 html.light .bg-slate-800\/80,
 html.light .bg-slate-800\/70,
 html.light .bg-slate-800\/60,
+html.light .bg-slate-800\/50,
 html.light .bg-slate-800\/40,
-html.light .bg-slate-800\/30 {
+html.light .bg-slate-800\/30,
+html.light .bg-slate-800\/20,
+html.light .bg-slate-700\/40,
+html.light .bg-slate-700\/50 {
   background-color: var(--bg-surface) !important;
   color: var(--text-main);
   border-color: var(--border-app) !important;
 }
 
+/* Light mode override for dark gradients */
+html.light .from-slate-900,
+html.light .from-slate-950 {
+  --tw-gradient-from: var(--bg-surface-elevated) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: var(--bg-surface) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+html.light .via-slate-900,
+html.light .via-slate-900\/95,
+html.light .via-slate-900\/80,
+html.light .via-slate-900\/60,
+html.light .via-slate-900\/50,
+html.light .via-slate-900\/40,
+html.light .via-slate-900\/30,
+html.light .via-slate-950 {
+  --tw-gradient-stops: var(--tw-gradient-from), var(--bg-surface) var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+}
+html.light .to-slate-900,
+html.light .to-slate-900\/80,
+html.light .to-slate-900\/60,
+html.light .to-slate-900\/50,
+html.light .to-slate-900\/40,
+html.light .to-slate-900\/30,
+html.light .to-slate-950 {
+  --tw-gradient-to: var(--bg-surface-elevated) var(--tw-gradient-to-position) !important;
+}
+
+/* Hover adaptation in light mode */
+html.light .hover\:bg-slate-800:hover,
+html.light .hover\:bg-slate-900:hover,
+html.light .hover\:bg-slate-950:hover {
+  background-color: var(--bg-surface-elevated) !important;
+}
+
 html.light .border-slate-800,
 html.light .border-slate-800\/90,
 html.light .border-slate-800\/80,
+html.light .border-slate-800\/60,
 html.light .border-slate-700,
 html.light .border-slate-700\/80,
 html.light .border-slate-700\/70,
@@ -142,9 +193,31 @@ html.light .border-slate-700\/50 {
   border-color: var(--border-app) !important;
 }
 
-html.light .text-slate-100,
-html.light .text-white {
+/* Headings and generic text in light mode */
+html.light .text-slate-100 {
   color: var(--text-main) !important;
+}
+
+/* Adapt text-white to text-main ONLY on neutral / surface elements, NOT on colored primary buttons */
+html.light :not(button):not([type="submit"]):not([class*="bg-blue"]):not([class*="bg-orange"]):not([class*="bg-emerald"]):not([class*="bg-red"]):not([class*="bg-purple"]):not([class*="bg-indigo"]):not([class*="from-blue"]):not([class*="from-orange"]) > .text-white,
+html.light p.text-white,
+html.light h1.text-white,
+html.light h2.text-white,
+html.light h3.text-white,
+html.light h4.text-white {
+  color: var(--text-main) !important;
+}
+
+/* Ensure text on colored buttons and badges remains crisp white */
+html.light button.text-white,
+html.light [type="submit"].text-white,
+html.light [class*="bg-blue-"] .text-white,
+html.light [class*="bg-orange-"] .text-white,
+html.light [class*="bg-emerald-"] .text-white,
+html.light [class*="bg-red-"] .text-white,
+html.light [class*="from-blue"] span,
+html.light [class*="from-orange"] span {
+  color: #ffffff !important;
 }
 
 html.light .text-slate-200,
@@ -235,4 +308,28 @@ html.light .bg-sky-500\/15 {
 
 .leaflet-control-zoom-in:hover, .leaflet-control-zoom-out:hover {
   background-color: var(--bg-surface-elevated) !important;
+}
+
+/* Progressive disclosure smooth reveal animation */
+@keyframes tsFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-ts-fade-in {
+  animation: tsFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ts-fade-in {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }
