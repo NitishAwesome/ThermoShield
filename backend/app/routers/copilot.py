@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
@@ -17,6 +17,8 @@ class CopilotChatRequest(BaseModel):
     risk_level: Optional[str] = Field(None, description="Current calculated risk tier (LOW, MODERATE, HIGH, EXTREME)")
     risk_score: Optional[float] = Field(None, description="Current calculated risk score (0-100)")
     user_role: Optional[str] = Field("citizen", description="User persona (citizen, official, responder, analyst)")
+    conversation_history: Optional[List[Dict[str, str]]] = Field(default=[], description="Previous conversation turns [{'role': 'user'|'model', 'text': '...'}]")
+    api_key: Optional[str] = Field(None, description="Optional Google Gemini API key passed from client")
 
 
 class CopilotChatResponse(BaseModel):
@@ -24,6 +26,8 @@ class CopilotChatResponse(BaseModel):
     suggested_questions: List[str] = []
     safety_tier: str
     timestamp: str
+    model_used: Optional[str] = "gemini-2.0-flash"
+    is_gemini: Optional[bool] = False
 
 
 @router.post("/chat", response_model=CopilotChatResponse)
@@ -48,7 +52,9 @@ async def chat_with_copilot(payload: CopilotChatRequest):
             humidity=payload.humidity,
             risk_level=payload.risk_level,
             risk_score=payload.risk_score,
-            user_role=payload.user_role
+            user_role=payload.user_role,
+            conversation_history=payload.conversation_history,
+            api_key=payload.api_key
         )
         return CopilotChatResponse(**response_data)
     except Exception as exc:
@@ -62,8 +68,10 @@ async def chat_with_copilot(payload: CopilotChatRequest):
 @router.get("/health")
 def copilot_health():
     """Health check for Copilot service."""
+    copilot_engine._refresh_keys()
     return {
         "status": "healthy",
         "llm_enabled": bool(copilot_engine.gemini_key or copilot_engine.openai_key),
-        "engine": "ThermoShield-Biometeorological-Copilot-v1"
+        "default_model": "gemini-2.0-flash",
+        "engine": "ThermoShield-Gemini-Biometeorological-Copilot-v2"
     }

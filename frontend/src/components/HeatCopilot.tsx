@@ -6,7 +6,11 @@ import {
   ShieldAlert,
   HeartPulse,
   ChevronDown,
-  Info
+  Info,
+  Key,
+  Check,
+  ExternalLink,
+  Cpu
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useLocation } from '../context/LocationContext';
@@ -19,6 +23,8 @@ interface ChatMessage {
   safetyTier?: string;
   suggestedQuestions?: string[];
   timestamp: string;
+  modelUsed?: string;
+  isGemini?: boolean;
 }
 
 const INITIAL_SUGGESTIONS = [
@@ -28,19 +34,34 @@ const INITIAL_SUGGESTIONS = [
   '👴 Precautions for elderly & kids',
 ];
 
+const GEMINI_STORAGE_KEY = 'thermoshield_gemini_key';
+
 export const HeatCopilot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [apiKey, setApiKey] = useState<string>(() => {
+    try {
+      return localStorage.getItem(GEMINI_STORAGE_KEY) || '';
+    } catch {
+      return '';
+    }
+  });
+  const [tempApiKey, setTempApiKey] = useState(apiKey);
+  const [keySavedMessage, setKeySavedMessage] = useState(false);
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       sender: 'copilot',
-      text: "Hello! I am **Dr. ThermoShield**, your AI Biometeorological Heatwave Advisor.\n\nAsk me anything about heat safety, hydration protocols, Wet-Bulb Globe Temperature (WBGT) work-rest cycles, or emergency heat exhaustion first aid.",
+      text: "Hello! I am **Dr. ThermoShield**, your AI Biometeorological Heatwave Advisor.\n\nAsk me anything about real-time heat safety, hydration protocols, Wet-Bulb Globe Temperature (WBGT) work-rest cycles, or emergency heat exhaustion first aid.",
       safetyTier: 'ADVISORY',
       suggestedQuestions: INITIAL_SUGGESTIONS,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      modelUsed: 'gemini-2.0-flash',
+      isGemini: true,
     },
   ]);
 
@@ -51,17 +72,36 @@ export const HeatCopilot: React.FC = () => {
 
   // Auto-scroll to latest message
   useEffect(() => {
-    if (isOpen && !isMinimized) {
+    if (isOpen && !isMinimized && !showSettings) {
       chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, isOpen, isMinimized, loading]);
+  }, [messages, isOpen, isMinimized, loading, showSettings]);
 
   // Focus input when opened
   useEffect(() => {
-    if (isOpen && !isMinimized) {
+    if (isOpen && !isMinimized && !showSettings) {
       inputRef.current?.focus();
     }
-  }, [isOpen, isMinimized]);
+  }, [isOpen, isMinimized, showSettings]);
+
+  const handleSaveKey = () => {
+    const cleanKey = tempApiKey.trim();
+    setApiKey(cleanKey);
+    try {
+      if (cleanKey) {
+        localStorage.setItem(GEMINI_STORAGE_KEY, cleanKey);
+      } else {
+        localStorage.removeItem(GEMINI_STORAGE_KEY);
+      }
+    } catch (e) {
+      console.warn('Failed to save Gemini key to localStorage', e);
+    }
+    setKeySavedMessage(true);
+    setTimeout(() => {
+      setKeySavedMessage(false);
+      setShowSettings(false);
+    }, 1200);
+  };
 
   const handleSendMessage = async (customPrompt?: string) => {
     const textToSend = (customPrompt || inputText).trim();
@@ -79,11 +119,19 @@ export const HeatCopilot: React.FC = () => {
     if (!customPrompt) setInputText('');
     setLoading(true);
 
+    // Prepare multi-turn history for Gemini
+    const historyPayload = messages.slice(-6).map((m) => ({
+      role: m.sender === 'user' ? 'user' : 'model',
+      text: m.text,
+    }));
+
     try {
       const res = await api.chatWithCopilot({
         message: textToSend,
         location: locationName || 'Mumbai',
         user_role: user?.role || 'citizen',
+        conversation_history: historyPayload,
+        api_key: apiKey || undefined,
       });
 
       const copilotMsg: ChatMessage = {
@@ -93,6 +141,8 @@ export const HeatCopilot: React.FC = () => {
         safetyTier: res.safety_tier,
         suggestedQuestions: res.suggested_questions,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        modelUsed: res.model_used || 'gemini-2.0-flash',
+        isGemini: res.is_gemini ?? true,
       };
 
       setMessages((prev) => [...prev, copilotMsg]);
@@ -104,6 +154,8 @@ export const HeatCopilot: React.FC = () => {
         safetyTier: 'ADVISORY',
         suggestedQuestions: INITIAL_SUGGESTIONS,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        modelUsed: 'biomet-expert-engine',
+        isGemini: false,
       };
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
@@ -118,13 +170,13 @@ export const HeatCopilot: React.FC = () => {
     }
   };
 
-  // Helper to format simple markdown (bold text and bullets)
+  // Helper to format simple markdown (bold text, headings, and bullets)
   const formatMarkdown = (content: string) => {
     const lines = content.split('\n');
     return lines.map((line, idx) => {
       // Bullet items
-      if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
-        const bulletContent = line.trim().substring(2);
+      if (line.trim().startsWith('* ') || line.trim().startsWith('- ') || line.trim().startsWith('• ')) {
+        const bulletContent = line.trim().replace(/^[*•-]\s*/, '');
         return (
           <li key={idx} className="ml-4 list-disc text-sm my-0.5">
             {renderFormattedSpans(bulletContent)}
@@ -157,7 +209,6 @@ export const HeatCopilot: React.FC = () => {
   };
 
   const renderFormattedSpans = (text: string) => {
-    // Basic regex parser for **bold** text
     const parts = text.split(/(\*\*.*?\*\*)/g);
     return parts.map((part, i) => {
       if (part.startsWith('**') && part.endsWith('**')) {
@@ -176,7 +227,7 @@ export const HeatCopilot: React.FC = () => {
     if (tier === 'EMERGENCY') {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300 border border-red-300 dark:border-red-800">
-          <HeartPulse className="w-3 h-3 text-red-500 animate-pulse" /> Emergency Protocol
+          <HeartPulse className="w-3 h-3 text-red-500 animate-pulse" /> Emergency
         </span>
       );
     }
@@ -214,7 +265,10 @@ export const HeatCopilot: React.FC = () => {
             </span>
           </div>
           <div className="flex flex-col items-start pr-1 text-left">
-            <span className="text-xs font-bold leading-tight tracking-wide">Ask Heat Copilot</span>
+            <span className="text-xs font-bold leading-tight tracking-wide flex items-center gap-1">
+              Ask Heat Copilot
+              <span className="text-[9px] px-1 py-0.2 bg-white/20 rounded">Gemini</span>
+            </span>
             <span className="text-[10px] text-orange-100 font-medium leading-tight">Dr. ThermoShield AI</span>
           </div>
         </button>
@@ -226,7 +280,7 @@ export const HeatCopilot: React.FC = () => {
           className={`flex flex-col rounded-2xl shadow-2xl transition-all duration-300 border ts-border backdrop-blur-xl bg-white/95 dark:bg-gray-900/95 text-gray-900 dark:text-gray-100 overflow-hidden ${
             isMinimized
               ? 'w-80 h-14'
-              : 'w-[92vw] sm:w-[410px] h-[580px] max-h-[85vh]'
+              : 'w-[92vw] sm:w-[420px] h-[590px] max-h-[85vh]'
           }`}
         >
           {/* Header */}
@@ -238,8 +292,8 @@ export const HeatCopilot: React.FC = () => {
               <div className="min-w-0">
                 <h3 className="text-sm font-bold truncate leading-tight flex items-center gap-1.5">
                   Dr. ThermoShield
-                  <span className="px-1.5 py-0.2 text-[9px] font-semibold uppercase bg-white/25 rounded-md">
-                    Copilot
+                  <span className="px-1.5 py-0.2 text-[9px] font-semibold uppercase bg-white/25 rounded-md flex items-center gap-0.5">
+                    <Sparkles className="w-2.5 h-2.5" /> Gemini AI
                   </span>
                 </h3>
                 <p className="text-[10px] text-orange-100 truncate flex items-center gap-1">
@@ -252,6 +306,13 @@ export const HeatCopilot: React.FC = () => {
 
             <div className="flex items-center gap-1 shrink-0">
               <button
+                onClick={() => setShowSettings(!showSettings)}
+                className={`p-1 rounded-md transition-colors ${showSettings ? 'bg-white/30' : 'hover:bg-white/20'}`}
+                title="Configure Gemini API Key"
+              >
+                <Key className="w-4 h-4" />
+              </button>
+              <button
                 onClick={() => setIsMinimized(!isMinimized)}
                 className="p-1 hover:bg-white/20 rounded-md transition-colors"
                 title={isMinimized ? 'Expand' : 'Minimize'}
@@ -259,7 +320,10 @@ export const HeatCopilot: React.FC = () => {
                 <ChevronDown className={`w-4 h-4 transition-transform ${isMinimized ? 'rotate-180' : ''}`} />
               </button>
               <button
-                onClick={() => setIsOpen(false)}
+                onClick={() => {
+                  setIsOpen(false);
+                  setShowSettings(false);
+                }}
                 className="p-1 hover:bg-white/20 rounded-md transition-colors"
                 title="Close"
               >
@@ -270,14 +334,70 @@ export const HeatCopilot: React.FC = () => {
 
           {!isMinimized && (
             <>
+              {/* Settings / API Key Modal Panel */}
+              {showSettings && (
+                <div className="p-4 bg-orange-50/90 dark:bg-gray-800/95 border-b border-orange-200 dark:border-gray-700 text-xs space-y-2.5 animate-fadeIn">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                      <Key className="w-3.5 h-3.5 text-orange-500" />
+                      Google Gemini AI Key
+                    </span>
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-0.5"
+                    >
+                      Get free key <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                  <p className="text-[11px] text-gray-600 dark:text-gray-300 leading-relaxed">
+                    Paste your Google Gemini API key to enable live, personalized LLM responses powered by <strong>Gemini 2.0 Flash</strong>:
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={tempApiKey}
+                      onChange={(e) => setTempApiKey(e.target.value)}
+                      placeholder="AIzaSy..."
+                      className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-orange-500 font-mono"
+                    />
+                    <button
+                      onClick={handleSaveKey}
+                      className="px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium flex items-center gap-1 shrink-0"
+                    >
+                      {keySavedMessage ? <Check className="w-3.5 h-3.5" /> : 'Save'}
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-gray-500 dark:text-gray-400">
+                    <span>
+                      Status: {apiKey ? '🟢 Custom Key Active' : '⚪ Using Server / Expert Engine'}
+                    </span>
+                    {apiKey && (
+                      <button
+                        onClick={() => {
+                          setTempApiKey('');
+                          setApiKey('');
+                          localStorage.removeItem(GEMINI_STORAGE_KEY);
+                        }}
+                        className="text-red-500 hover:underline"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Telemetry Awareness Strip */}
               <div className="px-3.5 py-1.5 bg-orange-50/80 dark:bg-orange-950/30 border-b border-orange-100 dark:border-orange-900/40 text-[11px] flex items-center justify-between text-orange-900 dark:text-orange-200">
                 <span className="flex items-center gap-1 font-medium">
                   <Info className="w-3 h-3 text-orange-600 dark:text-orange-400 shrink-0" />
                   Grounded in IMD, NDMA & WHO heat action standards
                 </span>
-                <span className="text-[10px] font-mono text-orange-700/80 dark:text-orange-300/80">
-                  v2.4
+                <span className="text-[10px] font-mono flex items-center gap-1 text-orange-700/90 dark:text-orange-300/90">
+                  <Cpu className="w-3 h-3 text-orange-500" />
+                  Gemini 2.0
                 </span>
               </div>
 
@@ -294,6 +414,11 @@ export const HeatCopilot: React.FC = () => {
                           Dr. ThermoShield
                         </span>
                         {getTierBadge(msg.safetyTier)}
+                        {msg.isGemini && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-0.5 font-medium">
+                            <Sparkles className="w-2.5 h-2.5 text-emerald-500" /> Gemini
+                          </span>
+                        )}
                         <span className="text-[10px] text-gray-400 ml-1">{msg.timestamp}</span>
                       </div>
                     )}
@@ -342,7 +467,8 @@ export const HeatCopilot: React.FC = () => {
                         Dr. ThermoShield
                       </span>
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] rounded-full bg-orange-100 dark:bg-orange-950 text-orange-600 dark:text-orange-400">
-                        Analyzing telemetry...
+                        <Sparkles className="w-2.5 h-2.5 animate-spin" />
+                        Generating Gemini advisory...
                       </span>
                     </div>
                     <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl rounded-bl-xs px-4 py-3 border border-gray-200 dark:border-gray-700 flex items-center gap-1.5">

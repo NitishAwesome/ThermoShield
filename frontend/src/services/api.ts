@@ -223,17 +223,23 @@ export const api = {
     risk_level?: string;
     risk_score?: number;
     user_role?: string;
+    conversation_history?: Array<{ role: string; text: string }>;
+    api_key?: string;
   }): Promise<{
     reply: string;
     suggested_questions: string[];
     safety_tier: string;
     timestamp: string;
+    model_used?: string;
+    is_gemini?: boolean;
   }> => {
     const res = await apiClient.post<{
       reply: string;
       suggested_questions: string[];
       safety_tier: string;
       timestamp: string;
+      model_used?: string;
+      is_gemini?: boolean;
     }>('/copilot/chat', data);
     return res.data;
   },
