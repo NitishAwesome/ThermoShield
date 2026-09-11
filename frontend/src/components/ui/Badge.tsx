@@ -38,13 +38,13 @@ export const Badge: React.FC<BadgeProps> = ({
   }[size];
 
   const variantStyles = {
-    default: 'bg-slate-800/80 text-slate-200 border-slate-700',
-    neutral: 'bg-slate-700/40 text-slate-300 border-slate-600/60',
-    brand: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
-    low: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40',
-    moderate: 'bg-amber-500/15 text-amber-400 border-amber-500/40',
-    high: 'bg-orange-500/15 text-orange-400 border-orange-500/40',
-    extreme: 'bg-red-500/20 text-red-400 border-red-500/50',
+    default: 'bg-slate-100 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-700',
+    neutral: 'bg-slate-100 dark:bg-slate-700/40 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600/60',
+    brand: 'bg-sky-500/15 text-sky-700 dark:text-sky-400 border-sky-500/30',
+    low: 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 border-emerald-500/40',
+    moderate: 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/40',
+    high: 'bg-orange-500/15 text-orange-800 dark:text-orange-300 border-orange-500/40',
+    extreme: 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/40',
   }[effectiveVariant];
 
   const dotColor = {

@@ -325,7 +325,7 @@ export const AreaRiskShowcase: React.FC<AreaRiskShowcaseProps> = ({
 
         <div className="p-3.5 rounded-xl ts-card-subtle border ts-border">
           <div className="text-[11px] font-medium ts-text-subtle">{t('matrix.avgWbgt')}</div>
-          <div className="text-xl sm:text-2xl font-black text-orange-400 mt-0.5">{stats.avgWbgt}°C</div>
+          <div className="text-xl sm:text-2xl font-black text-orange-600 dark:text-orange-400 mt-0.5">{stats.avgWbgt}°C</div>
           <div className="text-[10.5px] ts-text-subtle mt-0.5">{t('dashboard.heatStressIndex')}</div>
         </div>
       </div>
@@ -354,7 +354,7 @@ export const AreaRiskShowcase: React.FC<AreaRiskShowcaseProps> = ({
               onClick={() => setSelectedZone(zone)}
               className={`px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
                 selectedZone === zone
-                  ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40 font-bold'
+                  ? 'bg-orange-500/20 text-orange-700 dark:text-orange-300 border border-orange-500/40 font-bold'
                   : 'ts-card border ts-border ts-text-muted hover:ts-text-primary'
               }`}
             >
@@ -484,8 +484,8 @@ export const AreaRiskShowcase: React.FC<AreaRiskShowcaseProps> = ({
                           {area.state}
                         </span>
                         {isActive && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-orange-500/15 text-orange-400 border border-orange-500/40 flex items-center space-x-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/40 flex items-center space-x-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-orange-500 dark:bg-orange-400 animate-pulse" />
                             <span>{t('matrix.activeFocus')}</span>
                           </span>
                         )}
@@ -537,10 +537,10 @@ export const AreaRiskShowcase: React.FC<AreaRiskShowcaseProps> = ({
 
                       <div>
                         <div className="text-[10px] ts-text-subtle flex items-center justify-center space-x-0.5 font-medium">
-                          <Flame className="w-3 h-3 text-orange-400" />
+                          <Flame className="w-3 h-3 text-orange-500 dark:text-orange-400" />
                           <span>{t('matrix.wetBulb')}</span>
                         </div>
-                        <div className="text-xs font-bold text-orange-400 mt-0.5 font-mono">
+                        <div className="text-xs font-bold text-orange-600 dark:text-orange-400 mt-0.5 font-mono">
                           {area.wbgt_c.toFixed(1)}°C
                         </div>
                       </div>

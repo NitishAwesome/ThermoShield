@@ -52,7 +52,7 @@ export const Forecast: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-orange-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400">
               Synoptic Outlook
             </span>
             <Badge variant="brand" size="sm">
@@ -108,7 +108,7 @@ export const Forecast: React.FC = () => {
             <CardHeader
               title={
                 <div className="flex items-center space-x-2">
-                  <Calendar className="w-5 h-5 text-orange-400" />
+                  <Calendar className="w-5 h-5 text-orange-600 dark:text-orange-400" />
                   <span>{t('forecast.outlookMatrix', '5-Day Synoptic Outlook Matrix')}</span>
                 </div>
               }
@@ -208,7 +208,7 @@ export const Forecast: React.FC = () => {
 
               {/* Outlook transparency note */}
               <div className="mt-4 p-3 rounded-xl ts-card-subtle border ts-border flex items-center space-x-2 text-xs ts-text-muted">
-                <Info className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                <Info className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0" />
                 <span>
                   Weather forecast displays real meteorological data. Multi-day civic risk score modeling is computed dynamically upon date arrival to maintain empirical integrity.
                 </span>

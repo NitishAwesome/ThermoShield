@@ -246,7 +246,7 @@ export const HeatCopilot: React.FC = () => {
   };
 
   return (
-    <aside aria-label="AI Heatwave Copilot" className="fixed bottom-5 right-5 z-50 select-none">
+    <aside aria-label="AI Heatwave Copilot" className="fixed bottom-3 right-3 sm:bottom-5 sm:right-5 z-50 select-none max-w-[calc(100vw-24px)]">
       {/* Floating Trigger Badge */}
       {!isOpen && (
         <button
@@ -279,8 +279,8 @@ export const HeatCopilot: React.FC = () => {
         <div
           className={`flex flex-col rounded-2xl shadow-2xl transition-all duration-300 border ts-border backdrop-blur-xl bg-white/95 dark:bg-gray-900/95 text-gray-900 dark:text-gray-100 overflow-hidden ${
             isMinimized
-              ? 'w-80 h-14'
-              : 'w-[92vw] sm:w-[420px] h-[590px] max-h-[85vh]'
+              ? 'w-72 sm:w-80 h-14'
+              : 'w-[calc(100vw-24px)] sm:w-[420px] h-[590px] max-h-[85vh]'
           }`}
         >
           {/* Header */}

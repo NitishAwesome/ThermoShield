@@ -198,25 +198,21 @@ html.light .text-slate-100 {
   color: var(--text-main) !important;
 }
 
-/* Adapt text-white to text-main ONLY on neutral / surface elements, NOT on colored primary buttons */
-html.light :not(button):not([type="submit"]):not([class*="bg-blue"]):not([class*="bg-orange"]):not([class*="bg-emerald"]):not([class*="bg-red"]):not([class*="bg-purple"]):not([class*="bg-indigo"]):not([class*="from-blue"]):not([class*="from-orange"]) > .text-white,
-html.light p.text-white,
-html.light h1.text-white,
-html.light h2.text-white,
-html.light h3.text-white,
-html.light h4.text-white {
-  color: var(--text-main) !important;
-}
-
-/* Ensure text on colored buttons and badges remains crisp white */
+/* Ensure text on colored primary buttons, links, and badges remains crisp white */
 html.light button.text-white,
+html.light a.text-white,
 html.light [type="submit"].text-white,
-html.light [class*="bg-blue-"] .text-white,
-html.light [class*="bg-orange-"] .text-white,
-html.light [class*="bg-emerald-"] .text-white,
-html.light [class*="bg-red-"] .text-white,
-html.light [class*="from-blue"] span,
-html.light [class*="from-orange"] span {
+html.light button.text-white *,
+html.light a.text-white *,
+html.light [type="submit"].text-white *,
+html.light [class*="bg-blue-600"] .text-white,
+html.light [class*="bg-orange-500"] .text-white,
+html.light [class*="bg-orange-600"] .text-white,
+html.light [class*="bg-emerald-600"] .text-white,
+html.light [class*="bg-red-500"] .text-white,
+html.light [class*="bg-red-600"] .text-white,
+html.light [class*="bg-purple-600"] .text-white,
+html.light [class*="bg-cyan-600"] .text-white {
   color: #ffffff !important;
 }
 

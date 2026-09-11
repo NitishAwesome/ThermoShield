@@ -176,7 +176,7 @@ export const PersonalizedDashboardSummary: React.FC<PersonalizedDashboardSummary
             {personalAssessment.factors.length > 0 && (
               <>
                 <span>•</span>
-                <span className="text-orange-400 font-medium">
+                <span className="text-orange-700 dark:text-orange-400 font-medium">
                   {personalAssessment.factors.slice(0, 2).join(', ')}
                 </span>
               </>

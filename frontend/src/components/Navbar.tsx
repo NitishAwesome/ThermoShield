@@ -76,25 +76,25 @@ export const Navbar: React.FC = () => {
         return {
           label: t('role.healthOfficial'),
           icon: Building2,
-          classes: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+          classes: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/30',
         };
       case 'responder':
         return {
           label: t('role.responder'),
           icon: Flame,
-          classes: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+          classes: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30',
         };
       case 'analyst':
         return {
           label: t('role.analyst'),
           icon: ActivitySquare,
-          classes: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+          classes: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30',
         };
       default:
         return {
           label: t('role.citizen'),
           icon: ShieldCheck,
-          classes: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+          classes: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
         };
     }
   };
@@ -240,7 +240,7 @@ export const Navbar: React.FC = () => {
                 onClick={() => setMoreDropdownOpen(!moreDropdownOpen)}
                 className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                   isMoreActive
-                    ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
+                    ? 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/30'
                     : 'ts-text-muted hover:ts-text-primary hover:bg-slate-800/30'
                 }`}
               >
@@ -263,12 +263,12 @@ export const Navbar: React.FC = () => {
                         className={({ isActive }) =>
                           `flex items-start space-x-2.5 px-3 py-2 text-xs transition-colors ${
                             isActive
-                              ? 'bg-orange-500/15 text-orange-400 font-bold'
+                              ? 'bg-orange-500/15 text-orange-700 dark:text-orange-300 font-bold'
                               : 'ts-text-muted hover:ts-text-primary hover:bg-slate-800/40'
                           }`
                         }
                       >
-                        <Icon className="w-4 h-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                        <Icon className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
                         <div>
                           <div className="font-semibold text-xs">{item.label}</div>
                           <div className="text-[10.5px] ts-text-subtle leading-tight">{item.description}</div>
@@ -365,7 +365,7 @@ export const Navbar: React.FC = () => {
                     <div className="text-xs font-bold leading-tight max-w-[85px] lg:max-w-[110px] truncate ts-text-primary">
                       {user.name}
                     </div>
-                    <div className="text-[10px] text-orange-400 font-medium leading-none mt-0.5">
+                    <div className="text-[10px] text-orange-700 dark:text-orange-300 font-medium leading-none mt-0.5">
                       {roleInfo.label}
                     </div>
                   </div>
@@ -378,8 +378,8 @@ export const Navbar: React.FC = () => {
                     <div className="px-4 py-3 border-b ts-border">
                       <div className="text-sm font-bold ts-text-primary">{user.name}</div>
                       <div className="text-xs ts-text-muted truncate">{user.email}</div>
-                      <div className="mt-2 inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] border font-semibold ts-card-subtle border-slate-700">
-                        <RoleIcon className="w-3 h-3 text-orange-400" />
+                      <div className={`mt-2 inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] border font-semibold ${roleInfo.classes}`}>
+                        <RoleIcon className="w-3 h-3" />
                         <span>{roleInfo.label}</span>
                       </div>
                     </div>
@@ -388,7 +388,7 @@ export const Navbar: React.FC = () => {
                       <NavLink
                         to="/profile"
                         onClick={() => setDropdownOpen(false)}
-                        className="flex items-center space-x-2.5 px-3 py-2 text-xs text-orange-400 hover:bg-orange-500/10 rounded-xl transition-colors font-semibold"
+                        className="flex items-center space-x-2.5 px-3 py-2 text-xs text-orange-700 dark:text-orange-300 hover:bg-orange-500/10 rounded-xl transition-colors font-semibold"
                       >
                         <UserIcon className="w-4 h-4" />
                         <span>{t('nav.myProfile')}</span>
@@ -457,7 +457,7 @@ export const Navbar: React.FC = () => {
               to={item.to}
               className={({ isActive }) =>
                 `flex flex-col items-center justify-center p-1 rounded-lg text-xs transition-colors min-w-[48px] max-w-[62px] ${
-                  isActive ? 'text-orange-400 font-bold' : 'ts-text-muted hover:ts-text-primary'
+                  isActive ? 'text-orange-600 dark:text-orange-400 font-bold' : 'ts-text-muted hover:ts-text-primary'
                 }`
               }
             >
@@ -472,7 +472,7 @@ export const Navbar: React.FC = () => {
           type="button"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           className={`flex flex-col items-center justify-center p-1 rounded-lg text-xs transition-colors min-w-[48px] max-w-[62px] ${
-            isMoreActive || mobileMenuOpen ? 'text-orange-400 font-bold' : 'ts-text-muted hover:ts-text-primary'
+            isMoreActive || mobileMenuOpen ? 'text-orange-600 dark:text-orange-400 font-bold' : 'ts-text-muted hover:ts-text-primary'
           }`}
         >
           <MoreHorizontal className="w-4 h-4 flex-shrink-0" />
@@ -499,12 +499,12 @@ export const Navbar: React.FC = () => {
                 className={({ isActive }) =>
                   `flex items-center space-x-3 p-2.5 rounded-xl text-xs transition-colors ${
                     isActive
-                      ? 'bg-orange-500/15 text-orange-400 font-bold border border-orange-500/30'
+                      ? 'bg-orange-500/15 text-orange-700 dark:text-orange-300 font-bold border border-orange-500/30'
                       : 'ts-card-subtle border ts-border ts-text-primary'
                   }`
                 }
               >
-                <Icon className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                <Icon className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0" />
                 <div>
                   <div className="font-semibold text-xs">{item.label}</div>
                   <div className="text-[10px] ts-text-subtle">{item.description}</div>

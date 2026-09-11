@@ -36,40 +36,40 @@ export const getRiskBadgeStyles = (level: RiskLevel | string | undefined) => {
   switch (level?.toUpperCase()) {
     case 'LOW':
       return {
-        bg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
-        badge: 'bg-emerald-500 text-slate-950 font-bold',
-        text: 'text-emerald-400',
+        bg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-400',
+        badge: 'bg-emerald-500 text-white dark:text-slate-950 font-bold',
+        text: 'text-emerald-700 dark:text-emerald-400',
         glow: 'shadow-emerald-500/20',
         border: 'border-emerald-500/40',
-        dot: 'bg-emerald-400',
+        dot: 'bg-emerald-500 dark:bg-emerald-400',
         label: 'Low Risk',
       };
     case 'MODERATE':
       return {
-        bg: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
-        badge: 'bg-amber-500 text-slate-950 font-bold',
-        text: 'text-amber-400',
+        bg: 'bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-400',
+        badge: 'bg-amber-500 text-white dark:text-slate-950 font-bold',
+        text: 'text-amber-700 dark:text-amber-400',
         glow: 'shadow-amber-500/20',
         border: 'border-amber-500/40',
-        dot: 'bg-amber-400',
+        dot: 'bg-amber-500 dark:bg-amber-400',
         label: 'Moderate Risk',
       };
     case 'HIGH':
       return {
-        bg: 'bg-orange-500/10 border-orange-500/30 text-orange-400',
-        badge: 'bg-orange-500 text-slate-950 font-bold',
-        text: 'text-orange-400',
+        bg: 'bg-orange-500/10 border-orange-500/30 text-orange-800 dark:text-orange-400',
+        badge: 'bg-orange-500 text-white dark:text-slate-950 font-bold',
+        text: 'text-orange-700 dark:text-orange-400',
         glow: 'shadow-orange-500/20',
         border: 'border-orange-500/40',
-        dot: 'bg-orange-400',
+        dot: 'bg-orange-500 dark:bg-orange-400',
         label: 'High Risk',
       };
     case 'EXTREME':
     case 'CRITICAL':
       return {
-        bg: 'bg-red-500/10 border-red-500/30 text-red-400',
+        bg: 'bg-red-500/10 border-red-500/30 text-red-800 dark:text-red-400',
         badge: 'bg-red-500 text-white font-bold animate-pulse',
-        text: 'text-red-400',
+        text: 'text-red-700 dark:text-red-400',
         glow: 'shadow-red-500/30',
         border: 'border-red-500/50',
         dot: 'bg-red-500 animate-ping',

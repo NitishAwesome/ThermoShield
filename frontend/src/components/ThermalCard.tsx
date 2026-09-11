@@ -83,7 +83,7 @@ export const ThermalCard: React.FC<ThermalCardProps> = ({
           {/* 1. Wet-Bulb Globe Temperature (WBGT) */}
           <div className="p-4 rounded-xl ts-card-subtle border border-orange-500/30 flex flex-col justify-between bg-orange-500/5">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-orange-400 flex items-center gap-1">
+              <span className="font-bold text-orange-600 dark:text-orange-400 flex items-center gap-1">
                 <Sun className="w-3.5 h-3.5" />
                 WBGT
               </span>
@@ -92,7 +92,7 @@ export const ThermalCard: React.FC<ThermalCardProps> = ({
               </span>
             </div>
             <div className="mt-2">
-              <div className="text-3xl font-black font-mono text-orange-400">
+              <div className="text-3xl font-black font-mono text-orange-600 dark:text-orange-400">
                 {formatTemperature(indices.wbgt_c)}
               </div>
               <div className={`text-[11px] font-bold ${wbgtSev.color} mt-0.5`}>
@@ -215,14 +215,14 @@ export const ThermalCard: React.FC<ThermalCardProps> = ({
         {riskAssessment && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="ts-card-subtle p-4 rounded-xl border ts-border">
-              <div className="flex items-center space-x-1.5 text-xs font-bold text-orange-400 mb-2">
+              <div className="flex items-center space-x-1.5 text-xs font-bold text-orange-600 dark:text-orange-400 mb-2">
                 <Shield className="w-4 h-4" />
                 <span>{t('thermalCard.riskBasisTitle')}</span>
               </div>
               <ul className="space-y-1.5">
                 {riskAssessment.risk_basis?.map((rb, idx) => (
                   <li key={idx} className="text-xs ts-text-muted flex items-start space-x-2">
-                    <span className="text-orange-400 mt-0.5">•</span>
+                    <span className="text-orange-500 dark:text-orange-400 mt-0.5">•</span>
                     <span>{translateExplainabilityFactor(rb, t)}</span>
                   </li>
                 ))}

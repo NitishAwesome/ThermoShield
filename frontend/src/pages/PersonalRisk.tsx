@@ -231,10 +231,10 @@ export const PersonalRisk: React.FC = () => {
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <div>
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 rounded-xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center text-orange-400">
+              <div className="w-8 h-8 rounded-xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center text-orange-600 dark:text-orange-400">
                 <HeartPulse className="w-4 h-4" />
               </div>
-              <span className="text-xs font-bold uppercase tracking-wider text-orange-400">
+              <span className="text-xs font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400">
                 {t('risk.advisoryTitle', 'Personalized Heat Advisory')}
               </span>
             </div>
@@ -248,16 +248,16 @@ export const PersonalRisk: React.FC = () => {
 
           {/* Connected Profile Status Box */}
           <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full lg:w-auto">
-            <div className="flex items-center space-x-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 flex-1 sm:flex-initial">
-              <UserCheck className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+            <div className="flex items-center space-x-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 flex-1 sm:flex-initial">
+              <UserCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
               <div className="text-xs">
                 <div className="font-bold ts-text-primary flex items-center gap-1.5">
                   <span>{profile.fullName || user?.name || t('role.citizen', 'My Profile')}</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-normal">
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-normal">
                     {profile.role}
                   </span>
                 </div>
-                <div className="text-[11px] text-emerald-300/80">
+                <div className="text-[11px] text-emerald-700 dark:text-emerald-300/80">
                   {completionPercentage}% complete · {profile.age || 'Age unverified'}
                 </div>
               </div>
@@ -378,7 +378,7 @@ export const PersonalRisk: React.FC = () => {
               <div>
                 <div className="flex justify-between items-center text-xs mb-1.5">
                   <span className="ts-text-muted font-semibold">{t('risk.ageYears')}</span>
-                  <span className="font-mono text-sm font-black text-orange-400 px-2.5 py-0.5 rounded bg-orange-500/10 border border-orange-500/20">
+                  <span className="font-mono text-sm font-black text-orange-700 dark:text-orange-400 px-2.5 py-0.5 rounded bg-orange-500/10 border border-orange-500/20">
                     {t('risk.ageYearsVal', { age })}
                   </span>
                 </div>
@@ -664,7 +664,7 @@ export const PersonalRisk: React.FC = () => {
               <Card variant="elevated" className="p-4 sm:p-6 relative overflow-hidden">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-orange-400">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400">
                       SECTION 1
                     </span>
                     <h3 className="text-lg font-black ts-text-primary">
@@ -728,7 +728,7 @@ export const PersonalRisk: React.FC = () => {
                 {/* Directives Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t ts-border">
                   <div className="p-3 rounded-xl ts-card-subtle border ts-border">
-                    <div className="flex items-center space-x-1.5 text-xs text-sky-400 font-bold">
+                    <div className="flex items-center space-x-1.5 text-xs text-sky-700 dark:text-sky-400 font-bold">
                       <Droplets className="w-4 h-4" />
                       <span>{t('risk.waterIntakeTarget', 'Recommended Water Intake')}</span>
                     </div>
@@ -740,7 +740,7 @@ export const PersonalRisk: React.FC = () => {
                   </div>
 
                   <div className="p-3 rounded-xl ts-card-subtle border ts-border">
-                    <div className="flex items-center space-x-1.5 text-xs text-orange-400 font-bold">
+                    <div className="flex items-center space-x-1.5 text-xs text-orange-700 dark:text-orange-400 font-bold">
                       <Clock className="w-4 h-4" />
                       <span>{t('risk.workRestCycle', 'Work-Rest Cycle')}</span>
                     </div>
@@ -875,7 +875,7 @@ export const PersonalRisk: React.FC = () => {
                   className="w-full p-4 flex items-center justify-between text-left transition-colors hover:bg-slate-500/5 rounded-2xl"
                 >
                   <div className="flex items-center space-x-2.5">
-                    <Info className="w-4 h-4 text-orange-400" />
+                    <Info className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                     <div>
                       <div className="text-xs font-bold ts-text-primary">
                         {t('risk.section4Title', 'Scientific & Occupational Methodology Details')}
@@ -924,7 +924,7 @@ export const PersonalRisk: React.FC = () => {
             </>
           ) : (
             <EmptyState
-              icon={<HeartPulse className="w-8 h-8 text-orange-400" />}
+              icon={<HeartPulse className="w-8 h-8 text-orange-600 dark:text-orange-400" />}
               title={t('empty.awaitingCalculation', 'Awaiting Calculation')}
               description={t('risk.awaitingCalcDesc')}
             />

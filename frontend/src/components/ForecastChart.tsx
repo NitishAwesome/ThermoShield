@@ -22,7 +22,7 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({ forecast }) => {
 
   if (!forecast || !forecast.dates || forecast.dates.length === 0) {
     return (
-      <div className="rounded-2xl bg-slate-800/90 border border-slate-700 p-6 text-center text-slate-400 text-sm">
+      <div className="rounded-2xl ts-card-elevated border ts-border p-6 text-center ts-text-muted text-sm">
         {t('forecastChart.noData')}
       </div>
     );
@@ -39,15 +39,15 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({ forecast }) => {
   });
 
   return (
-    <div className="rounded-2xl bg-slate-800/90 border border-slate-700/80 p-4 sm:p-6 shadow-xl backdrop-blur-md">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-700/60 pb-3 mb-4">
+    <div className="rounded-2xl ts-card-elevated border ts-border p-4 sm:p-6 shadow-xl backdrop-blur-md">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b ts-border pb-3 mb-4">
         <div className="flex items-center space-x-2">
-          <Calendar className="w-5 h-5 text-cyan-400 flex-shrink-0" />
-          <h3 className="text-base font-bold text-slate-100">
+          <Calendar className="w-5 h-5 text-cyan-500 dark:text-cyan-400 flex-shrink-0" />
+          <h3 className="text-base font-bold ts-text-primary">
             {t('forecastChart.title')}
           </h3>
         </div>
-        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 self-start sm:self-auto flex-shrink-0">
+        <span className="text-xs font-semibold px-2 py-0.5 rounded ts-card-subtle ts-text-muted border ts-border self-start sm:self-auto flex-shrink-0">
           Open-Meteo Synoptic
         </span>
       </div>

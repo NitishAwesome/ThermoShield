@@ -296,7 +296,7 @@ export const RoleWelcomeBanner: React.FC<RoleWelcomeBannerProps> = ({
               <button
                 type="button"
                 onClick={() => setIsRoleMenuOpen(!isRoleMenuOpen)}
-                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-orange-500/15 border border-orange-500/30 text-orange-400 hover:bg-orange-500/25 transition-all"
+                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-orange-500/15 border border-orange-500/30 text-orange-700 dark:text-orange-300 hover:bg-orange-500/25 transition-all"
               >
                 {t('roleBanner.changeView', 'Change View')}
               </button>
@@ -318,7 +318,7 @@ export const RoleWelcomeBanner: React.FC<RoleWelcomeBannerProps> = ({
                         onClick={() => handleRoleSelect(r.id)}
                         className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left transition-colors ${
                           isCurrent
-                            ? 'bg-orange-500/15 font-bold text-orange-400'
+                            ? 'bg-orange-500/15 font-bold text-orange-700 dark:text-orange-300'
                             : 'ts-text-muted hover:ts-text-primary hover:bg-slate-800/40'
                         }`}
                       >
@@ -326,7 +326,7 @@ export const RoleWelcomeBanner: React.FC<RoleWelcomeBannerProps> = ({
                           <RIcon className={`w-3.5 h-3.5 ${r.color}`} />
                           <span>{getLocalizedRoleLabel(r.id, r.label)}</span>
                         </div>
-                        {isCurrent && <Check className="w-3.5 h-3.5 text-orange-400" />}
+                        {isCurrent && <Check className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />}
                       </button>
                     );
                   })}
@@ -442,7 +442,7 @@ export const RoleWelcomeBanner: React.FC<RoleWelcomeBannerProps> = ({
                             onClick={() => handleRoleSelect(r.id)}
                             className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left transition-colors ${
                               isCurrent
-                                ? 'bg-orange-500/15 font-bold text-orange-400'
+                                ? 'bg-orange-500/15 font-bold text-orange-700 dark:text-orange-300'
                                 : 'ts-text-muted hover:ts-text-primary hover:bg-slate-800/40'
                             }`}
                           >
@@ -450,7 +450,7 @@ export const RoleWelcomeBanner: React.FC<RoleWelcomeBannerProps> = ({
                               <RIcon className={`w-3.5 h-3.5 ${r.color}`} />
                               <span>{getLocalizedRoleLabel(r.id, r.label)}</span>
                             </div>
-                            {isCurrent && <Check className="w-3.5 h-3.5 text-orange-400" />}
+                            {isCurrent && <Check className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />}
                           </button>
                         );
                       })}
@@ -589,7 +589,7 @@ export const RoleWelcomeBanner: React.FC<RoleWelcomeBannerProps> = ({
                           onClick={() => handleRoleSelect(r.id)}
                           className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left transition-colors ${
                             isCurrent
-                              ? 'bg-orange-500/15 font-bold text-orange-400'
+                              ? 'bg-orange-500/15 font-bold text-orange-700 dark:text-orange-300'
                               : 'ts-text-muted hover:ts-text-primary hover:bg-slate-800/40'
                           }`}
                         >
@@ -597,7 +597,7 @@ export const RoleWelcomeBanner: React.FC<RoleWelcomeBannerProps> = ({
                             <RIcon className={`w-3.5 h-3.5 ${r.color}`} />
                             <span>{getLocalizedRoleLabel(r.id, r.label)}</span>
                           </div>
-                          {isCurrent && <Check className="w-3.5 h-3.5 text-orange-400" />}
+                          {isCurrent && <Check className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />}
                         </button>
                       );
                     })}

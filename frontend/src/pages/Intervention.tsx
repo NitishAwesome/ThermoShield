@@ -282,7 +282,7 @@ export const Intervention: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-orange-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400">
               {t('intervention.decisionSupportEngine')}
             </span>
             <Badge variant="brand" size="sm">
@@ -300,7 +300,7 @@ export const Intervention: React.FC = () => {
         {/* Active City Location Badge & Sync Button */}
         <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2 ts-card-elevated border ts-border px-3 sm:px-3.5 py-2 rounded-xl">
           <div className="flex items-center space-x-2">
-            <MapPin className="w-4 h-4 text-orange-400 flex-shrink-0" />
+            <MapPin className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0" />
             <div className="text-xs">
               <span className="ts-text-subtle block text-[11px]">{t('nav.activeZone')}:</span>
               <span className="font-semibold ts-text-primary">{locationName.split(',')[0]}</span>
@@ -311,7 +311,7 @@ export const Intervention: React.FC = () => {
             size="sm"
             onClick={handleSyncLive}
             disabled={isSyncing}
-            leftIcon={<Zap className={`w-3.5 h-3.5 text-orange-400 ${isSyncing ? 'animate-bounce' : ''}`} />}
+            leftIcon={<Zap className={`w-3.5 h-3.5 text-orange-600 dark:text-orange-400 ${isSyncing ? 'animate-bounce' : ''}`} />}
             className="ml-auto sm:ml-1 text-xs cursor-pointer"
           >
             {isSyncing ? t('common.loading') : t('intervention.syncLiveBtn')}

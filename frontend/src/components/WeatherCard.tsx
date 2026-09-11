@@ -33,11 +33,11 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ weather, className = '
   const uvIndex = weather.uv_index ?? (weather.solar_radiation && weather.solar_radiation > 400 ? 7.5 : 2.0);
 
   const getUvBadge = (uv: number) => {
-    if (uv >= 11) return { label: t('uv.extreme', 'Extreme'), color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' };
-    if (uv >= 8) return { label: t('uv.veryHigh', 'Very High'), color: 'bg-red-500/20 text-red-400 border-red-500/30' };
-    if (uv >= 6) return { label: t('uv.high', 'High'), color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' };
-    if (uv >= 3) return { label: t('uv.moderate', 'Moderate'), color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' };
-    return { label: t('uv.low', 'Low'), color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' };
+    if (uv >= 11) return { label: t('uv.extreme', 'Extreme'), color: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30' };
+    if (uv >= 8) return { label: t('uv.veryHigh', 'Very High'), color: 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30' };
+    if (uv >= 6) return { label: t('uv.high', 'High'), color: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30' };
+    if (uv >= 3) return { label: t('uv.moderate', 'Moderate'), color: 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30' };
+    return { label: t('uv.low', 'Low'), color: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30' };
   };
 
   const uvBadge = getUvBadge(uvIndex);

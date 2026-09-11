@@ -250,7 +250,7 @@ export const Profile: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-orange-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400">
               {t('profile.accountTab', 'Account & Personalization')}
             </span>
             <Badge variant="brand" size="sm">
@@ -280,9 +280,9 @@ export const Profile: React.FC = () => {
 
           <Link
             to="/personal-risk"
-            className="px-3.5 py-2 rounded-xl text-xs font-bold ts-card-subtle hover:bg-orange-500/10 hover:text-orange-400 border ts-border ts-text-primary transition-all flex items-center space-x-1.5"
+            className="px-3.5 py-2 rounded-xl text-xs font-bold ts-card-subtle hover:bg-orange-500/10 hover:text-orange-600 dark:hover:text-orange-400 border ts-border ts-text-primary transition-all flex items-center space-x-1.5"
           >
-            <HeartPulse className="w-4 h-4 text-orange-400" />
+            <HeartPulse className="w-4 h-4 text-orange-600 dark:text-orange-400" />
             <span>{t('profile.viewPersonalRisk', 'View Personal Risk')}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
@@ -291,12 +291,12 @@ export const Profile: React.FC = () => {
 
       {/* Success Banner */}
       {savedSuccess && (
-        <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs flex items-center justify-between animate-ts-fade-in shadow-sm">
+        <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-800 dark:text-emerald-300 text-xs flex items-center justify-between animate-ts-fade-in shadow-sm">
           <div className="flex items-center space-x-2.5">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
             <div>
-              <p className="font-bold text-sm text-emerald-200">{t('profile.savedSuccessToast', 'Profile Updated Successfully')}</p>
-              <p className="text-emerald-300/80 mt-0.5">
+              <p className="font-bold text-sm text-emerald-900 dark:text-emerald-200">{t('profile.savedSuccessToast', 'Profile Updated Successfully')}</p>
+              <p className="text-emerald-700 dark:text-emerald-300/80 mt-0.5">
                 {t('profile.completeAdvisory', 'Your personal risk scores, alerts, and dashboard guidance are now updated with your latest profile information.')}
               </p>
             </div>
@@ -310,7 +310,7 @@ export const Profile: React.FC = () => {
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           <div className="flex-1 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
+              <span className="text-xs font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" />
                 {t('profile.setupAccuracy', 'Profile Setup & Accuracy')}
               </span>
@@ -674,7 +674,7 @@ export const Profile: React.FC = () => {
             <CardContent className="space-y-4">
               {/* Informational Disclaimer */}
               <div className="p-3.5 rounded-xl bg-orange-500/10 border border-orange-500/30 text-xs ts-text-muted flex items-start space-x-2.5">
-                <Info className="w-4 h-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                <Info className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
                 <p className="leading-relaxed">
                   <strong className="ts-text-primary font-semibold">{t('profile.privacySafetyNoteTitle', 'Privacy & Safety Note:')} </strong>
                   {t('profile.privacySafetyNoteText', 'This information helps estimate how strongly heat may affect your body and customizes your recommended water intake and rest breaks. It does not replace medical advice from a doctor.')}
@@ -699,7 +699,7 @@ export const Profile: React.FC = () => {
                       <span className="text-xl flex-shrink-0 mt-0.5">{cond.icon}</span>
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
-                          <span className={`text-xs font-bold ${isChecked ? 'text-orange-500 dark:text-orange-400' : 'ts-text-primary'}`}>
+                          <span className={`text-xs font-bold ${isChecked ? 'text-orange-700 dark:text-orange-400' : 'ts-text-primary'}`}>
                             {cond.label}
                           </span>
                           <div

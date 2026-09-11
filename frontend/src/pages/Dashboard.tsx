@@ -184,7 +184,7 @@ export const Dashboard: React.FC = () => {
         return {
           badge: t('role.healthOfficial', 'Municipal Health Authority'),
           icon: Building2,
-          color: 'text-cyan-400',
+          color: 'text-cyan-700 dark:text-cyan-400',
           bg: 'bg-cyan-500/10 border-cyan-500/30',
           title: t('dashboard.roleOfficialTitle', 'Municipal Command Center: Heat Surveillance & Action Planning'),
           subtitle: t('dashboard.roleOfficialSubtitle', 'Monitor area-level heat risk across municipal wards, understand civic health demand, and evaluate intervention responses.'),
@@ -198,7 +198,7 @@ export const Dashboard: React.FC = () => {
         return {
           badge: t('role.responder', 'Emergency Field Responder'),
           icon: Flame,
-          color: 'text-orange-400',
+          color: 'text-orange-700 dark:text-orange-400',
           bg: 'bg-orange-500/10 border-orange-500/30',
           title: t('dashboard.roleResponderTitle', 'Field Response Command: Heat Hazard & Alert Operations'),
           subtitle: t('dashboard.roleResponderSubtitle', 'Operational surveillance: active alerts, areas needing attention, heat conditions, people needing extra protection, and response measures.'),
@@ -212,7 +212,7 @@ export const Dashboard: React.FC = () => {
         return {
           badge: t('role.analyst', 'Climate & Data Analyst'),
           icon: BarChart2,
-          color: 'text-purple-400',
+          color: 'text-purple-700 dark:text-purple-400',
           bg: 'bg-purple-500/10 border-purple-500/30',
           title: t('dashboard.roleAnalystTitle', 'Climate Intelligence & Multi-Index Risk Analytics'),
           subtitle: t('dashboard.roleAnalystSubtitle', 'Biometeorological modeling: analyze WBGT, multi-index heat stress, predictive ML risk factors, and cross-zone surveillance.'),
@@ -226,7 +226,7 @@ export const Dashboard: React.FC = () => {
         return {
           badge: t('role.citizen', 'Citizen Safety View'),
           icon: ShieldCheck,
-          color: 'text-emerald-400',
+          color: 'text-emerald-700 dark:text-emerald-400',
           bg: 'bg-emerald-500/10 border-emerald-500/30',
           title: t('dashboard.title', "Today's Heat Conditions & Personal Safety"),
           subtitle: t('dashboard.subtitle', 'Real-time local heat risk monitoring, personalized safety precautions, weather updates, and early warning protection for you and your family.'),
@@ -249,7 +249,7 @@ export const Dashboard: React.FC = () => {
             <span className="text-xs font-black uppercase tracking-wider text-orange-500">
               {t('dashboard.extremeHeatwaveEarlyWarning')}
             </span>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-500/15 text-orange-400 border border-orange-500/30">
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/30">
               {t('dashboard.decisionSupportBadge')}
             </span>
             <span className={`px-2 py-0.5 rounded text-[10px] font-bold border flex items-center space-x-1 ${roleHeader.bg}`}>
@@ -402,10 +402,10 @@ export const Dashboard: React.FC = () => {
                 </div>
                 <div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-orange-400">
+                    <span className="text-xs font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400">
                       {t('dashboard.personalizedIntelligence')}
                     </span>
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-orange-500/20 text-orange-300 border border-orange-500/30">
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-orange-500/20 text-orange-700 dark:text-orange-300 border border-orange-500/30">
                       {user.role?.toUpperCase()}
                     </span>
                   </div>

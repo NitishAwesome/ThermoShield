@@ -210,7 +210,7 @@ export const Alerts: React.FC = () => {
       {/* Header */}
       <div>
         <div className="flex items-center space-x-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-orange-400">
+          <span className="text-xs font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400">
             Civic Protection Directives
           </span>
           <Badge variant="brand" size="sm">
@@ -261,10 +261,10 @@ export const Alerts: React.FC = () => {
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b ts-border pb-3">
               <div className="flex items-center space-x-2">
-                <Bell className={`w-5 h-5 ${level === 'EXTREME' || level === 'HIGH' ? 'text-red-400 animate-pulse' : 'text-orange-400'}`} />
+                <Bell className={`w-5 h-5 ${level === 'EXTREME' || level === 'HIGH' ? 'text-red-500 dark:text-red-400 animate-pulse' : 'text-orange-500 dark:text-orange-400'}`} />
                 <h2 className="text-lg font-bold ts-text-primary">
                   {t('alerts.activeThreatBanner', 'Heat Threat Advisory Status')}:{' '}
-                  <span className={level === 'EXTREME' ? 'text-red-400' : level === 'HIGH' ? 'text-orange-400' : 'text-emerald-400'}>
+                  <span className={level === 'EXTREME' ? 'text-red-600 dark:text-red-400' : level === 'HIGH' ? 'text-orange-600 dark:text-orange-400' : 'text-emerald-600 dark:text-emerald-400'}>
                     {translateRiskLevel(level, t)}
                   </span>
                 </h2>
@@ -291,7 +291,7 @@ export const Alerts: React.FC = () => {
 
               <div className="flex flex-wrap items-center gap-4 text-xs ts-text-muted pt-1">
                 <div className="flex items-center space-x-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-orange-400" />
+                  <MapPin className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
                   <span>{t('alerts.location', 'Location')}: <strong className="ts-text-primary">{locationName}</strong></span>
                 </div>
                 <div className="flex items-center space-x-1.5">
@@ -307,10 +307,10 @@ export const Alerts: React.FC = () => {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
               <div className="space-y-2 max-w-xl">
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-orange-400">
+                  <div className="w-7 h-7 rounded-lg bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-orange-600 dark:text-orange-400">
                     <Radio className="w-4 h-4 animate-pulse" />
                   </div>
-                  <span className="text-xs font-bold uppercase tracking-wider text-orange-500 dark:text-orange-400">
+                  <span className="text-xs font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400">
                     {t('alerts.networkTitle')}
                   </span>
                   <Badge variant="brand" size="sm" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">

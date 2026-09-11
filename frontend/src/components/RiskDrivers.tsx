@@ -198,7 +198,7 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
           {/* 5. Human Thermal Strain */}
           <div className="p-3 rounded-xl ts-card-subtle border border-orange-500/30 flex flex-col justify-between bg-orange-500/5">
             <div className="flex items-center justify-between text-xs ts-text-muted">
-              <span className="font-semibold flex items-center gap-1.5 text-orange-400">
+              <span className="font-semibold flex items-center gap-1.5 text-orange-600 dark:text-orange-400">
                 <Activity className="w-3.5 h-3.5" />
                 {t('riskDrivers.thermalStrain')}
               </span>
@@ -207,7 +207,7 @@ export const RiskDrivers: React.FC<RiskDriversProps> = ({
               </Badge>
             </div>
             <div className="mt-2">
-              <div className="text-2xl font-black font-mono text-orange-400">
+              <div className="text-2xl font-black font-mono text-orange-600 dark:text-orange-400">
                 {thermalScore !== undefined ? Math.round(thermalScore) : '—'}
                 <span className="text-xs font-semibold ts-text-muted ml-1">/ 100</span>
               </div>
