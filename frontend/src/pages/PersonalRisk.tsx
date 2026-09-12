@@ -225,7 +225,7 @@ export const PersonalRisk: React.FC = () => {
   }, [wbgt, age, selectedConditions.length, physicalActivity]);
 
   return (
-    <div className="space-y-6 pb-16 max-w-7xl mx-auto">
+    <div className="space-y-6 pb-24 max-w-7xl mx-auto">
       {/* Top Banner: Connected Profile Status */}
       <Card variant="elevated" className="p-4 sm:p-6 relative overflow-hidden">
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
@@ -809,118 +809,6 @@ export const PersonalRisk: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
-
-              {/* SECTION 3: WHAT YOU CAN DO NOW */}
-              <Card>
-                <CardHeader
-                  title={t('risk.section3Title', 'What you can do now')}
-                  subtitle={t('risk.actionChecklistSubtitle')}
-                  badge={
-                    <Badge variant="low" size="sm">
-                      {t('risk.actionChecklist')}
-                    </Badge>
-                  }
-                />
-                <CardContent>
-                  <ul className="space-y-2 text-xs ts-text-muted">
-                    {result.safety_recommendations.map((rec, i) => (
-                      <li key={i} className="flex items-start space-x-2.5 p-2.5 rounded-xl ts-card-subtle border ts-border">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
-                        <span className="leading-relaxed ts-text-primary">{translateSafetyRecommendation(rec, t)}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {profile.preparedness && (
-                    <div className="mt-4 pt-3 border-t ts-border">
-                      <div className="text-[11px] font-bold ts-text-muted mb-2 uppercase tracking-wider">
-                        {t('risk.emergencyResourcesOnHand')}
-                      </div>
-                      <div className="flex flex-wrap gap-2 text-xs">
-                        {profile.preparedness.hasDrinkingWaterAccess && (
-                          <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-300">
-                            {t('risk.resourceWater')}
-                          </span>
-                        )}
-                        {profile.preparedness.hasCoolingAccess && (
-                          <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-300">
-                            {t('risk.resourceCooler')}
-                          </span>
-                        )}
-                        {profile.preparedness.hasShadeAccess && (
-                          <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-300">
-                            {t('risk.resourceShade')}
-                          </span>
-                        )}
-                        {profile.preparedness.knowsCoolingCenter && (
-                          <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-300">
-                            {t('risk.resourceCoolingCenter')}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <p className="text-[10.5px] ts-text-subtle mt-3 pt-2.5 border-t ts-border leading-snug">
-                    {t('risk.medicalDisclaimer')}
-                  </p>
-                </CardContent>
-              </Card>
-
-              {/* SECTION 4: SCIENTIFIC DETAILS ACCORDION */}
-              <Card>
-                <button
-                  type="button"
-                  onClick={() => setShowScientificDetails(!showScientificDetails)}
-                  className="w-full p-4 flex items-center justify-between text-left transition-colors hover:bg-slate-500/5 rounded-2xl"
-                >
-                  <div className="flex items-center space-x-2.5">
-                    <Info className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                    <div>
-                      <div className="text-xs font-bold ts-text-primary">
-                        {t('risk.section4Title', 'Scientific & Occupational Methodology Details')}
-                      </div>
-                      <div className="text-[11px] ts-text-subtle">
-                        {t('risk.scientificAccordionDesc', 'Expand to inspect WBGT, clo ratings, and OSHA/ACGIH index parameters.')}
-                      </div>
-                    </div>
-                  </div>
-                  <ChevronDown
-                    className={`w-4 h-4 ts-text-muted transition-transform duration-200 ${
-                      showScientificDetails ? 'transform rotate-180' : ''
-                    }`}
-                  />
-                </button>
-
-                {showScientificDetails && (
-                  <CardContent className="pt-0 border-t ts-border space-y-3">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 text-xs">
-                      <div className="p-2 rounded-lg ts-card-subtle border ts-border">
-                        <span className="text-[10px] ts-text-subtle block">Wet Bulb Globe (WBGT)</span>
-                        <span className="font-mono font-bold ts-text-primary text-sm">{wbgt.toFixed(1)}°C</span>
-                      </div>
-                      <div className="p-2 rounded-lg ts-card-subtle border ts-border">
-                        <span className="text-[10px] ts-text-subtle block">{t('dashboard.apparentTemp')}</span>
-                        <span className="font-mono font-bold ts-text-primary text-sm">{apparentTemp.toFixed(1)}°C</span>
-                      </div>
-                      <div className="p-2 rounded-lg ts-card-subtle border ts-border">
-                        <span className="text-[10px] ts-text-subtle block">{t('risk.attireUniform')}</span>
-                        <span className="font-mono font-bold ts-text-primary text-sm">
-                          {clothingType === 'light' ? '0.3 clo' : clothingType === 'heavy_protective' ? '1.8 clo' : '0.7 clo'}
-                        </span>
-                      </div>
-                      <div className="p-2 rounded-lg ts-card-subtle border ts-border">
-                        <span className="text-[10px] ts-text-subtle block">UV Index</span>
-                        <span className="font-mono font-bold ts-text-primary text-sm">{uvIndex.toFixed(1)}</span>
-                      </div>
-                    </div>
-
-                    <div className="text-[11px] ts-text-muted leading-relaxed p-2.5 rounded-lg ts-card-subtle border ts-border">
-                      {t('risk.methodologyNote')}
-                    </div>
-                  </CardContent>
-                )}
-              </Card>
             </>
           ) : (
             <EmptyState
@@ -931,6 +819,128 @@ export const PersonalRisk: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* FULL-WIDTH DECISION SUPPORT: Action Checklist & Scientific Methodology */}
+      {result && (
+        <div className="space-y-6">
+          {/* SECTION 3: WHAT YOU CAN DO NOW */}
+          <Card variant="elevated" className="overflow-hidden">
+            <CardHeader
+              title={t('risk.section3Title', 'What you can do now')}
+              subtitle={t('risk.actionChecklistSubtitle')}
+              badge={
+                <Badge variant="low" size="sm">
+                  {t('risk.actionChecklist')}
+                </Badge>
+              }
+            />
+            <CardContent className="space-y-4">
+              <ul className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs ts-text-muted">
+                {result.safety_recommendations.map((rec, i) => (
+                  <li
+                    key={i}
+                    className="flex items-start space-x-3 p-3 rounded-xl ts-card-subtle border ts-border transition-colors hover:border-emerald-500/30"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
+                    <span className="leading-relaxed ts-text-primary font-medium">
+                      {translateSafetyRecommendation(rec, t)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              {profile.preparedness && (
+                <div className="pt-3 border-t ts-border">
+                  <div className="text-[11px] font-bold ts-text-muted mb-2 uppercase tracking-wider">
+                    {t('risk.emergencyResourcesOnHand')}
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    {profile.preparedness.hasDrinkingWaterAccess && (
+                      <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 dark:text-emerald-300">
+                        {t('risk.resourceWater')}
+                      </span>
+                    )}
+                    {profile.preparedness.hasCoolingAccess && (
+                      <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 dark:text-emerald-300">
+                        {t('risk.resourceCooler')}
+                      </span>
+                    )}
+                    {profile.preparedness.hasShadeAccess && (
+                      <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 dark:text-emerald-300">
+                        {t('risk.resourceShade')}
+                      </span>
+                    )}
+                    {profile.preparedness.knowsCoolingCenter && (
+                      <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 dark:text-emerald-300">
+                        {t('risk.resourceCoolingCenter')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <p className="text-[10.5px] ts-text-subtle pt-2.5 border-t ts-border leading-snug">
+                {t('risk.medicalDisclaimer')}
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* SECTION 4: SCIENTIFIC DETAILS ACCORDION */}
+          <Card>
+            <button
+              type="button"
+              onClick={() => setShowScientificDetails(!showScientificDetails)}
+              className="w-full p-4 flex items-center justify-between text-left transition-colors hover:bg-slate-500/5 rounded-2xl"
+            >
+              <div className="flex items-center space-x-2.5">
+                <Info className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                <div>
+                  <div className="text-xs font-bold ts-text-primary">
+                    {t('risk.section4Title', 'Scientific & Occupational Methodology Details')}
+                  </div>
+                  <div className="text-[11px] ts-text-subtle">
+                    {t('risk.scientificAccordionDesc', 'Expand to inspect WBGT, clo ratings, and OSHA/ACGIH index parameters.')}
+                  </div>
+                </div>
+              </div>
+              <ChevronDown
+                className={`w-4 h-4 ts-text-muted transition-transform duration-200 ${
+                  showScientificDetails ? 'transform rotate-180' : ''
+                }`}
+              />
+            </button>
+
+            {showScientificDetails && (
+              <CardContent className="pt-0 border-t ts-border space-y-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3 text-xs">
+                  <div className="p-2.5 rounded-xl ts-card-subtle border ts-border">
+                    <span className="text-[10px] ts-text-subtle block">Wet Bulb Globe (WBGT)</span>
+                    <span className="font-mono font-bold ts-text-primary text-sm">{wbgt.toFixed(1)}°C</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl ts-card-subtle border ts-border">
+                    <span className="text-[10px] ts-text-subtle block">{t('dashboard.apparentTemp')}</span>
+                    <span className="font-mono font-bold ts-text-primary text-sm">{apparentTemp.toFixed(1)}°C</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl ts-card-subtle border ts-border">
+                    <span className="text-[10px] ts-text-subtle block">{t('risk.attireUniform')}</span>
+                    <span className="font-mono font-bold ts-text-primary text-sm">
+                      {clothingType === 'light' ? '0.3 clo' : clothingType === 'heavy_protective' ? '1.8 clo' : '0.7 clo'}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl ts-card-subtle border ts-border">
+                    <span className="text-[10px] ts-text-subtle block">UV Index</span>
+                    <span className="font-mono font-bold ts-text-primary text-sm">{uvIndex.toFixed(1)}</span>
+                  </div>
+                </div>
+
+                <div className="text-[11px] ts-text-muted leading-relaxed p-3 rounded-xl ts-card-subtle border ts-border">
+                  {t('risk.methodologyNote')}
+                </div>
+              </CardContent>
+            )}
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
