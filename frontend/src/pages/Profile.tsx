@@ -22,6 +22,7 @@ import {
   Eye,
   Check,
   Compass,
+  Bell,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -279,6 +280,15 @@ export const Profile: React.FC = () => {
           </Button>
 
           <Link
+            to="/notification-settings"
+            className="px-3.5 py-2 rounded-xl text-xs font-bold ts-card-subtle hover:bg-orange-500/10 hover:text-orange-600 dark:hover:text-orange-400 border ts-border ts-text-primary transition-all flex items-center space-x-1.5"
+          >
+            <Bell className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+            <span>{t('notif.title', 'Notification Preferences')}</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+
+          <Link
             to="/personal-risk"
             className="px-3.5 py-2 rounded-xl text-xs font-bold ts-card-subtle hover:bg-orange-500/10 hover:text-orange-600 dark:hover:text-orange-400 border ts-border ts-text-primary transition-all flex items-center space-x-1.5"
           >
@@ -386,6 +396,35 @@ export const Profile: React.FC = () => {
           </div>
         </div>
       </Card>
+
+      {/* Notification & Safety Preferences Card */}
+      <div className="p-4 sm:p-5 rounded-2xl ts-card-elevated border ts-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center space-x-3.5">
+          <div className="w-10 h-10 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center flex-shrink-0 text-orange-600 dark:text-orange-400">
+            <Bell className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <h2 className="text-sm font-bold ts-text-primary">
+                {t('notif.title', 'Notification & Safety Preferences')}
+              </h2>
+              <Badge variant="brand" size="sm">
+                {(profile.notificationPreferences?.mode || 'smart').toUpperCase()}
+              </Badge>
+            </div>
+            <p className="text-xs ts-text-muted mt-0.5 max-w-xl">
+              {t('notif.subtitle', 'Control what heat safety alerts and personal health reminders you receive, grounded in real-time thermal conditions.')}
+            </p>
+          </div>
+        </div>
+        <Link
+          to="/notification-settings"
+          className="px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-sm flex items-center justify-center space-x-1.5 whitespace-nowrap self-start sm:self-auto transition-all"
+        >
+          <span>{t('notif.customizeBtn', 'Customize Preferences')}</span>
+          <ChevronRight className="w-3.5 h-3.5" />
+        </Link>
+      </div>
 
       {/* Navigation Tabs for Easy Section Browsing */}
       <div className="flex items-center space-x-2 border-b ts-border pb-2 overflow-x-auto scrollbar-none">

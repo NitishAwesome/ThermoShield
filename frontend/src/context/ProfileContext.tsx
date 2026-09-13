@@ -1,8 +1,21 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { UserProfile, UserHealthProfile, UserExposureProfile, UserEmergencyPreparedness, UserPreferences } from '../types';
+import {
+  UserProfile,
+  UserHealthProfile,
+  UserExposureProfile,
+  UserEmergencyPreparedness,
+  UserPreferences,
+  NotificationPreferences,
+  NotificationMode,
+  SituationalContextType,
+  SituationalCheckInState,
+  FamilyVulnerableMember,
+  VulnerableCategory,
+} from '../types';
 import { useAuth } from './AuthContext';
 import { db } from '../firebase/config';
 import { doc, setDoc } from 'firebase/firestore';
+import { getDefaultNotificationPreferences, applyModeToPreferences } from '../utils/notifications';
 
 export interface PersonalizationSummary {
   status: 'full' | 'partial' | 'general_estimate';
@@ -24,7 +37,21 @@ export interface ProfileContextType {
   updateHealthProfile: (health: Partial<UserHealthProfile>) => Promise<void>;
   updateExposureProfile: (exposure: Partial<UserExposureProfile>) => Promise<void>;
   updatePreparedness: (prep: Partial<UserEmergencyPreparedness>) => Promise<void>;
+  updateNotificationPreferences: (notifs: Partial<NotificationPreferences>) => Promise<void>;
+  setNotificationMode: (mode: NotificationMode) => Promise<void>;
+  resetNotificationPreferences: () => Promise<void>;
   resetToDefaultProfile: () => void;
+
+  // Situational Context Safety Check-In
+  situationalCheckIn: SituationalCheckInState;
+  updateSituationalCheckIn: (context: SituationalContextType) => void;
+  dismissSituationalCheckIn: (hours?: number) => void;
+  resetSituationalCheckIn: () => void;
+
+  // Vulnerable Family Protection
+  updateFamilyMembers: (members: FamilyVulnerableMember[]) => Promise<void>;
+  addFamilyMember: (category: VulnerableCategory, nickname?: string, notes?: string) => Promise<void>;
+  removeFamilyMember: (id: string) => Promise<void>;
 }
 
 const DEFAULT_HEALTH: UserHealthProfile = {
@@ -86,6 +113,7 @@ const getInitialProfile = (user: any): UserProfile => {
       exposure: { ...DEFAULT_EXPOSURE, dailyOutdoorTime: 'mostly_indoors', coolingAccess: 'reliable' },
       preparedness: { ...DEFAULT_PREPAREDNESS, hasCoolingAccess: true, knowsCoolingCenter: true },
       preferences: { ...DEFAULT_PREFERENCES, preferredLanguage: 'English' },
+      notificationPreferences: getDefaultNotificationPreferences('smart', 'official'),
     };
   }
 
@@ -107,6 +135,7 @@ const getInitialProfile = (user: any): UserProfile => {
       exposure: { ...DEFAULT_EXPOSURE, dailyOutdoorTime: 'mostly_outdoors', activityLevel: 'heavy', clothingType: 'heavy_protective' },
       preparedness: { ...DEFAULT_PREPAREDNESS, knowsCoolingCenter: true },
       preferences: { ...DEFAULT_PREFERENCES, preferredLanguage: 'Hindi / English' },
+      notificationPreferences: getDefaultNotificationPreferences('smart', 'responder'),
     };
   }
 
@@ -128,6 +157,7 @@ const getInitialProfile = (user: any): UserProfile => {
       exposure: { ...DEFAULT_EXPOSURE, dailyOutdoorTime: 'mostly_indoors', coolingAccess: 'reliable' },
       preparedness: { ...DEFAULT_PREPAREDNESS, hasCoolingAccess: true },
       preferences: { ...DEFAULT_PREFERENCES, preferredLanguage: 'English' },
+      notificationPreferences: getDefaultNotificationPreferences('smart', 'analyst'),
     };
   }
 
@@ -166,6 +196,7 @@ const getInitialProfile = (user: any): UserProfile => {
       : { ...DEFAULT_EXPOSURE },
     preparedness: { ...DEFAULT_PREPAREDNESS },
     preferences: { ...DEFAULT_PREFERENCES },
+    notificationPreferences: getDefaultNotificationPreferences('smart', 'user'),
   };
 };
 
@@ -301,10 +332,155 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     [profile, persistProfile]
   );
 
+  const updateNotificationPreferences = useCallback(
+    async (notifChanges: Partial<NotificationPreferences>) => {
+      const current = profile.notificationPreferences || getDefaultNotificationPreferences('smart', profile.role);
+      const updated: UserProfile = {
+        ...profile,
+        notificationPreferences: {
+          ...current,
+          ...notifChanges,
+          updatedAt: new Date().toISOString(),
+        },
+        updatedAt: new Date().toISOString(),
+      };
+      await persistProfile(updated);
+    },
+    [profile, persistProfile]
+  );
+
+  const setNotificationMode = useCallback(
+    async (newMode: NotificationMode) => {
+      const current = profile.notificationPreferences || getDefaultNotificationPreferences('smart', profile.role);
+      const updatedPrefs = applyModeToPreferences(current, newMode, profile.role);
+      const updated: UserProfile = {
+        ...profile,
+        notificationPreferences: updatedPrefs,
+        updatedAt: new Date().toISOString(),
+      };
+      await persistProfile(updated);
+    },
+    [profile, persistProfile]
+  );
+
+  const resetNotificationPreferences = useCallback(
+    async () => {
+      const defaultPrefs = getDefaultNotificationPreferences('smart', profile.role);
+      const updated: UserProfile = {
+        ...profile,
+        notificationPreferences: defaultPrefs,
+        updatedAt: new Date().toISOString(),
+      };
+      await persistProfile(updated);
+    },
+    [profile, persistProfile]
+  );
+
   const resetToDefaultProfile = useCallback(() => {
     const initial = getInitialProfile(user);
     persistProfile(initial);
   }, [user, persistProfile]);
+
+  // Situational Context Safety Check-In State
+  const situationalStorageKey = useMemo(() => {
+    return `${storageKey}_situational_checkin`;
+  }, [storageKey]);
+
+  const [situationalCheckIn, setSituationalCheckIn] = useState<SituationalCheckInState>(() => {
+    try {
+      const saved = localStorage.getItem('thermoshield_situational_checkin');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn('Failed to load situational check-in state', e);
+    }
+    return {
+      currentContext: null,
+      checkedInAt: null,
+      dismissedUntil: null,
+    };
+  });
+
+  const updateSituationalCheckIn = useCallback((context: SituationalContextType) => {
+    const nextState: SituationalCheckInState = {
+      currentContext: context,
+      checkedInAt: Date.now(),
+      dismissedUntil: null,
+    };
+    setSituationalCheckIn(nextState);
+    try {
+      localStorage.setItem('thermoshield_situational_checkin', JSON.stringify(nextState));
+    } catch (e) {
+      console.warn('Failed to persist situational check-in', e);
+    }
+  }, []);
+
+  const dismissSituationalCheckIn = useCallback((hours: number = 4) => {
+    setSituationalCheckIn((prev) => {
+      const nextState: SituationalCheckInState = {
+        ...prev,
+        dismissedUntil: Date.now() + hours * 60 * 60 * 1000,
+      };
+      try {
+        localStorage.setItem('thermoshield_situational_checkin', JSON.stringify(nextState));
+      } catch (e) {
+        console.warn('Failed to persist dismissed check-in', e);
+      }
+      return nextState;
+    });
+  }, []);
+
+  const resetSituationalCheckIn = useCallback(() => {
+    const resetState: SituationalCheckInState = {
+      currentContext: null,
+      checkedInAt: null,
+      dismissedUntil: null,
+    };
+    setSituationalCheckIn(resetState);
+    try {
+      localStorage.removeItem('thermoshield_situational_checkin');
+    } catch (e) {
+      console.warn('Failed to clear situational check-in', e);
+    }
+  }, []);
+
+  // Vulnerable Family Protection Operations
+  const updateFamilyMembers = useCallback(
+    async (members: FamilyVulnerableMember[]) => {
+      const updated: UserProfile = {
+        ...profile,
+        familyProtectionMembers: members,
+        updatedAt: new Date().toISOString(),
+      };
+      await persistProfile(updated);
+    },
+    [profile, persistProfile]
+  );
+
+  const addFamilyMember = useCallback(
+    async (category: VulnerableCategory, nickname?: string, notes?: string) => {
+      const currentMembers = profile.familyProtectionMembers || [];
+      const newMember: FamilyVulnerableMember = {
+        id: `fam-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        category,
+        nickname: nickname?.trim() || undefined,
+        notes: notes?.trim() || undefined,
+        addedAt: new Date().toISOString(),
+      };
+      await updateFamilyMembers([...currentMembers, newMember]);
+    },
+    [profile.familyProtectionMembers, updateFamilyMembers]
+  );
+
+  const removeFamilyMember = useCallback(
+    async (id: string) => {
+      const currentMembers = profile.familyProtectionMembers || [];
+      const filtered = currentMembers.filter((m) => m.id !== id);
+      await updateFamilyMembers(filtered);
+    },
+    [profile.familyProtectionMembers, updateFamilyMembers]
+  );
 
   // Compute profile completeness percentage and missing items
   const { completionPercentage, isProfileComplete, completedSections, missingSections } = useMemo(() => {
@@ -456,7 +632,17 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateHealthProfile,
         updateExposureProfile,
         updatePreparedness,
+        updateNotificationPreferences,
+        setNotificationMode,
+        resetNotificationPreferences,
         resetToDefaultProfile,
+        situationalCheckIn,
+        updateSituationalCheckIn,
+        dismissSituationalCheckIn,
+        resetSituationalCheckIn,
+        updateFamilyMembers,
+        addFamilyMember,
+        removeFamilyMember,
       }}
     >
       {children}
@@ -471,3 +657,22 @@ export const useProfile = (): ProfileContextType => {
   }
   return context;
 };
+
+export const useNotificationPreferences = () => {
+  const { profile, updateNotificationPreferences, setNotificationMode, resetNotificationPreferences, isSaving } = useProfile();
+  
+  const preferences = useMemo(() => {
+    return profile.notificationPreferences || getDefaultNotificationPreferences('smart', profile.role);
+  }, [profile.notificationPreferences, profile.role]);
+
+  return {
+    preferences,
+    mode: (preferences.mode || 'smart') as NotificationMode,
+    updatePreferences: updateNotificationPreferences,
+    setMode: setNotificationMode,
+    resetPreferences: resetNotificationPreferences,
+    isSaving,
+    role: profile.role,
+  };
+};
+
