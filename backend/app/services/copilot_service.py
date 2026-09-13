@@ -297,8 +297,13 @@ class ThermoShieldCopilot:
         Supports multi-turn history and custom API keys.
         """
         self._refresh_keys()
-        api_key = (custom_key or "").strip() or self.gemini_key
-        if not api_key:
+        keys_to_try = []
+        if custom_key and custom_key.strip():
+            keys_to_try.append(custom_key.strip())
+        if self.gemini_key and self.gemini_key.strip() not in keys_to_try:
+            keys_to_try.append(self.gemini_key.strip())
+
+        if not keys_to_try:
             return None
 
         # Format conversation contents for Gemini REST API
@@ -318,11 +323,11 @@ class ThermoShieldCopilot:
             "for the ThermoShield Early Warning Decision Support System (SIH26083). Ground your responses in IMD, NDMA, and WHO biometeorological guidelines.\n\n"
             f"Active Environmental Telemetry Context: {system_context}\n\n"
             "Style Guidelines:\n"
-            "1. Multilingual Agility: Fluently understand and respond in the language used by the citizen (English, Hindi, Hinglish, or regional Indian languages). "
-            "If asked in Hindi/Hinglish (e.g. 'pani kitna pina chahiye', 'loo se kaise bache'), provide warm, natural, and medically accurate advice in that language.\n"
-            "2. Address the user's specific question directly with clear, engaging, conversational language.\n"
-            "3. Use structured markdown: bold headings, bullet points, and exact numbers (e.g. mL of water, minutes of rest, specific temperature thresholds).\n"
-            "4. Recommend traditional, scientifically proven Indian heat remedies alongside modern electrolytes: ORS, Aam Panna (raw mango cooler), Sattu sharbat, Chaas (salted buttermilk), and fresh coconut water.\n"
+            "1. Conversational & Non-Redundant: Treat this as an intelligent dialogue like ChatGPT or Google Gemini. Never repeat static or canned templates. Directly answer what the user is asking with fresh, engaging prose.\n"
+            "2. Multilingual Agility: Fluently understand and respond in the language used by the citizen (English, Hindi, Hinglish, or regional Indian languages). "
+            "If asked in Hindi/Hinglish (e.g. 'pani kitna pina chahiye', 'loo se kaise bache', 'bahut garmi hai'), provide warm, natural, and medically accurate advice in colloquial, easy-to-understand language.\n"
+            "3. Structured Markdown: Use concise bullet points, bold key actions, and exact metrics (e.g. 250-300 mL water, minutes of rest, specific temperature thresholds).\n"
+            "4. Remedies: Recommend traditional, scientifically proven Indian heat remedies alongside modern electrolytes: ORS, Aam Panna (raw mango cooler), Sattu sharbat, Chaas (salted buttermilk), and fresh coconut water.\n"
             "5. Emergency Protocol: If severe heat illness or heat stroke is suspected (temp > 40°C, delirium, stopped sweating, vomiting, confusion), urgently advise calling 108/112 ambulance and starting aggressive cooling immediately.\n"
             "6. Keep answers concise, actionable, and easy to read on mobile devices."
         )
@@ -333,35 +338,41 @@ class ThermoShieldCopilot:
             },
             "contents": contents,
             "generation_config": {
-                "temperature": 0.4,
+                "temperature": 0.7,
                 "max_output_tokens": 1000
             }
         }
 
-        # Try gemini-3.6-flash, gemini-flash-latest, and gemini-3.5-flash for rate-limit failover
-        models_to_try = ["gemini-3.6-flash", "gemini-flash-latest", "gemini-3.5-flash"]
+        # Optimized sequence: gemini-3.5-flash-lite has <1s latency and fresh quota pool
+        models_to_try = [
+            "gemini-3.5-flash-lite",
+            "gemini-flash-lite-latest",
+            "gemini-3.5-flash",
+            "gemini-3.6-flash"
+        ]
 
         async with httpx.AsyncClient(timeout=14.0) as client:
-            for model_name in models_to_try:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-                try:
-                    res = await client.post(url, json=payload)
-                    if res.status_code == 200:
-                        data = res.json()
-                        candidates = data.get("candidates", [])
-                        if candidates:
-                            parts = candidates[0].get("content", {}).get("parts", [])
-                            if parts:
-                                generated_text = parts[0].get("text", "").strip()
-                                logger.info(f"Successfully generated response with Gemini model: {model_name}")
-                                return {
-                                    "reply": generated_text,
-                                    "model": model_name
-                                }
-                    else:
-                        logger.warning(f"Gemini API returned status {res.status_code} for {model_name}: {res.text[:200]}")
-                except Exception as err:
-                    logger.warning(f"Gemini API call failed for {model_name}: {err}")
+            for active_key in keys_to_try:
+                for model_name in models_to_try:
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={active_key}"
+                    try:
+                        res = await client.post(url, json=payload)
+                        if res.status_code == 200:
+                            data = res.json()
+                            candidates = data.get("candidates", [])
+                            if candidates:
+                                parts = candidates[0].get("content", {}).get("parts", [])
+                                if parts:
+                                    generated_text = parts[0].get("text", "").strip()
+                                    logger.info(f"Successfully generated response with Gemini model: {model_name}")
+                                    return {
+                                        "reply": generated_text,
+                                        "model": model_name
+                                    }
+                        else:
+                            logger.warning(f"Gemini API returned status {res.status_code} for {model_name}: {res.text[:150]}")
+                    except Exception as err:
+                        logger.warning(f"Gemini API call failed for {model_name}: {err}")
 
         return None
 
@@ -648,8 +659,8 @@ class ThermoShieldCopilot:
         if gemini_result and gemini_result.get("reply"):
             reply_text = gemini_result["reply"]
             is_emergency = any(
-                w in query.lower() or w in reply_text.lower()
-                for w in ["heat stroke", "stroke", "unconscious", "collapse", "collapsed", "emergency ambulance", "call 108", "call 112", "faint", "behosh", "seizure"]
+                w in query.lower()
+                for w in ["heat stroke", "stroke", "unconscious", "collapse", "collapsed", "faint", "behosh", "seizure", "emergency first aid"]
             )
             return {
                 "reply": reply_text,
@@ -660,7 +671,7 @@ class ThermoShieldCopilot:
                 ],
                 "safety_tier": "EMERGENCY" if is_emergency else res_risk,
                 "emergency_call": is_emergency,
-                "model_used": gemini_result.get("model", "gemini-3.6-flash"),
+                "model_used": gemini_result.get("model", "gemini-3.5-flash-lite"),
                 "is_gemini": True,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "resolved_location": resolved_loc,
