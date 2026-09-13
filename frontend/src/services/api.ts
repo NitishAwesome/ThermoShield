@@ -244,6 +244,8 @@ export const api = {
       longitude?: number;
       is_query_location?: boolean;
     };
+    rag_sources?: string[];
+    grounded_authority?: string;
   }> => {
     const res = await apiClient.post<{
       reply: string;
@@ -264,6 +266,8 @@ export const api = {
         longitude?: number;
         is_query_location?: boolean;
       };
+      rag_sources?: string[];
+      grounded_authority?: string;
     }>('/copilot/chat', data);
     return res.data;
   },

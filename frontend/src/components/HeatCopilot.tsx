@@ -55,6 +55,8 @@ interface ChatMessage {
     longitude?: number;
     is_query_location?: boolean;
   };
+  ragSources?: string[];
+  groundedAuthority?: string;
 }
 
 const POPULAR_QUICK_CITIES = [
@@ -475,6 +477,8 @@ export const HeatCopilot: React.FC = () => {
         emergencyCall: isEmergency,
         resolvedLocation: res.resolved_location,
         resolvedTelemetry: res.resolved_telemetry,
+        ragSources: res.rag_sources,
+        groundedAuthority: res.grounded_authority || 'NDMA / IMD / WHO Guidelines',
       };
 
       setMessages((prev) => [...prev, copilotMsg]);
@@ -872,7 +876,8 @@ export const HeatCopilot: React.FC = () => {
                     </a>
                   </div>
                   <p className="text-[11px] text-gray-600 dark:text-gray-300 leading-relaxed">
-                    Paste your personal Google Gemini API key to enable live, unmetered AI responses:
+                    Paste your personal Google Gemini API key to activate conversational LLM responses on Vercel & Render.
+                    Even without a key, Dr. ThermoShield answers using authoritative <strong>NDMA / WHO / IMD RAG</strong> grounding.
                   </p>
                   <div className="flex gap-2">
                     <input
@@ -891,7 +896,7 @@ export const HeatCopilot: React.FC = () => {
                   </div>
                   <div className="flex items-center justify-between text-[10px] text-gray-500 dark:text-gray-400">
                     <span>
-                      Status: {apiKey ? '🟢 Custom Key Active' : '⚪ Using Server / Expert Engine'}
+                      Status: {apiKey ? '🟢 Personal Gemini Key Active' : '⚡ Biometeorological RAG Engine Active'}
                     </span>
                     {apiKey && (
                       <button
@@ -946,9 +951,13 @@ export const HeatCopilot: React.FC = () => {
                           Dr. ThermoShield
                         </span>
                         {getTierBadge(msg.safetyTier)}
-                        {msg.isGemini && (
+                        {msg.isGemini ? (
                           <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-0.5 font-medium">
-                            <Sparkles className="w-2.5 h-2.5 text-emerald-500" /> Gemini 2.0
+                            <Sparkles className="w-2.5 h-2.5 text-emerald-500" /> Gemini AI + RAG
+                          </span>
+                        ) : (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 flex items-center gap-0.5 font-medium">
+                            <Cpu className="w-2.5 h-2.5 text-blue-500" /> RAG Grounded
                           </span>
                         )}
                         <span className="text-[10px] text-gray-400 ml-1">{msg.timestamp}</span>
@@ -1017,6 +1026,26 @@ export const HeatCopilot: React.FC = () => {
                               >
                                 <PhoneCall className="w-3.5 h-3.5 animate-bounce" /> Call 108 Ambulance Hotline
                               </a>
+                            </div>
+                          )}
+
+                          {/* RAG Sources Citations */}
+                          {msg.ragSources && msg.ragSources.length > 0 && (
+                            <div className="mt-2.5 pt-2 border-t border-gray-200/60 dark:border-gray-700/60">
+                              <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                                <Info className="w-3 h-3 text-blue-500 shrink-0" />
+                                <span>Grounded Guidelines ({msg.groundedAuthority || 'NDMA / WHO / IMD'}):</span>
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {msg.ragSources.map((source, sIdx) => (
+                                  <span
+                                    key={sIdx}
+                                    className="inline-flex items-center text-[10px] px-2 py-0.5 rounded-md bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/40"
+                                  >
+                                    {source}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
                           )}
 

@@ -31,6 +31,8 @@ class CopilotChatResponse(BaseModel):
     emergency_call: Optional[bool] = False
     resolved_location: Optional[str] = None
     resolved_telemetry: Optional[Dict[str, Any]] = None
+    rag_sources: Optional[List[str]] = Field(default=[], description="Authoritative RAG documents and standards utilized")
+    grounded_authority: Optional[str] = Field(default="NDMA / IMD / WHO Guidelines", description="Primary regulatory standard")
 
 
 @router.post("/chat", response_model=CopilotChatResponse)
@@ -75,6 +77,7 @@ def copilot_health():
     return {
         "status": "healthy",
         "llm_enabled": bool(copilot_engine.gemini_key or copilot_engine.openai_key),
+        "rag_enabled": True,
         "default_model": "gemini-3.5-flash-lite",
-        "engine": "ThermoShield-Gemini-Biometeorological-Copilot-v2"
+        "engine": "ThermoShield-Gemini-RAG-Biometeorological-Copilot-v3"
     }

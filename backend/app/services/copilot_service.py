@@ -9,6 +9,7 @@ import httpx
 
 from app.services.location import search_location
 from app.services.weather import get_weather
+from app.services.rag_service import rag_engine, KnowledgeChunk
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,11 @@ NON_PLACE_WORDS = {
     "someone", "anyone", "person", "man", "woman", "baby", "kid", "people", "worker", "family",
     "much", "many", "should", "could", "would", "shall", "will", "can", "tell", "show", "give",
     "help", "need", "want", "take", "feel", "feeling", "have", "with", "from", "about", "suggest",
-    "guide", "advice", "advise", "please", "kya", "kaise", "batao", "bataiye", "kitna", "kitni"
+    "guide", "advice", "advise", "please", "kya", "kaise", "batao", "bataiye", "kitna", "kitni",
+    "hawa", "hava", "pavan", "pawan", "wind", "air", "loo", "nami", "pyaas", "peena", "peeyein",
+    "bachne", "tarika", "tarike", "remedy", "remedies", "aam", "panna", "sattu", "chaas", "dahi",
+    "lemon", "nimbu", "lake", "havasu", "garam", "thand", "thanda", "rahe", "rahi", "hain", "kuch",
+    "bata", "batao", "bataiye", "jaise", "hota", "hoti", "hai", "hain", "karein", "karna"
 }
 
 # ==============================================================================
@@ -93,7 +98,7 @@ MUNICIPAL_INTERVENTIONS_GUIDE = (
 class ThermoShieldCopilot:
     """
     Intelligent AI Copilot for ThermoShield Heatwave Decision Support.
-    Supports Google Gemini (2.0-flash / 1.5-flash) with dynamic biometeorological synthesis fallback.
+    Integrates Biometeorological RAG Grounding (NDMA, IMD, WHO) + Google Gemini (2.0-flash / 1.5-flash).
     """
 
     def __init__(self):
@@ -106,10 +111,11 @@ class ThermoShieldCopilot:
 
     async def _detect_location_from_query(self, query: str) -> Optional[Tuple[str, float, float]]:
         """
-        Intelligently detects whether the user query asks about a specific city or region.
+        Intelligently detects whether the user query explicitly asks about a specific city or region.
+        Strictly prevents casual Hindi words ('hawa', 'garmi me', 'bachne ke') from triggering spurious geocoding!
         1. Fast scan against in-memory geocoding cache.
-        2. Pattern extractor for 'in <city>', '<city> me/mein', '<city> ka/ki/ke', '<city> weather'.
-        3. Dynamic fallback to Open-Meteo geocoding search_location API (0 hardcoded lists).
+        2. Strict pattern extractor for explicit weather queries.
+        3. Dynamic geocoding with candidate-match verification against Open-Meteo.
         """
         q = query.lower()
 
@@ -118,12 +124,13 @@ class ThermoShieldCopilot:
             if re.search(rf"\b{re.escape(cached_key)}\b", q):
                 return info
 
-        # 2. Pattern candidates (e.g. 'in Lucknow', 'Kolkata me', 'Jaipur ka weather', 'Delhi weather')
+        # 2. Strict explicit weather/forecast patterns
         patterns = [
-            r"\b(?:in|at|for|near|around)\s+([a-zA-Z]{3,25}(?:\s+[a-zA-Z]{3,25})?)\b",
-            r"\b([a-zA-Z]{3,25}(?:\s+[a-zA-Z]{3,25})?)\s+(?:me|mein|mai|ka|ki|ke)\b",
-            r"\b(?:weather|temp|temperature|mausam|forecast|garmi|heat)\s+(?:of|in|for)\s+([a-zA-Z]{3,25}(?:\s+[a-zA-Z]{3,25})?)\b",
-            r"\b([a-zA-Z]{3,25})\s+(?:weather|temp|temperature|forecast|mausam)\b"
+            r"\b(?:weather|temperature|temp|mausam|forecast|conditions)\s+(?:in|at|for|of)\s+([a-zA-Z]{3,25}(?:\s+[a-zA-Z]{3,25})?)\b",
+            r"\b(?:in|at)\s+([A-Z][a-zA-Z]{2,24}(?:\s+[A-Z][a-zA-Z]{2,24})?)\s+(?:weather|temperature|temp|mausam|forecast)\b",
+            r"\b([A-Z][a-zA-Z]{2,24}(?:\s+[A-Z][a-zA-Z]{2,24})?)\s+(?:ka\s+mausam|ki\s+garmi|ka\s+weather|ka\s+temperature)\b",
+            r"\b(?:what\s+is\s+the\s+weather\s+in|kaisa\s+hai\s+mausam\s+in)\s+([a-zA-Z]{3,25})\b",
+            r"\b([A-Z][a-zA-Z]{2,24})\s+(?:weather|temp|temperature|forecast|mausam)\b"
         ]
         for pat in patterns:
             match = re.search(pat, query, re.IGNORECASE)
@@ -141,6 +148,11 @@ class ThermoShieldCopilot:
                     results = await search_location(candidate)
                     if results:
                         top = results[0]
+                        top_name_lower = top.get("name", "").lower()
+                        top_city = top_name_lower.split(",")[0].strip()
+                        # Strictly verify candidate matches result to avoid false-positive phonetic matches
+                        if cand_lower not in top_city and top_city not in cand_lower:
+                            continue
                         res_tuple = (top["name"], float(top["latitude"]), float(top["longitude"]))
                         _GEOCODING_CACHE[cand_lower] = res_tuple
                         return res_tuple
@@ -151,18 +163,23 @@ class ThermoShieldCopilot:
         clean_query = re.sub(r'[?!.,;:]', '', query).strip()
         tokens = clean_query.split()
         if 1 <= len(tokens) <= 2 and not any(t.lower() in NON_PLACE_WORDS for t in tokens):
-            q_cand = clean_query.lower()
-            if q_cand in _GEOCODING_CACHE:
-                return _GEOCODING_CACHE[q_cand]
-            try:
-                results = await search_location(clean_query)
-                if results:
-                    top = results[0]
-                    res_tuple = (top["name"], float(top["latitude"]), float(top["longitude"]))
-                    _GEOCODING_CACHE[q_cand] = res_tuple
-                    return res_tuple
-            except Exception:
-                pass
+            # Only consider if capitalized or length >= 4
+            if any(t[0].isupper() for t in tokens if t) or len(clean_query) >= 4:
+                q_cand = clean_query.lower()
+                if q_cand in _GEOCODING_CACHE:
+                    return _GEOCODING_CACHE[q_cand]
+                try:
+                    results = await search_location(clean_query)
+                    if results:
+                        top = results[0]
+                        top_name_lower = top.get("name", "").lower()
+                        top_city = top_name_lower.split(",")[0].strip()
+                        if q_cand in top_city or top_city in q_cand:
+                            res_tuple = (top["name"], float(top["latitude"]), float(top["longitude"]))
+                            _GEOCODING_CACHE[q_cand] = res_tuple
+                            return res_tuple
+                except Exception:
+                    pass
 
         return None
 
@@ -290,11 +307,12 @@ class ThermoShieldCopilot:
         prompt: str,
         system_context: str,
         conversation_history: Optional[List[Dict[str, str]]] = None,
-        custom_key: Optional[str] = None
+        custom_key: Optional[str] = None,
+        rag_context: Optional[str] = None
     ) -> Optional[Dict[str, str]]:
         """
         Calls Google Gemini API (gemini-2.0-flash or gemini-1.5-flash) via lightweight HTTPX REST.
-        Supports multi-turn history and custom API keys.
+        Supports multi-turn history, custom API keys, and retrieved biometeorological RAG grounding.
         """
         self._refresh_keys()
         keys_to_try = []
@@ -320,10 +338,21 @@ class ThermoShieldCopilot:
 
         system_instruction = (
             "You are Dr. ThermoShield, an empathetic, highly knowledgeable AI biometeorologist and heatwave health advisor "
-            "for the ThermoShield Early Warning Decision Support System (SIH26083). Ground your responses in IMD, NDMA, and WHO biometeorological guidelines.\n\n"
+            "for the ThermoShield Early Warning Decision Support System (SIH26083). Ground your responses strictly in authoritative IMD, NDMA, and WHO guidelines.\n\n"
             f"Active Environmental Telemetry Context: {system_context}\n\n"
+        )
+        if rag_context:
+            system_instruction += (
+                f"RETRIEVED AUTHORITATIVE MEDICAL & METEOROLOGICAL STANDARDS (RAG):\n"
+                f"{rag_context}\n\n"
+                "Strict Grounding Directives:\n"
+                "1. Answer the user's specific question directly using the retrieved guidelines and clinical protocols above.\n"
+                "2. Never output a canned generic weather forecast template unless the user explicitly requested a weather forecast.\n"
+                "3. If asked about hydration, work-rest cycles, remedies, or vulnerable groups, provide the exact numbers and recommendations from the retrieved documents.\n\n"
+            )
+        system_instruction += (
             "Style Guidelines:\n"
-            "1. Conversational & Non-Redundant: Treat this as an intelligent dialogue like ChatGPT or Google Gemini. Never repeat static or canned templates. Directly answer what the user is asking with fresh, engaging prose.\n"
+            "1. Conversational & Non-Redundant: Treat this as an intelligent dialogue like ChatGPT or Google Gemini. Directly answer what the user is asking with fresh, engaging prose.\n"
             "2. Multilingual Agility: Fluently understand and respond in the language used by the citizen (English, Hindi, Hinglish, or regional Indian languages). "
             "If asked in Hindi/Hinglish (e.g. 'pani kitna pina chahiye', 'loo se kaise bache', 'bahut garmi hai'), provide warm, natural, and medically accurate advice in colloquial, easy-to-understand language.\n"
             "3. Structured Markdown: Use concise bullet points, bold key actions, and exact metrics (e.g. 250-300 mL water, minutes of rest, specific temperature thresholds).\n"
@@ -648,19 +677,30 @@ class ThermoShieldCopilot:
             "is_query_location": is_query_loc
         }
 
-        # 2. Attempt Gemini Frontier LLM
+        # 2. Retrieve authoritative RAG knowledge chunks
+        rag_chunks = rag_engine.retrieve_relevant_chunks(
+            query=query,
+            top_k=3,
+            temperature_c=res_temp,
+            risk_level=res_risk
+        )
+        rag_context_str = rag_engine.format_rag_context(rag_chunks)
+        rag_source_titles = [f"{c.title} ({c.authority})" for c in rag_chunks]
+
+        # 3. Attempt Gemini Frontier LLM with RAG grounding
         gemini_result = await self._call_gemini_api(
             prompt=query,
             system_context=system_context,
             conversation_history=conversation_history,
-            custom_key=api_key
+            custom_key=api_key,
+            rag_context=rag_context_str
         )
 
         if gemini_result and gemini_result.get("reply"):
             reply_text = gemini_result["reply"]
             is_emergency = any(
                 w in query.lower()
-                for w in ["heat stroke", "stroke", "unconscious", "collapse", "collapsed", "faint", "behosh", "seizure", "emergency first aid"]
+                for w in ["heat stroke", "stroke", "unconscious", "collapse", "collapsed", "faint", "behosh", "seizure", "emergency first aid", "108", "112"]
             )
             return {
                 "reply": reply_text,
@@ -675,25 +715,26 @@ class ThermoShieldCopilot:
                 "is_gemini": True,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "resolved_location": resolved_loc,
-                "resolved_telemetry": resolved_telemetry_dict
+                "resolved_telemetry": resolved_telemetry_dict,
+                "rag_sources": rag_source_titles,
+                "grounded_authority": "NDMA / IMD / WHO Guidelines"
             }
 
-        # 3. Dynamic Domain Expert Synthesis Engine
-        expert_res = self._expert_rule_engine(
+        # 4. Autonomous RAG Synthesizer (Reliable fallback when external LLM key is absent)
+        rag_res = rag_engine.synthesize_rag_response(
             query=query,
             location=resolved_loc,
             temp=res_temp,
             humidity=res_rh,
             risk_level=res_risk,
-            risk_score=risk_score,
-            role=user_role,
+            chunks=rag_chunks,
             extra_weather=extra_w
         )
-        expert_res["is_gemini"] = False
-        expert_res["timestamp"] = datetime.now(timezone.utc).isoformat()
-        expert_res["resolved_location"] = resolved_loc
-        expert_res["resolved_telemetry"] = resolved_telemetry_dict
-        return expert_res
+        rag_res["timestamp"] = datetime.now(timezone.utc).isoformat()
+        rag_res["resolved_location"] = resolved_loc
+        rag_res["resolved_telemetry"] = resolved_telemetry_dict
+        rag_res["grounded_authority"] = "NDMA / IMD / WHO Guidelines"
+        return rag_res
 
 
 # Global singleton instance
