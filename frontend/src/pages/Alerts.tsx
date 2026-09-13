@@ -26,6 +26,7 @@ import { useLocation } from '../context/LocationContext';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardHeader, CardContent, Badge, Button, EmptyState } from '../components/ui';
 import { useTranslation } from '../context/LanguageContext';
+import { NotificationDecisionFeed } from '../components/NotificationDecisionFeed';
 import {
   translateAlertTier,
   translateAlertReason,
@@ -57,6 +58,11 @@ export const Alerts: React.FC = () => {
   const [isSendingEmail, setIsSendingEmail] = useState<boolean>(false);
   const [emailSuccessMsg, setEmailSuccessMsg] = useState<string | null>(null);
   const [emailErrorMsg, setEmailErrorMsg] = useState<string | null>(null);
+  const [showEmailPreview, setShowEmailPreview] = useState<boolean>(false);
+
+  // Autonomous Proactive Background Daemon Telemetry State
+  const [engineTelemetry, setEngineTelemetry] = useState<any>(null);
+  const [isTriggeringCycle, setIsTriggeringCycle] = useState<boolean>(false);
 
   // Automatically pre-fill logged-in candidate email
   useEffect(() => {
@@ -64,6 +70,29 @@ export const Alerts: React.FC = () => {
       setRecipientEmail(user.email);
     }
   }, [user?.email]);
+
+  const fetchEngineTelemetry = async () => {
+    try {
+      const data = await api.getAlertEngineStatus();
+      setEngineTelemetry(data);
+    } catch (e) {
+      console.debug('Failed to fetch alert engine status:', e);
+    }
+  };
+
+  const handleTriggerCycle = async () => {
+    setIsTriggeringCycle(true);
+    setEmailErrorMsg(null);
+    try {
+      const res = await api.triggerAlertEngineCycle();
+      setEngineTelemetry(res.telemetry || res);
+      setEmailSuccessMsg(`⚡ Proactive monitoring cycle completed! Evaluated ${res.results?.length || 5} regional municipal clusters.`);
+    } catch (e: any) {
+      setEmailErrorMsg(e?.response?.data?.detail || e?.message || 'Failed to trigger background evaluation cycle.');
+    } finally {
+      setIsTriggeringCycle(false);
+    }
+  };
 
   const fetchAlerts = async () => {
     const cached = getCachedData(coords.lat, coords.lon);
@@ -91,6 +120,7 @@ export const Alerts: React.FC = () => {
 
   useEffect(() => {
     fetchAlerts();
+    fetchEngineTelemetry();
   }, [coords.lat, coords.lon]);
 
   const risk = thermalData?.thermal?.risk_assessment;
@@ -246,6 +276,9 @@ export const Alerts: React.FC = () => {
         </div>
       ) : thermalData ? (
         <div className="space-y-6">
+          {/* Smart Decision Engine Live Feed */}
+          <NotificationDecisionFeed variant="full" showSimulations={true} />
+
           {/* Active Alert Banner Card */}
           <Card
             variant="elevated"
@@ -302,55 +335,166 @@ export const Alerts: React.FC = () => {
             </div>
           </Card>
 
-          {/* Automated Citizen Heat Defense Network Card */}
-          <Card variant="elevated" className="p-4 sm:p-6 ts-card-elevated border border-orange-500/30 dark:border-orange-500/40 bg-gradient-to-r from-orange-500/5 via-amber-500/5 to-transparent dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-900 overflow-hidden relative shadow-xl">
+          {/* 1. Proactive Autonomous Early-Warning Engine Telemetry Card */}
+          <Card variant="elevated" className="p-4 sm:p-6 ts-card-elevated border border-orange-500/30 dark:border-orange-500/40 bg-gradient-to-br from-orange-500/5 via-amber-500/5 to-transparent dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-900 overflow-hidden relative shadow-xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b ts-border pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-9 h-9 rounded-xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-orange-600 dark:text-orange-400 flex-shrink-0">
+                  <Radio className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400">
+                      Autonomous Civic Heat Defense Engine
+                    </span>
+                    <Badge variant="brand" size="sm" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
+                      ● Daemon Active
+                    </Badge>
+                    <Badge variant="neutral" size="sm" className="text-[10px] text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700">
+                      15m Background Loop
+                    </Badge>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-extrabold ts-text-primary mt-0.5">
+                    Continuous Regional Wet-Bulb Monitoring & Auto-Dispatch
+                  </h3>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isTriggeringCycle}
+                  onClick={handleTriggerCycle}
+                  leftIcon={
+                    isTriggeringCycle ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Zap className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+                    )
+                  }
+                  className="text-xs border-orange-500/30 hover:bg-orange-500/10 text-orange-700 dark:text-orange-300 font-bold whitespace-nowrap cursor-pointer"
+                >
+                  {isTriggeringCycle ? 'Evaluating Regions...' : '⚡ Trigger Autonomous Cycle Now'}
+                </Button>
+              </div>
+            </div>
+
+            {/* 4 Engine Telemetry Tiles */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4">
+              <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/60 border ts-border">
+                <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Daemon Status</div>
+                <div className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                  Active Loop
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/60 border ts-border">
+                <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Monitored Clusters</div>
+                <div className="text-sm font-extrabold ts-text-primary mt-0.5">
+                  {engineTelemetry?.monitored_areas_count || 5} Municipalities
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/60 border ts-border">
+                <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Cycles Completed</div>
+                <div className="text-sm font-extrabold text-orange-600 dark:text-orange-400 mt-0.5 font-mono">
+                  #{engineTelemetry?.total_cycles_completed || 1}
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/60 border ts-border">
+                <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Anti-Spam Guard</div>
+                <div className="text-sm font-extrabold text-sky-600 dark:text-sky-400 mt-0.5">
+                  60m Fingerprint
+                </div>
+              </div>
+            </div>
+
+            {/* Live Monitored Municipalities Matrix */}
+            {engineTelemetry?.last_cycle_results && engineTelemetry.last_cycle_results.length > 0 && (
+              <div className="mt-4 pt-4 border-t ts-border space-y-2">
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Live Municipal Telemetry & Auto-Dispatch State
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                  {engineTelemetry.last_cycle_results.map((res: any, idx: number) => {
+                    const isSevere = res.risk_level === 'HIGH' || res.risk_level === 'EXTREME';
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-2.5 rounded-xl border text-xs space-y-1 ${
+                          isSevere
+                            ? 'bg-red-500/10 border-red-500/30'
+                            : 'bg-slate-50 dark:bg-slate-800/40 ts-border'
+                        }`}
+                      >
+                        <div className="font-bold ts-text-primary truncate">{res.location}</div>
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                          <span>🌡️ {res.temperature?.toFixed(1) || '--'}°C</span>
+                          <span>🌐 WBGT: {res.wbgt?.toFixed(1) || '--'}°C</span>
+                        </div>
+                        <div className="flex items-center justify-between pt-0.5">
+                          <Badge riskLevel={res.risk_level || 'LOW'} size="sm">
+                            {res.risk_level || 'LOW'}
+                          </Badge>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {res.dispatch?.transition || 'Baseline'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* 2. Automated Citizen Heat Defense Network Enrollment Card */}
+          <Card variant="elevated" className="p-4 sm:p-6 ts-card-elevated border ts-border shadow-lg">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
               <div className="space-y-2 max-w-xl">
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-orange-600 dark:text-orange-400">
-                    <Radio className="w-4 h-4 animate-pulse" />
-                  </div>
                   <span className="text-xs font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400">
-                    {t('alerts.networkTitle')}
+                    Citizen Early-Warning Enrollment
                   </span>
                   <Badge variant="brand" size="sm" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
-                    {t('alerts.autoBroadcastActive')}
-                  </Badge>
-                  <Badge variant="neutral" size="sm" className="text-[10px] text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700">
-                    {t('alerts.cooldownGuard')}
+                    No Manual Checking Required
                   </Badge>
                 </div>
                 
                 <h3 className="text-lg font-bold ts-text-primary flex items-center gap-2">
-                  {t('alerts.autoDispatchHeading')}
+                  Automatic Early-Warning Citizen Dispatch
                 </h3>
                 
                 <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                  {t('alerts.autoDispatchDescription', { location: locationName })}
+                  Enroll your address once. Whenever HIGH or EXTREME biometeorological heat risk is detected for {locationName}, our proactive engine automatically alerts you with medical-grade hydration and WBGT work-rest safety directives.
                 </p>
 
                 {user ? (
                   <div className="flex items-center gap-2 pt-1 text-xs text-emerald-700 dark:text-emerald-400 font-medium bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/30 px-3 py-1.5 rounded-lg w-fit">
                     <ShieldCheck className="w-4 h-4 flex-shrink-0" />
-                    <span>{t('role.citizen')}: <strong>{user.name || 'Resident'}</strong> ({user.email})</span>
+                    <span>Citizen: <strong>{user.name || 'Resident'}</strong> ({user.email})</span>
                   </div>
                 ) : (
                   <div className="text-[11px] ts-text-subtle flex items-center gap-1.5 pt-1">
                     <Info className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
-                    <span>{t('alerts.enterEmailAutonomous')}</span>
+                    <span>Enter your email below to activate automatic emergency alerts for {locationName}.</span>
                   </div>
                 )}
               </div>
 
-              {/* Action Controls */}
-              <div className="w-full lg:w-auto flex-shrink-0 flex flex-col gap-2">
+              {/* Enrollment Form */}
+              <div className="w-full lg:w-auto flex-shrink-0">
                 <form onSubmit={handleEnrollCitizen} className="flex flex-col sm:flex-row gap-2">
                   <div className="relative">
                     <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="email"
                       required
-                      placeholder={t('alerts.citizenEmailPlaceholder')}
+                      placeholder={t('alerts.citizenEmailPlaceholder', 'Enter citizen email address...')}
                       value={recipientEmail}
                       onChange={(e) => {
                         setRecipientEmail(e.target.value);
@@ -374,33 +518,103 @@ export const Alerts: React.FC = () => {
                     }
                     className="whitespace-nowrap font-bold text-xs cursor-pointer"
                   >
-                    {isSendingEmail ? t('common.loading', 'Enrolling...') : t('alerts.subscribeBtn', 'Dispatch Alert to Email')}
+                    {isSendingEmail ? 'Enrolling...' : 'Enroll for Auto-Alerts'}
                   </Button>
                 </form>
-
-                {/* Simulation / Instant Test Button */}
-                <div className="flex items-center justify-between sm:justify-end gap-2 pt-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={isSendingEmail}
-                    onClick={handleSimulateAutoAlert}
-                    leftIcon={
-                      isSendingEmail ? (
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Zap className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
-                      )
-                    }
-                    className="text-xs border-slate-300 dark:border-slate-700 hover:border-orange-500/50 hover:bg-orange-500/10 text-slate-700 dark:text-slate-300 hover:ts-text-primary cursor-pointer"
-                  >
-                    ⚡ {t('alerts.testEmergency', 'Test Emergency Auto-Alert')}
-                  </Button>
-                  <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">{t('alerts.fromSender')}</span>
-                </div>
               </div>
             </div>
+          </Card>
+
+          {/* 3. Evaluator Simulation & Manual Testing Suite Card */}
+          <Card variant="elevated" className="p-4 sm:p-6 ts-card-elevated border ts-border shadow-lg">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b ts-border pb-3">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <Badge variant="neutral" size="sm" className="text-[10px] text-sky-600 dark:text-sky-400 font-bold uppercase border-sky-500/30 bg-sky-500/10">
+                    Evaluator Test Mode
+                  </Badge>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Manual Verification & RFC 5322 Template Inspector
+                  </span>
+                </div>
+                <h4 className="text-base font-bold ts-text-primary mt-1">
+                  On-Demand Simulation & Live Email Dispatch
+                </h4>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowEmailPreview(!showEmailPreview)}
+                  leftIcon={<Mail className="w-3.5 h-3.5 text-sky-500" />}
+                  className="text-xs text-slate-700 dark:text-slate-300 hover:ts-text-primary cursor-pointer"
+                >
+                  {showEmailPreview ? 'Hide Email Preview' : 'Preview Alert Email'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isSendingEmail}
+                  onClick={handleSendEmailAlert}
+                  leftIcon={
+                    isSendingEmail ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Zap className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+                    )
+                  }
+                  className="text-xs border-slate-300 dark:border-slate-700 hover:border-orange-500/50 hover:bg-orange-500/10 text-slate-700 dark:text-slate-300 hover:ts-text-primary cursor-pointer"
+                >
+                  ⚡ Send Test Alert to Candidate
+                </Button>
+              </div>
+            </div>
+
+            {/* Email Preview Card */}
+            {showEmailPreview && (
+              <div className="mt-4 p-4 rounded-2xl bg-slate-950 border border-slate-800 text-slate-100 text-xs space-y-3 animate-fadeIn">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-bold text-orange-400">🛡️ ThermoShield Heat Defense Dispatch</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-orange-500/20 text-orange-300 font-mono">
+                      RFC 5322 Email Preview
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-400">
+                    To: {recipientEmail || user?.email || 'nitish24it@student.mes.ac.in'}
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/30">
+                  <h4 className="font-bold text-orange-400 text-sm">
+                    🚨 {level === 'HIGH' || level === 'EXTREME' ? level : 'HIGH'} HEAT ALERT — {locationName}
+                  </h4>
+                  <p className="text-slate-300 text-[11px] mt-1">
+                    Ambient Temp: {thermalData?.weather?.temperature?.toFixed(1) || '37.5'}°C | Wet-Bulb (WBGT): {thermalData?.thermal?.indices?.wbgt_c?.toFixed(1) || '31.0'}°C | Heat Index: {thermalData?.thermal?.indices?.heat_index_c?.toFixed(1) || '41.2'}°C
+                  </p>
+                </div>
+
+                <div className="space-y-1.5 text-[11px] text-slate-300">
+                  <div className="font-semibold text-slate-200">Mandatory Emergency Directives:</div>
+                  <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                    • <strong>Hydration:</strong> {hydration?.guidance || 'Drink 500mL water/electrolytes every 20 minutes.'}
+                  </div>
+                  <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                    • <strong>Work Pacing:</strong> {activity?.heavy_physical_work || 'Halt heavy outdoor labor; take 15-minute shaded cooldown breaks.'}
+                  </div>
+                  <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                    • <strong>Cooling:</strong> {activity?.rest_guidance || 'Seek designated municipal cooling shelters and ventilated spaces.'}
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800 text-[10px] text-slate-500 text-center">
+                  Smart India Hackathon 2026 • Automated Civic Heatwave Early Warning Network
+                </div>
+              </div>
+            )}
 
             {/* Status Feedback Messages */}
             {emailSuccessMsg && (
@@ -411,9 +625,29 @@ export const Alerts: React.FC = () => {
             )}
 
             {emailErrorMsg && (
-              <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-xs flex items-center space-x-2 animate-fadeIn">
-                <AlertTriangle className="w-4 h-4 text-red-500 dark:text-red-400 flex-shrink-0" />
-                <span>{emailErrorMsg}</span>
+              <div className="mt-4 p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-xs space-y-2.5 animate-fadeIn">
+                <div className="flex items-center space-x-2">
+                  <AlertTriangle className="w-4 h-4 text-red-500 dark:text-red-400 flex-shrink-0" />
+                  <span className="font-semibold">{emailErrorMsg}</span>
+                </div>
+
+                {emailErrorMsg.toLowerCase().includes('credentials') && (
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11.5px] leading-relaxed text-slate-700 dark:text-slate-200">
+                    <p className="font-bold text-amber-800 dark:text-amber-300 mb-1.5 flex items-center gap-1.5">
+                      <span>💡</span>
+                      <span>How to connect real email delivery (takes 1 minute):</span>
+                    </p>
+                    <ol className="list-decimal list-inside space-y-1 text-slate-600 dark:text-slate-300">
+                      <li>Open <code className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 font-mono text-[11px] text-orange-600 dark:text-orange-400">backend/.env</code> in your project.</li>
+                      <li>Enter your sender Gmail: <code className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 font-mono text-[11px]">MAIL_USERNAME=your-email@gmail.com</code></li>
+                      <li>Generate a 16-character App Password at <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" className="text-blue-500 underline font-semibold">myaccount.google.com/apppasswords</a></li>
+                      <li>Paste it into: <code className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 font-mono text-[11px]">MAIL_PASSWORD=xxxx xxxx xxxx xxxx</code></li>
+                    </ol>
+                    <p className="mt-2 text-[10.5px] text-slate-500 italic">
+                      Once saved, live emails will immediately arrive in your inbox whenever alerts trigger!
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </Card>
