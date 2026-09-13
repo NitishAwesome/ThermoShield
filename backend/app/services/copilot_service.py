@@ -21,6 +21,33 @@ logger = logging.getLogger(__name__)
 _GEOCODING_CACHE: Dict[str, Tuple[str, float, float]] = {
     "mumbai": ("Mumbai, Maharashtra, India", 19.0760, 72.8777),
     "delhi": ("Delhi, India", 28.6139, 77.2090),
+    "new delhi": ("New Delhi, Delhi, India", 28.6139, 77.2090),
+    "jaipur": ("Jaipur, Rajasthan, India", 26.9124, 75.7873),
+    "pune": ("Pune, Maharashtra, India", 18.5204, 73.8567),
+    "kolkata": ("Kolkata, West Bengal, India", 22.5726, 88.3639),
+    "calcutta": ("Kolkata, West Bengal, India", 22.5726, 88.3639),
+    "bengaluru": ("Bengaluru, Karnataka, India", 12.9716, 77.5946),
+    "bangalore": ("Bengaluru, Karnataka, India", 12.9716, 77.5946),
+    "chennai": ("Chennai, Tamil Nadu, India", 13.0827, 80.2707),
+    "madras": ("Chennai, Tamil Nadu, India", 13.0827, 80.2707),
+    "hyderabad": ("Hyderabad, Telangana, India", 17.3850, 78.4867),
+    "ahmedabad": ("Ahmedabad, Gujarat, India", 23.0225, 72.5714),
+    "lucknow": ("Lucknow, Uttar Pradesh, India", 26.8467, 80.9462),
+    "patna": ("Patna, Bihar, India", 25.5941, 85.1376),
+    "nagpur": ("Nagpur, Maharashtra, India", 21.1458, 79.0882),
+    "indore": ("Indore, Madhya Pradesh, India", 22.7196, 75.8577),
+    "bhopal": ("Bhopal, Madhya Pradesh, India", 23.2599, 77.4126),
+    "surat": ("Surat, Gujarat, India", 21.1702, 72.8311),
+    "kanpur": ("Kanpur, Uttar Pradesh, India", 26.4499, 80.3319),
+    "varanasi": ("Varanasi, Uttar Pradesh, India", 25.3176, 82.9739),
+    "banaras": ("Varanasi, Uttar Pradesh, India", 25.3176, 82.9739),
+    "chandigarh": ("Chandigarh, India", 30.7333, 76.7794),
+    "panvel": ("Panvel, Maharashtra, India", 18.9894, 73.1175),
+    "navi mumbai": ("Navi Mumbai, Maharashtra, India", 19.0330, 73.0297),
+    "thane": ("Thane, Maharashtra, India", 19.2183, 72.9781),
+    "nashik": ("Nashik, Maharashtra, India", 19.9975, 73.7898),
+    "amritsar": ("Amritsar, Punjab, India", 31.6340, 74.8723),
+    "agra": ("Agra, Uttar Pradesh, India", 27.1767, 78.0081),
 }
 
 NON_PLACE_WORDS = {
@@ -189,16 +216,16 @@ class ThermoShieldCopilot:
         passed_location: Optional[str],
         passed_temp: Optional[float],
         passed_humidity: Optional[float],
-        passed_risk: Optional[str]
+        passed_risk: Optional[str],
+        latitude: Optional[float] = None,
+        longitude: Optional[float] = None
     ) -> Tuple[str, float, float, str, Dict[str, Any], bool]:
         """
-        Resolves the true target location and live real-time weather telemetry.
-        If the user asks about ANY city (e.g. Delhi, Jaipur, Lucknow, Kolkata):
-        - Resolves city coordinates via dynamic search
-        - Fetches real-time weather from Open-Meteo
-        - Sets live ambient temperature, humidity, apparent temp, and forecast!
-        Returns:
-        (resolved_location, temp, humidity, risk_level, extra_weather, is_city_detected_from_query)
+        Resolves the true target location and fetches LIVE real-time weather telemetry from Open-Meteo.
+        Priority:
+        1. City explicitly mentioned in query (e.g. "Delhi", "Jaipur", "weather in Pune")
+        2. Client coordinates or active dashboard location -> fetched directly from Open-Meteo!
+        3. Fallback to client passed values or safe baseline.
         """
         # 1. First priority: City mentioned directly in user query
         detected = await self._detect_location_from_query(query)
@@ -207,73 +234,84 @@ class ThermoShieldCopilot:
             try:
                 weather_data = await get_weather(lat, lon)
                 w_curr = weather_data.get("weather", {})
-                t = float(w_curr.get("temperature", 35.0))
-                h = float(w_curr.get("humidity", 50.0))
+                t = float(w_curr.get("temperature", 30.0))
+                h = float(w_curr.get("humidity", 60.0))
                 app_t = float(w_curr.get("apparent_temperature", t))
                 desc = str(w_curr.get("weather_description", "Clear Sky"))
+                precip = float(w_curr.get("precipitation", 0.0))
+                wind = float(w_curr.get("wind_speed", 0.0))
                 forecast = weather_data.get("forecast", {})
                 risk = "EXTREME" if t >= 40 else "HIGH" if t >= 36 else "MODERATE" if t >= 32 else "LOW"
                 extra = {
                     "apparent_temperature": app_t,
                     "description": desc,
+                    "precipitation": precip,
+                    "wind_speed": wind,
                     "forecast": forecast,
                     "latitude": lat,
                     "longitude": lon,
+                    "source": "Open-Meteo API"
                 }
                 return loc_name, t, h, risk, extra, True
             except Exception as e:
-                logger.warning(f"Could not fetch live weather for detected city {loc_name}: {e}")
+                logger.warning(f"Could not fetch live Open-Meteo weather for detected city {loc_name}: {e}")
                 risk = "HIGH"
-                return loc_name, 36.0, 50.0, risk, {}, True
+                return loc_name, 35.0, 50.0, risk, {}, True
 
-        # 2. Second priority: Passed location from dashboard/client
-        if passed_location:
-            clean_loc = passed_location.strip()
-            # If valid temperature was passed from client, use it
-            if passed_temp is not None and passed_humidity is not None:
-                risk = passed_risk.upper() if passed_risk else ("EXTREME" if passed_temp >= 40 else "HIGH" if passed_temp >= 36 else "MODERATE")
-                return clean_loc, passed_temp, passed_humidity, risk, {}, False
+        # 2. Second priority: Active dashboard location or coordinates (Live Open-Meteo)
+        target_name = (passed_location.strip() if passed_location else "Mumbai, Maharashtra, India")
+        target_coords: Optional[Tuple[float, float]] = None
 
-            # If temperature was not provided, attempt to resolve location coordinates & live weather dynamically
-            loc_key = clean_loc.lower().split(",")[0].strip()
-            loc_coords = None
+        if latitude is not None and longitude is not None:
+            target_coords = (float(latitude), float(longitude))
+        else:
+            loc_key = target_name.lower().split(",")[0].strip()
             if loc_key in _GEOCODING_CACHE:
-                loc_coords = _GEOCODING_CACHE[loc_key]
+                cached_name, c_lat, c_lon = _GEOCODING_CACHE[loc_key]
+                target_coords = (c_lat, c_lon)
             else:
                 try:
                     results = await search_location(loc_key)
                     if results:
                         top = results[0]
-                        loc_coords = (top["name"], float(top["latitude"]), float(top["longitude"]))
-                        _GEOCODING_CACHE[loc_key] = loc_coords
+                        target_coords = (float(top["latitude"]), float(top["longitude"]))
+                        _GEOCODING_CACHE[loc_key] = (top["name"], target_coords[0], target_coords[1])
                 except Exception as err:
-                    logger.warning(f"Dynamic search location failed for {clean_loc}: {err}")
+                    logger.warning(f"Search location failed for {target_name}: {err}")
 
-            if loc_coords:
-                full_name, lat, lon = loc_coords
-                try:
-                    w_data = await get_weather(lat, lon)
-                    w_curr = w_data.get("weather", {})
-                    t = float(w_curr.get("temperature", 36.0))
-                    h = float(w_curr.get("humidity", 50.0))
-                    app_t = float(w_curr.get("apparent_temperature", t))
-                    desc = str(w_curr.get("weather_description", "Clear Sky"))
-                    forecast = w_data.get("forecast", {})
-                    risk = "EXTREME" if t >= 40 else "HIGH" if t >= 36 else "MODERATE" if t >= 32 else "LOW"
-                    return full_name, t, h, risk, {
-                        "apparent_temperature": app_t,
-                        "description": desc,
-                        "forecast": forecast,
-                        "latitude": lat,
-                        "longitude": lon
-                    }, False
-                except Exception as err:
-                    logger.warning(f"Weather lookup failed for passed location {clean_loc}: {err}")
+        # Always fetch live Open-Meteo weather for target coordinates
+        if target_coords:
+            lat, lon = target_coords
+            try:
+                weather_data = await get_weather(lat, lon)
+                w_curr = weather_data.get("weather", {})
+                t = float(w_curr.get("temperature", passed_temp if passed_temp is not None else 30.0))
+                h = float(w_curr.get("humidity", passed_humidity if passed_humidity is not None else 60.0))
+                app_t = float(w_curr.get("apparent_temperature", t))
+                desc = str(w_curr.get("weather_description", "Clear Sky"))
+                precip = float(w_curr.get("precipitation", 0.0))
+                wind = float(w_curr.get("wind_speed", 0.0))
+                forecast = weather_data.get("forecast", {})
+                risk = "EXTREME" if t >= 40 else "HIGH" if t >= 36 else "MODERATE" if t >= 32 else "LOW"
+                extra = {
+                    "apparent_temperature": app_t,
+                    "description": desc,
+                    "precipitation": precip,
+                    "wind_speed": wind,
+                    "forecast": forecast,
+                    "latitude": lat,
+                    "longitude": lon,
+                    "source": "Open-Meteo API"
+                }
+                return target_name, t, h, risk, extra, False
+            except Exception as e:
+                logger.warning(f"Open-Meteo live weather failed for {target_name} ({lat}, {lon}): {e}")
 
-            return clean_loc, passed_temp or 36.0, passed_humidity or 50.0, (passed_risk or "HIGH").upper(), {}, False
-
-        # 3. Default fallback
-        return "your monitored area", passed_temp or 36.0, passed_humidity or 50.0, (passed_risk or "HIGH").upper(), {}, False
+        # Fallback if both Open-Meteo and geocoding fail
+        fallback_temp = passed_temp if passed_temp is not None else 30.0
+        fallback_humidity = passed_humidity if passed_humidity is not None else 60.0
+        fallback_risk = (passed_risk or ("EXTREME" if fallback_temp >= 40 else "HIGH" if fallback_temp >= 36 else "MODERATE")).upper()
+        return target_name, fallback_temp, fallback_humidity, fallback_risk, {}, False
 
     def _build_context_summary(
         self,
@@ -283,19 +321,28 @@ class ThermoShieldCopilot:
         risk_level: Optional[str],
         risk_score: Optional[float],
         role: Optional[str],
-        weather_desc: Optional[str] = None
+        weather_desc: Optional[str] = None,
+        apparent_temp: Optional[float] = None,
+        wind_speed: Optional[float] = None,
+        precipitation: Optional[float] = None
     ) -> str:
         ctx_parts = []
         if location:
             ctx_parts.append(f"Location: {location}")
         if temp is not None:
-            ctx_parts.append(f"Ambient Temperature: {temp:.1f}°C")
+            ctx_parts.append(f"Live Open-Meteo Temperature: {temp:.1f}°C")
+        if apparent_temp is not None:
+            ctx_parts.append(f"Feels Like (Heat Index): {apparent_temp:.1f}°C")
         if humidity is not None:
-            ctx_parts.append(f"Humidity: {humidity:.0f}%")
+            ctx_parts.append(f"Relative Humidity: {humidity:.0f}%")
         if weather_desc:
-            ctx_parts.append(f"Sky Condition: {weather_desc}")
+            ctx_parts.append(f"Weather Condition: {weather_desc}")
+        if precipitation is not None and precipitation > 0:
+            ctx_parts.append(f"Precipitation: {precipitation:.1f} mm")
+        if wind_speed is not None:
+            ctx_parts.append(f"Wind Speed: {wind_speed:.1f} m/s")
         if risk_level:
-            ctx_parts.append(f"Heat Risk Tier: {risk_level.upper()}")
+            ctx_parts.append(f"ThermoShield Heat Risk Tier: {risk_level.upper()}")
         if risk_score is not None:
             ctx_parts.append(f"Risk Score: {risk_score:.1f}/100")
         if role:
@@ -657,30 +704,37 @@ class ThermoShieldCopilot:
         risk_score: Optional[float] = None,
         user_role: Optional[str] = "citizen",
         conversation_history: Optional[List[Dict[str, str]]] = None,
-        api_key: Optional[str] = None
+        api_key: Optional[str] = None,
+        latitude: Optional[float] = None,
+        longitude: Optional[float] = None
     ) -> Dict[str, Any]:
         """
         Orchestrates Copilot response:
-        1. Intelligently resolves location: checks if user query asks about a specific city
-           (Delhi, Jaipur, Lucknow, Kolkata, etc.). If so, fetches real-time Open-Meteo telemetry!
-        2. Checks for Gemini API key (from request payload, GEMINI_API_KEY, or GOOGLE_API_KEY).
-        3. If key exists, attempts frontier LLM generation (gemini-2.0-flash / 1.5-flash).
-        4. Falls back gracefully to dynamic biometeorological synthesis engine.
+        1. Intelligently resolves location and fetches live Open-Meteo telemetry.
+        2. Retrieves biometeorological RAG guidelines.
+        3. Invokes Gemini Frontier LLM (grounded strictly in live Open-Meteo telemetry & RAG).
+        4. Falls back to Autonomous RAG Synthesizer if external LLM key is absent.
         """
-        # 1. Resolve true target location & live weather telemetry
+        # 1. Resolve true target location & live Open-Meteo weather telemetry
         resolved_loc, res_temp, res_rh, res_risk, extra_w, is_query_loc = await self._resolve_telemetry(
             query=query,
             passed_location=location,
             passed_temp=temperature_c,
             passed_humidity=humidity,
-            passed_risk=risk_level
+            passed_risk=risk_level,
+            latitude=latitude,
+            longitude=longitude
         )
 
         weather_desc = extra_w.get("description")
+        app_temp = extra_w.get("apparent_temperature", res_temp)
+        wind_speed = extra_w.get("wind_speed")
+        precipitation = extra_w.get("precipitation")
         forecast_hint = None
         f_max = extra_w.get("forecast", {}).get("temperature_max", [])
-        if len(f_max) > 1:
-            forecast_hint = f"Tomorrow forecast max: {f_max[1]:.1f}°C"
+        f_min = extra_w.get("forecast", {}).get("temperature_min", [])
+        if len(f_max) > 1 and len(f_min) > 1:
+            forecast_hint = f"Tomorrow Forecast: High {f_max[1]:.1f}°C, Low {f_min[1]:.1f}°C"
 
         system_context = self._build_context_summary(
             location=resolved_loc,
@@ -689,7 +743,10 @@ class ThermoShieldCopilot:
             risk_level=res_risk,
             risk_score=risk_score,
             role=user_role,
-            weather_desc=weather_desc
+            weather_desc=weather_desc,
+            apparent_temp=app_temp,
+            wind_speed=wind_speed,
+            precipitation=precipitation
         )
         if forecast_hint:
             system_context += f" | {forecast_hint}"
@@ -697,12 +754,15 @@ class ThermoShieldCopilot:
         resolved_telemetry_dict = {
             "temp": res_temp,
             "humidity": res_rh,
-            "apparent_temperature": extra_w.get("apparent_temperature", res_temp),
+            "apparent_temperature": app_temp,
             "weather_description": weather_desc or "Clear Sky",
+            "precipitation": precipitation or 0.0,
+            "wind_speed": wind_speed or 0.0,
             "risk_level": res_risk,
             "latitude": extra_w.get("latitude"),
             "longitude": extra_w.get("longitude"),
-            "is_query_location": is_query_loc
+            "is_query_location": is_query_loc,
+            "source": "Open-Meteo API"
         }
 
         # 2. Retrieve authoritative RAG knowledge chunks

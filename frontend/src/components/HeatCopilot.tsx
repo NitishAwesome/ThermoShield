@@ -228,8 +228,8 @@ export const HeatCopilot: React.FC = () => {
       try {
         const data = await api.getWeather(coords.lat, coords.lon);
         if (isSubscribed && data && data.weather) {
-          const t = data.weather.temperature ?? 36.5;
-          const h = data.weather.humidity ?? 58;
+          const t = data.weather.temperature ?? 30.0;
+          const h = data.weather.humidity ?? 60;
           // Calculate approx Heat Index & WBGT
           const hi = data.weather.apparent_temperature ?? (t + 0.5555 * ((6.11 * Math.pow(10, (7.5 * t) / (237.3 + t)) * (h / 100)) - 10));
           const wbgt = 0.7 * (t * 0.8) + 0.3 * t; // simplified estimate
@@ -247,13 +247,11 @@ export const HeatCopilot: React.FC = () => {
         // Keep baseline telemetry on network error
       }
     };
-    if (isOpen) {
-      fetchTelemetry();
-    }
+    fetchTelemetry();
     return () => {
       isSubscribed = false;
     };
-  }, [coords, isOpen]);
+  }, [coords]);
 
   // Speech Recognition setup (Web Speech API)
   useEffect(() => {
@@ -454,6 +452,8 @@ export const HeatCopilot: React.FC = () => {
       const res = await api.chatWithCopilot({
         message: textToSend,
         location: locationName || 'Mumbai',
+        latitude: coords.lat,
+        longitude: coords.lon,
         temperature_c: liveTelemetry.temp,
         humidity: liveTelemetry.humidity,
         risk_level: liveTelemetry.riskLevel,

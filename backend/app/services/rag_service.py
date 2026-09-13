@@ -402,8 +402,8 @@ class ThermoShieldRAGService:
         )
 
         intro = (
-            f"🛡️ **ThermoShield RAG Intelligence Advisory for {location}**\n"
-            f"*Active Telemetry:* **{temp:.1f}°C** | **{humidity:.0f}% Humidity** | Risk Tier: **{risk_level}**\n"
+            f"🛡️ **ThermoShield Biometeorological Advisory for {location}**\n"
+            f"*Live Open-Meteo Telemetry:* **{temp:.1f}°C** | **{humidity:.0f}% Humidity** | Risk Tier: **{risk_level}**\n"
             f"*Grounded in:* **{source_str}**\n\n"
         )
 
@@ -411,20 +411,26 @@ class ThermoShieldRAGService:
         weather_section = ""
         if any(w in q_lower for w in ["weather", "temperature", "temp", "mausam", "forecast", "garmi", "climate", "barish", "rain"]):
             extra = extra_weather or {}
-            weather_desc = extra.get("description", "Clear Sky & High Solar Radiation")
+            weather_desc = extra.get("description", "Clear Sky")
             app_t = extra.get("apparent_temperature", temp)
             forecast = extra.get("forecast", {})
             f_max = forecast.get("temperature_max", [])
             f_min = forecast.get("temperature_min", [])
 
-            lines = [f"🌤️ **Live Meteorological Status for {location}:**"]
-            lines.append(f"• **Current Ambient:** **{temp:.1f}°C** (Apparent / Feels Like: **{app_t:.1f}°C**)")
-            lines.append(f"• **Relative Humidity:** **{humidity:.0f}%** | Sky: **{weather_desc}**")
+            lines = [f"🌤️ **Live Open-Meteo Weather Status for {location}:**"]
+            lines.append(f"• **Current Temperature:** **{temp:.1f}°C** (Feels Like / Heat Index: **{app_t:.1f}°C**)")
+            lines.append(f"• **Relative Humidity:** **{humidity:.0f}%** | Sky Condition: **{weather_desc}**")
+            precip = extra.get("precipitation")
+            if precip and float(precip) > 0:
+                lines.append(f"• **Precipitation:** **{float(precip):.1f} mm**")
+            wind = extra.get("wind_speed")
+            if wind and float(wind) > 0:
+                lines.append(f"• **Wind Speed:** **{float(wind):.1f} m/s**")
             if len(f_max) > 1 and len(f_min) > 1:
-                lines.append(f"• **Tomorrow:** High **{f_max[1]:.1f}°C** | Low **{f_min[1]:.1f}°C**")
+                lines.append(f"• **Tomorrow's Forecast:** High **{f_max[1]:.1f}°C** | Low **{f_min[1]:.1f}°C**")
             if len(f_max) > 2 and len(f_min) > 2:
-                lines.append(f"• **Day After:** High **{f_max[2]:.1f}°C** | Low **{f_min[2]:.1f}°C**")
-            lines.append(f"• **Thermal Stress Level:** {risk_level.upper()} Risk Tier")
+                lines.append(f"• **Day After Forecast:** High **{f_max[2]:.1f}°C** | Low **{f_min[2]:.1f}°C**")
+            lines.append(f"• **ThermoShield Thermal Risk:** {risk_level.upper()} Risk Tier")
             weather_section = "\n".join(lines) + "\n\n"
 
         # Body synthesized from top chunks

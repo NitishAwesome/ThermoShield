@@ -19,6 +19,8 @@ class CopilotChatRequest(BaseModel):
     user_role: Optional[str] = Field("citizen", description="User persona (citizen, official, responder, analyst)")
     conversation_history: Optional[List[Dict[str, str]]] = Field(default=[], description="Previous conversation turns [{'role': 'user'|'model', 'text': '...'}]")
     api_key: Optional[str] = Field(None, description="Optional Google Gemini API key passed from client")
+    latitude: Optional[float] = Field(None, description="Optional client coordinates latitude")
+    longitude: Optional[float] = Field(None, description="Optional client coordinates longitude")
 
 
 class CopilotChatResponse(BaseModel):
@@ -59,7 +61,9 @@ async def chat_with_copilot(payload: CopilotChatRequest):
             risk_score=payload.risk_score,
             user_role=payload.user_role,
             conversation_history=payload.conversation_history,
-            api_key=payload.api_key
+            api_key=payload.api_key,
+            latitude=payload.latitude,
+            longitude=payload.longitude
         )
         return CopilotChatResponse(**response_data)
     except Exception as exc:

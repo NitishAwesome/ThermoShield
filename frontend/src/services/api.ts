@@ -225,6 +225,8 @@ export const api = {
     user_role?: string;
     conversation_history?: Array<{ role: string; text: string }>;
     api_key?: string;
+    latitude?: number;
+    longitude?: number;
   }): Promise<{
     reply: string;
     suggested_questions: string[];
