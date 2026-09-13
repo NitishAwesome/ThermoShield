@@ -3,11 +3,125 @@ import re
 import json
 import time
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, timezone
 import httpx
 
+from app.services.location import search_location
+from app.services.weather import get_weather
+
 logger = logging.getLogger(__name__)
+
+# ==============================================================================
+# COMPREHENSIVE INDIAN CITIES DIRECTORY & GEO-REGISTRY
+# Instant 0ms latency geocoding for all major Indian cities, state capitals & heat hubs
+# ==============================================================================
+
+INDIAN_CITIES_REGISTRY: Dict[str, Dict[str, Any]] = {
+    "mumbai": {"name": "Mumbai, Maharashtra, India", "latitude": 19.0760, "longitude": 72.8777},
+    "bombay": {"name": "Mumbai, Maharashtra, India", "latitude": 19.0760, "longitude": 72.8777},
+    "navi mumbai": {"name": "Navi Mumbai, Maharashtra, India", "latitude": 19.0330, "longitude": 73.0297},
+    "panvel": {"name": "Panvel, Navi Mumbai, Maharashtra, India", "latitude": 18.9894, "longitude": 73.1175},
+    "thane": {"name": "Thane, Maharashtra, India", "latitude": 19.2183, "longitude": 72.9781},
+    "pune": {"name": "Pune, Maharashtra, India", "latitude": 18.5204, "longitude": 73.8567},
+    "nagpur": {"name": "Nagpur, Maharashtra, India", "latitude": 21.1458, "longitude": 79.0882},
+    "nashik": {"name": "Nashik, Maharashtra, India", "latitude": 19.9975, "longitude": 73.7898},
+    "aurangabad": {"name": "Chhatrapati Sambhajinagar, Maharashtra, India", "latitude": 19.8762, "longitude": 75.3433},
+    "solapur": {"name": "Solapur, Maharashtra, India", "latitude": 17.6599, "longitude": 75.9064},
+    "kolhapur": {"name": "Kolhapur, Maharashtra, India", "latitude": 16.7050, "longitude": 74.2433},
+    "delhi": {"name": "Delhi, National Capital Territory of Delhi, India", "latitude": 28.6139, "longitude": 77.2090},
+    "new delhi": {"name": "New Delhi, Delhi, India", "latitude": 28.6139, "longitude": 77.2090},
+    "noida": {"name": "Noida, Uttar Pradesh, India", "latitude": 28.5355, "longitude": 77.3910},
+    "greater noida": {"name": "Greater Noida, Uttar Pradesh, India", "latitude": 28.4744, "longitude": 77.5040},
+    "gurgaon": {"name": "Gurugram, Haryana, India", "latitude": 28.4595, "longitude": 77.0266},
+    "gurugram": {"name": "Gurugram, Haryana, India", "latitude": 28.4595, "longitude": 77.0266},
+    "faridabad": {"name": "Faridabad, Haryana, India", "latitude": 28.4089, "longitude": 77.3178},
+    "ghaziabad": {"name": "Ghaziabad, Uttar Pradesh, India", "latitude": 28.6692, "longitude": 77.4538},
+    "jaipur": {"name": "Jaipur, Rajasthan, India", "latitude": 26.9124, "longitude": 75.7873},
+    "jodhpur": {"name": "Jodhpur, Rajasthan, India", "latitude": 26.2389, "longitude": 73.0243},
+    "udaipur": {"name": "Udaipur, Rajasthan, India", "latitude": 24.5854, "longitude": 73.7125},
+    "kota": {"name": "Kota, Rajasthan, India", "latitude": 25.2138, "longitude": 75.8648},
+    "bikaner": {"name": "Bikaner, Rajasthan, India", "latitude": 28.0229, "longitude": 73.3119},
+    "ajmer": {"name": "Ajmer, Rajasthan, India", "latitude": 26.4499, "longitude": 74.6399},
+    "bengaluru": {"name": "Bengaluru, Karnataka, India", "latitude": 12.9716, "longitude": 77.5946},
+    "bangalore": {"name": "Bengaluru, Karnataka, India", "latitude": 12.9716, "longitude": 77.5946},
+    "mysore": {"name": "Mysuru, Karnataka, India", "latitude": 12.2958, "longitude": 76.6394},
+    "mysuru": {"name": "Mysuru, Karnataka, India", "latitude": 12.2958, "longitude": 76.6394},
+    "mangalore": {"name": "Mangaluru, Karnataka, India", "latitude": 12.9141, "longitude": 74.8560},
+    "hubli": {"name": "Hubballi, Karnataka, India", "latitude": 15.3647, "longitude": 75.1240},
+    "ahmedabad": {"name": "Ahmedabad, Gujarat, India", "latitude": 23.0225, "longitude": 72.5714},
+    "surat": {"name": "Surat, Gujarat, India", "latitude": 21.1702, "longitude": 72.8311},
+    "vadodara": {"name": "Vadodara, Gujarat, India", "latitude": 22.3072, "longitude": 73.1812},
+    "baroda": {"name": "Vadodara, Gujarat, India", "latitude": 22.3072, "longitude": 73.1812},
+    "rajkot": {"name": "Rajkot, Gujarat, India", "latitude": 22.3039, "longitude": 70.8022},
+    "hyderabad": {"name": "Hyderabad, Telangana, India", "latitude": 17.3850, "longitude": 78.4867},
+    "warangal": {"name": "Warangal, Telangana, India", "latitude": 17.9689, "longitude": 79.5941},
+    "chennai": {"name": "Chennai, Tamil Nadu, India", "latitude": 13.0827, "longitude": 80.2707},
+    "madras": {"name": "Chennai, Tamil Nadu, India", "latitude": 13.0827, "longitude": 80.2707},
+    "coimbatore": {"name": "Coimbatore, Tamil Nadu, India", "latitude": 11.0168, "longitude": 76.9558},
+    "madurai": {"name": "Madurai, Tamil Nadu, India", "latitude": 9.9252, "longitude": 78.1198},
+    "salem": {"name": "Salem, Tamil Nadu, India", "latitude": 11.6643, "longitude": 78.1460},
+    "kolkata": {"name": "Kolkata, West Bengal, India", "latitude": 22.5726, "longitude": 88.3639},
+    "calcutta": {"name": "Kolkata, West Bengal, India", "latitude": 22.5726, "longitude": 88.3639},
+    "lucknow": {"name": "Lucknow, Uttar Pradesh, India", "latitude": 26.8467, "longitude": 80.9462},
+    "kanpur": {"name": "Kanpur, Uttar Pradesh, India", "latitude": 26.4499, "longitude": 80.3319},
+    "varanasi": {"name": "Varanasi, Uttar Pradesh, India", "latitude": 25.3176, "longitude": 82.9739},
+    "banaras": {"name": "Varanasi, Uttar Pradesh, India", "latitude": 25.3176, "longitude": 82.9739},
+    "kashi": {"name": "Varanasi, Uttar Pradesh, India", "latitude": 25.3176, "longitude": 82.9739},
+    "agra": {"name": "Agra, Uttar Pradesh, India", "latitude": 27.1767, "longitude": 78.0081},
+    "prayagraj": {"name": "Prayagraj, Uttar Pradesh, India", "latitude": 25.4358, "longitude": 81.8463},
+    "allahabad": {"name": "Prayagraj, Uttar Pradesh, India", "latitude": 25.4358, "longitude": 81.8463},
+    "meerut": {"name": "Meerut, Uttar Pradesh, India", "latitude": 28.9845, "longitude": 77.7064},
+    "bareilly": {"name": "Bareilly, Uttar Pradesh, India", "latitude": 28.3670, "longitude": 79.4304},
+    "aligarh": {"name": "Aligarh, Uttar Pradesh, India", "latitude": 27.8974, "longitude": 78.0880},
+    "gorakhpur": {"name": "Gorakhpur, Uttar Pradesh, India", "latitude": 26.7606, "longitude": 83.3732},
+    "patna": {"name": "Patna, Bihar, India", "latitude": 25.5941, "longitude": 85.1376},
+    "gaya": {"name": "Gaya, Bihar, India", "latitude": 24.7914, "longitude": 85.0002},
+    "bhopal": {"name": "Bhopal, Madhya Pradesh, India", "latitude": 23.2599, "longitude": 77.4126},
+    "indore": {"name": "Indore, Madhya Pradesh, India", "latitude": 22.7196, "longitude": 75.8577},
+    "gwalior": {"name": "Gwalior, Madhya Pradesh, India", "latitude": 26.2183, "longitude": 78.1828},
+    "jabalpur": {"name": "Jabalpur, Madhya Pradesh, India", "latitude": 23.1815, "longitude": 79.9864},
+    "chandigarh": {"name": "Chandigarh, India", "latitude": 30.7333, "longitude": 76.7794},
+    "amritsar": {"name": "Amritsar, Punjab, India", "latitude": 31.6340, "longitude": 74.8723},
+    "ludhiana": {"name": "Ludhiana, Punjab, India", "latitude": 30.9010, "longitude": 75.8573},
+    "shimla": {"name": "Shimla, Himachal Pradesh, India", "latitude": 31.1048, "longitude": 77.1734},
+    "dehradun": {"name": "Dehradun, Uttarakhand, India", "latitude": 30.3165, "longitude": 78.0322},
+    "haridwar": {"name": "Haridwar, Uttarakhand, India", "latitude": 29.9457, "longitude": 78.1642},
+    "rishikesh": {"name": "Rishikesh, Uttarakhand, India", "latitude": 30.0869, "longitude": 78.2676},
+    "srinagar": {"name": "Srinagar, Jammu and Kashmir, India", "latitude": 34.0837, "longitude": 74.7973},
+    "jammu": {"name": "Jammu, Jammu and Kashmir, India", "latitude": 32.7266, "longitude": 74.8570},
+    "ranchi": {"name": "Ranchi, Jharkhand, India", "latitude": 23.3441, "longitude": 85.3096},
+    "jamshedpur": {"name": "Jamshedpur, Jharkhand, India", "latitude": 22.8046, "longitude": 86.2029},
+    "dhanbad": {"name": "Dhanbad, Jharkhand, India", "latitude": 23.7957, "longitude": 86.4304},
+    "raipur": {"name": "Raipur, Chhattisgarh, India", "latitude": 21.2514, "longitude": 81.6296},
+    "bilaspur": {"name": "Bilaspur, Chhattisgarh, India", "latitude": 22.0797, "longitude": 82.1409},
+    "bhubaneswar": {"name": "Bhubaneswar, Odisha, India", "latitude": 20.2961, "longitude": 85.8245},
+    "cuttack": {"name": "Cuttack, Odisha, India", "latitude": 20.4625, "longitude": 85.8828},
+    "guwahati": {"name": "Guwahati, Assam, India", "latitude": 26.1445, "longitude": 91.7362},
+    "kochi": {"name": "Kochi, Kerala, India", "latitude": 9.9312, "longitude": 76.2673},
+    "cochin": {"name": "Kochi, Kerala, India", "latitude": 9.9312, "longitude": 76.2673},
+    "thiruvananthapuram": {"name": "Thiruvananthapuram, Kerala, India", "latitude": 8.5241, "longitude": 76.9366},
+    "trivandrum": {"name": "Thiruvananthapuram, Kerala, India", "latitude": 8.5241, "longitude": 76.9366},
+    "kozhikode": {"name": "Kozhikode, Kerala, India", "latitude": 11.2588, "longitude": 75.7804},
+    "calicut": {"name": "Kozhikode, Kerala, India", "latitude": 11.2588, "longitude": 75.7804},
+    "panaji": {"name": "Panaji, Goa, India", "latitude": 15.4909, "longitude": 73.8278},
+    "goa": {"name": "Goa, India", "latitude": 15.2993, "longitude": 74.1240},
+}
+
+NON_PLACE_WORDS = {
+    "garmi", "heat", "summer", "water", "body", "morning", "evening", "today", "tomorrow",
+    "now", "here", "night", "room", "sun", "sunlight", "hours", "cycle", "stroke", "illness",
+    "protocol", "first", "aid", "worker", "labor", "child", "elderly", "ors", "pani", "paani", "drink",
+    "food", "doctor", "hospital", "patient", "weather", "temp", "temperature", "forecast", "prediction",
+    "climate", "dhoop", "chakar", "chakkar", "behosh", "safe", "danger", "index", "wbgt", "level", "tier",
+    "this", "that", "these", "those", "there", "where", "what", "which", "who", "whom", "whose", "when",
+    "why", "how", "my", "your", "his", "her", "their", "our", "its", "the", "a", "an", "any", "some",
+    "all", "degree", "degrees", "celsius", "fahrenheit", "hot", "cold", "such", "each", "every",
+    "area", "zone", "place", "city", "town", "state", "country", "home", "house", "work", "school",
+    "college", "road", "street", "car", "bus", "train", "office", "high", "low", "extreme", "moderate",
+    "severe", "mild", "condition", "conditions", "situation", "outside", "inside", "outdoor", "indoor",
+    "someone", "anyone", "person", "man", "woman", "baby", "kid", "people", "worker", "family"
+}
 
 # ==============================================================================
 # BIOMETEOROLOGICAL KNOWLEDGE BASE & STANDARDS
@@ -74,6 +188,143 @@ class ThermoShieldCopilot:
         self.openai_key = os.getenv("OPENAI_API_KEY")
         self.neon_gateway_key = os.getenv("NEON_AI_GATEWAY_KEY")
 
+    async def _detect_location_from_query(self, query: str) -> Optional[Tuple[str, float, float]]:
+        """
+        Intelligently detects whether the user query asks about a specific city or region.
+        1. Fast 0ms scan against comprehensive Indian cities registry (multi-word then single-word).
+        2. Pattern extractor for 'in <city>', '<city> me/mein', '<city> ka/ki/ke'.
+        3. Fallback to Open-Meteo geocoding search_location API.
+        """
+        q = query.lower()
+
+        # 1. Multi-word cities in registry (e.g. 'navi mumbai', 'new delhi', 'greater noida')
+        for city_key in sorted(INDIAN_CITIES_REGISTRY.keys(), key=lambda x: -len(x)):
+            if " " in city_key:
+                pattern = rf"\b{re.escape(city_key)}\b"
+                if re.search(pattern, q):
+                    info = INDIAN_CITIES_REGISTRY[city_key]
+                    return info["name"], info["latitude"], info["longitude"]
+
+        # 2. Single-word cities in registry (e.g. 'delhi', 'jaipur', 'lucknow', 'pune')
+        for city_key, info in INDIAN_CITIES_REGISTRY.items():
+            if " " not in city_key:
+                pattern = rf"\b{re.escape(city_key)}\b"
+                if re.search(pattern, q):
+                    return info["name"], info["latitude"], info["longitude"]
+
+        # 3. Pattern candidates (e.g. 'in Lucknow', 'Kolkata me', 'Patna ka weather')
+        patterns = [
+            r"\b(?:in|at|for|near|around)\s+([a-zA-Z]{3,25}(?:\s+[a-zA-Z]{3,25})?)\b",
+            r"\b([a-zA-Z]{3,25}(?:\s+[a-zA-Z]{3,25})?)\s+(?:me|mein|ka|ki|ke|mai)\b",
+            r"\b(?:weather|temp|temperature|mausam|forecast|garmi|heat)\s+(?:of|in|for)\s+([a-zA-Z]{3,25})\b"
+        ]
+        for pat in patterns:
+            match = re.search(pat, query, re.IGNORECASE)
+            if match:
+                candidate = match.group(1).strip().lower()
+                # Skip if contains numbers or punctuation
+                if re.search(r'[\d,?.!]', candidate):
+                    continue
+                cand_words = set(candidate.split())
+                if cand_words.intersection(NON_PLACE_WORDS) or len(candidate) < 3:
+                    continue
+                # Check in registry first
+                if candidate in INDIAN_CITIES_REGISTRY:
+                    info = INDIAN_CITIES_REGISTRY[candidate]
+                    return info["name"], info["latitude"], info["longitude"]
+                # Try geocoding search only if plausible city name
+                raw_cand = match.group(1).strip()
+                if raw_cand[0].isupper() or len(candidate) >= 4:
+                    try:
+                        results = await search_location(candidate)
+                        if results:
+                            top = results[0]
+                            if candidate in top["name"].lower():
+                                return top["name"], float(top["latitude"]), float(top["longitude"])
+                    except Exception as err:
+                        logger.warning(f"Failed to geocode query candidate '{candidate}': {err}")
+
+        return None
+
+    async def _resolve_telemetry(
+        self,
+        query: str,
+        passed_location: Optional[str],
+        passed_temp: Optional[float],
+        passed_humidity: Optional[float],
+        passed_risk: Optional[str]
+    ) -> Tuple[str, float, float, str, Dict[str, Any], bool]:
+        """
+        Resolves the true target location and live real-time weather telemetry.
+        If the user asks about ANY city (e.g. Delhi, Jaipur, Lucknow, Kolkata):
+        - Resolves city coordinates
+        - Fetches real-time weather from Open-Meteo
+        - Sets live ambient temperature, humidity, apparent temp, and forecast!
+        Returns:
+        (resolved_location, temp, humidity, risk_level, extra_weather, is_city_detected_from_query)
+        """
+        # 1. First priority: City mentioned directly in user query
+        detected = await self._detect_location_from_query(query)
+        if detected:
+            loc_name, lat, lon = detected
+            try:
+                weather_data = await get_weather(lat, lon)
+                w_curr = weather_data.get("weather", {})
+                t = float(w_curr.get("temperature", 35.0))
+                h = float(w_curr.get("humidity", 50.0))
+                app_t = float(w_curr.get("apparent_temperature", t))
+                desc = str(w_curr.get("weather_description", "Clear Sky"))
+                forecast = weather_data.get("forecast", {})
+                risk = "EXTREME" if t >= 40 else "HIGH" if t >= 36 else "MODERATE" if t >= 32 else "LOW"
+                extra = {
+                    "apparent_temperature": app_t,
+                    "description": desc,
+                    "forecast": forecast,
+                    "latitude": lat,
+                    "longitude": lon,
+                }
+                return loc_name, t, h, risk, extra, True
+            except Exception as e:
+                logger.warning(f"Could not fetch live weather for detected city {loc_name}: {e}")
+                risk = "HIGH"
+                return loc_name, 36.0, 50.0, risk, {}, True
+
+        # 2. Second priority: Passed location from dashboard/client
+        if passed_location:
+            clean_loc = passed_location.strip()
+            # If valid temperature was passed from client, use it
+            if passed_temp is not None and passed_humidity is not None:
+                risk = passed_risk.upper() if passed_risk else ("EXTREME" if passed_temp >= 40 else "HIGH" if passed_temp >= 36 else "MODERATE")
+                return clean_loc, passed_temp, passed_humidity, risk, {}, False
+
+            # If temperature was not provided, attempt to resolve location coordinates & live weather
+            loc_key = clean_loc.lower().split(",")[0].strip()
+            if loc_key in INDIAN_CITIES_REGISTRY:
+                info = INDIAN_CITIES_REGISTRY[loc_key]
+                try:
+                    w_data = await get_weather(info["latitude"], info["longitude"])
+                    w_curr = w_data.get("weather", {})
+                    t = float(w_curr.get("temperature", 36.0))
+                    h = float(w_curr.get("humidity", 50.0))
+                    app_t = float(w_curr.get("apparent_temperature", t))
+                    desc = str(w_curr.get("weather_description", "Clear Sky"))
+                    forecast = w_data.get("forecast", {})
+                    risk = "EXTREME" if t >= 40 else "HIGH" if t >= 36 else "MODERATE" if t >= 32 else "LOW"
+                    return info["name"], t, h, risk, {
+                        "apparent_temperature": app_t,
+                        "description": desc,
+                        "forecast": forecast,
+                        "latitude": info["latitude"],
+                        "longitude": info["longitude"]
+                    }, False
+                except Exception as err:
+                    logger.warning(f"Weather lookup failed for passed location {clean_loc}: {err}")
+
+            return clean_loc, passed_temp or 36.0, passed_humidity or 50.0, (passed_risk or "HIGH").upper(), {}, False
+
+        # 3. Default fallback
+        return "your monitored area", passed_temp or 36.0, passed_humidity or 50.0, (passed_risk or "HIGH").upper(), {}, False
+
     def _build_context_summary(
         self,
         location: Optional[str],
@@ -81,7 +332,8 @@ class ThermoShieldCopilot:
         humidity: Optional[float],
         risk_level: Optional[str],
         risk_score: Optional[float],
-        role: Optional[str]
+        role: Optional[str],
+        weather_desc: Optional[str] = None
     ) -> str:
         ctx_parts = []
         if location:
@@ -90,6 +342,8 @@ class ThermoShieldCopilot:
             ctx_parts.append(f"Ambient Temperature: {temp:.1f}°C")
         if humidity is not None:
             ctx_parts.append(f"Humidity: {humidity:.0f}%")
+        if weather_desc:
+            ctx_parts.append(f"Sky Condition: {weather_desc}")
         if risk_level:
             ctx_parts.append(f"Heat Risk Tier: {risk_level.upper()}")
         if risk_score is not None:
@@ -186,7 +440,8 @@ class ThermoShieldCopilot:
         humidity: Optional[float],
         risk_level: Optional[str],
         risk_score: Optional[float],
-        role: Optional[str]
+        role: Optional[str],
+        extra_weather: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Dynamic Biometeorological Expert Synthesis Engine.
@@ -202,7 +457,7 @@ class ThermoShieldCopilot:
         heat_index_c = current_temp + 0.5555 * ((6.11 * (10 ** (7.5 * current_temp / (237.3 + current_temp))) * (current_rh / 100)) - 10)
         hi_str = f"{heat_index_c:.1f}°C" if heat_index_c > current_temp else f"{current_temp:.1f}°C"
 
-        # 1. Heat Emergency / Heat Stroke
+        # 1. Heat Emergency / Heat Stroke (Top Critical Safety Priority)
         if any(w in q for w in ["stroke", "exhaustion", "emergency", "faint", "unconscious", "first aid", "cramps", "sick", "vomit", "collapse", "behosh", "chakar", "chakkar", "108"]):
             return {
                 "reply": (
@@ -221,7 +476,59 @@ class ThermoShieldCopilot:
                 "model_used": "biomet-expert-engine"
             }
 
-        # 2. Hydration & Fluids
+        # 2. Real-Time Weather, Temperature & Forecast Queries
+        if any(w in q for w in ["weather", "temperature", "temp", "mausam", "forecast", "prediction", "garmi", "climate", "barish", "rain", "dhoop", "heatwave"]):
+            extra = extra_weather or {}
+            weather_desc = extra.get("description", "Clear Sky & Sunshine")
+            app_temp = extra.get("apparent_temperature", current_temp)
+            forecast = extra.get("forecast", {})
+            f_max = forecast.get("temperature_max", [])
+            f_min = forecast.get("temperature_min", [])
+
+            forecast_lines = []
+            if len(f_max) > 1 and len(f_min) > 1:
+                forecast_lines.append(f"• **Tomorrow:** High **{f_max[1]:.1f}°C** | Low **{f_min[1]:.1f}°C**")
+            if len(f_max) > 2 and len(f_min) > 2:
+                forecast_lines.append(f"• **Day After:** High **{f_max[2]:.1f}°C** | Low **{f_min[2]:.1f}°C**")
+            if len(f_max) > 3 and len(f_min) > 3:
+                forecast_lines.append(f"• **Day 3:** High **{f_max[3]:.1f}°C** | Low **{f_min[3]:.1f}°C**")
+
+            forecast_section = "\n".join(forecast_lines) if forecast_lines else "• Forecast models indicate sustained elevated thermal loads over the next 48–72 hours."
+
+            # Dynamic thermal stress guideline
+            if current_temp >= 40.0:
+                stress_note = "🔴 **Severe Heatwave Conditions:** High danger of heat hyperthermia. Cease all non-essential outdoor movements between 11:30 AM and 04:30 PM."
+            elif current_temp >= 36.0:
+                stress_note = "🟠 **High Heat Strain:** Thermal index is significantly elevated. Drink at least 350 mL of water or electrolytes every 30 minutes while outdoors."
+            elif current_temp >= 32.0:
+                stress_note = "🟡 **Moderate Heat Load:** Warm thermal conditions. Stay adequately hydrated and seek shaded or ventilated transit."
+            else:
+                stress_note = "🟢 **Mild Conditions:** Thermal stress levels are currently within safe baseline physiological limits."
+
+            return {
+                "reply": (
+                    f"🌤️ **Real-Time Weather & Heat Assessment for {current_loc}**\n\n"
+                    f"• **Current Temperature:** **{current_temp:.1f}°C** (Feels like **{app_temp:.1f}°C** / Heat Index **{hi_str}**)\n"
+                    f"• **Relative Humidity:** **{current_rh:.0f}%**\n"
+                    f"• **Atmospheric Condition:** **{weather_desc}**\n"
+                    f"• **Heat Stress Risk Tier:** **{current_risk}**\n\n"
+                    f"📅 **Upcoming Forecast for {current_loc}:**\n"
+                    f"{forecast_section}\n\n"
+                    f"💡 **Biometeorological Advisory:**\n"
+                    f"{stress_note}\n\n"
+                    f"Protect against high radiant heat by carrying water mixed with ORS or lemon-salt, wearing loose cotton clothing, and staying out of direct solar noon exposure."
+                ),
+                "suggested_questions": [
+                    f"How much water should I drink in {current_loc} today?",
+                    "What work-rest break schedule should outdoor laborers follow?",
+                    "What are the early warning signs of heat exhaustion?"
+                ],
+                "safety_tier": current_risk,
+                "emergency_call": False,
+                "model_used": "biomet-expert-engine"
+            }
+
+        # 3. Hydration & Fluids
         if any(w in q for w in ["water", "drink", "hydration", "dehydration", "ors", "electrolyte", "thirst", "cold water", "pani", "paani", "pyaas", "nimbu", "sattu", "panna", "chaas", "loo"]):
             fluid_amount = "500 mL every 20-25 minutes" if current_temp >= 38 else "250-300 mL every 30 minutes"
             daily_target = "3.5 to 4.5 Liters" if current_temp >= 38 else "3.0 Liters"
@@ -246,7 +553,7 @@ class ThermoShieldCopilot:
                 "model_used": "biomet-expert-engine"
             }
 
-        # 3. Vulnerable Populations (Elderly, Kids, Pregnant)
+        # 4. Vulnerable Populations (Elderly, Kids, Pregnant)
         if any(w in q for w in ["child", "kid", "baby", "infant", "elderly", "senior", "pregnant", "vulnerable", "old", "bacha", "bache", "bujurg", "dadaji", "nanaji", "maa"]):
             return {
                 "reply": (
@@ -274,7 +581,7 @@ class ThermoShieldCopilot:
                 "model_used": "biomet-expert-engine"
             }
 
-        # 4. Occupational & Labor Safety (WBGT Work-Rest Cycles)
+        # 5. Occupational & Labor Safety (WBGT Work-Rest Cycles)
         if any(w in q for w in ["work", "rest", "labor", "worker", "shift", "construction", "outdoor", "wbgt", "job"]):
             cycle_text = (
                 "15 minutes work / 45 minutes active shaded rest per hour"
@@ -302,7 +609,7 @@ class ThermoShieldCopilot:
                 "model_used": "biomet-expert-engine"
             }
 
-        # 5. Municipal & Administrative Action Plans
+        # 6. Municipal & Administrative Action Plans
         if any(w in q for w in ["municipal", "government", "action plan", "official", "city", "shelter", "cooling center", "ward", "hap"]):
             return {
                 "reply": (
@@ -320,7 +627,7 @@ class ThermoShieldCopilot:
                 "model_used": "biomet-expert-engine"
             }
 
-        # 6. General / Fallback Synthesis
+        # 7. General / Fallback Synthesis
         return {
             "reply": (
                 f"🌡️ **Dr. ThermoShield Biometeorological Assessment for {current_loc}**\n\n"
@@ -353,20 +660,51 @@ class ThermoShieldCopilot:
     ) -> Dict[str, Any]:
         """
         Orchestrates Copilot response:
-        1. Checks for Gemini API key (from request payload, GEMINI_API_KEY, or GOOGLE_API_KEY).
-        2. If key exists, attempts frontier LLM generation (gemini-2.0-flash / 1.5-flash).
-        3. Falls back gracefully to dynamic biometeorological synthesis engine.
+        1. Intelligently resolves location: checks if user query asks about a specific city
+           (Delhi, Jaipur, Lucknow, Kolkata, etc.). If so, fetches real-time Open-Meteo telemetry!
+        2. Checks for Gemini API key (from request payload, GEMINI_API_KEY, or GOOGLE_API_KEY).
+        3. If key exists, attempts frontier LLM generation (gemini-2.0-flash / 1.5-flash).
+        4. Falls back gracefully to dynamic biometeorological synthesis engine.
         """
-        system_context = self._build_context_summary(
-            location=location,
-            temp=temperature_c,
-            humidity=humidity,
-            risk_level=risk_level,
-            risk_score=risk_score,
-            role=user_role
+        # 1. Resolve true target location & live weather telemetry
+        resolved_loc, res_temp, res_rh, res_risk, extra_w, is_query_loc = await self._resolve_telemetry(
+            query=query,
+            passed_location=location,
+            passed_temp=temperature_c,
+            passed_humidity=humidity,
+            passed_risk=risk_level
         )
 
-        # 1. Attempt Gemini Frontier LLM
+        weather_desc = extra_w.get("description")
+        forecast_hint = None
+        f_max = extra_w.get("forecast", {}).get("temperature_max", [])
+        if len(f_max) > 1:
+            forecast_hint = f"Tomorrow forecast max: {f_max[1]:.1f}°C"
+
+        system_context = self._build_context_summary(
+            location=resolved_loc,
+            temp=res_temp,
+            humidity=res_rh,
+            risk_level=res_risk,
+            risk_score=risk_score,
+            role=user_role,
+            weather_desc=weather_desc
+        )
+        if forecast_hint:
+            system_context += f" | {forecast_hint}"
+
+        resolved_telemetry_dict = {
+            "temp": res_temp,
+            "humidity": res_rh,
+            "apparent_temperature": extra_w.get("apparent_temperature", res_temp),
+            "weather_description": weather_desc or "Clear Sky",
+            "risk_level": res_risk,
+            "latitude": extra_w.get("latitude"),
+            "longitude": extra_w.get("longitude"),
+            "is_query_location": is_query_loc
+        }
+
+        # 2. Attempt Gemini Frontier LLM
         gemini_result = await self._call_gemini_api(
             prompt=query,
             system_context=system_context,
@@ -377,35 +715,40 @@ class ThermoShieldCopilot:
         if gemini_result and gemini_result.get("reply"):
             reply_text = gemini_result["reply"]
             is_emergency = (
-                (risk_level or "").upper() == "EXTREME"
+                res_risk == "EXTREME"
                 or any(w in query.lower() or w in reply_text.lower() for w in ["stroke", "unconscious", "collapse", "emergency", "108", "faint", "behosh", "seizure"])
             )
             return {
                 "reply": reply_text,
                 "suggested_questions": [
-                    "What hydration rate matches my activity level?",
+                    f"What hydration rate matches my activity in {resolved_loc.split(',')[0]}?",
                     "What are warning signs of heat exhaustion?",
                     "What work-rest break schedule should I follow?"
                 ],
-                "safety_tier": "EMERGENCY" if is_emergency else (risk_level or "MODERATE").upper(),
+                "safety_tier": "EMERGENCY" if is_emergency else res_risk,
                 "emergency_call": is_emergency,
                 "model_used": gemini_result.get("model", "gemini-2.0-flash"),
                 "is_gemini": True,
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "resolved_location": resolved_loc,
+                "resolved_telemetry": resolved_telemetry_dict
             }
 
-        # 2. Dynamic Domain Expert Synthesis Engine
+        # 3. Dynamic Domain Expert Synthesis Engine
         expert_res = self._expert_rule_engine(
             query=query,
-            location=location,
-            temp=temperature_c,
-            humidity=humidity,
-            risk_level=risk_level,
+            location=resolved_loc,
+            temp=res_temp,
+            humidity=res_rh,
+            risk_level=res_risk,
             risk_score=risk_score,
-            role=user_role
+            role=user_role,
+            extra_weather=extra_w
         )
         expert_res["is_gemini"] = False
         expert_res["timestamp"] = datetime.now(timezone.utc).isoformat()
+        expert_res["resolved_location"] = resolved_loc
+        expert_res["resolved_telemetry"] = resolved_telemetry_dict
         return expert_res
 
 

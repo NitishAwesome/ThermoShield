@@ -233,6 +233,17 @@ export const api = {
     model_used?: string;
     is_gemini?: boolean;
     emergency_call?: boolean;
+    resolved_location?: string;
+    resolved_telemetry?: {
+      temp: number;
+      humidity: number;
+      apparent_temperature?: number;
+      weather_description?: string;
+      risk_level?: string;
+      latitude?: number;
+      longitude?: number;
+      is_query_location?: boolean;
+    };
   }> => {
     const res = await apiClient.post<{
       reply: string;
@@ -242,6 +253,17 @@ export const api = {
       model_used?: string;
       is_gemini?: boolean;
       emergency_call?: boolean;
+      resolved_location?: string;
+      resolved_telemetry?: {
+        temp: number;
+        humidity: number;
+        apparent_temperature?: number;
+        weather_description?: string;
+        risk_level?: string;
+        latitude?: number;
+        longitude?: number;
+        is_query_location?: boolean;
+      };
     }>('/copilot/chat', data);
     return res.data;
   },

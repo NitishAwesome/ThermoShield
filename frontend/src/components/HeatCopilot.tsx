@@ -25,7 +25,10 @@ import {
   Activity,
   Flame,
   Droplets,
-  Sun
+  Sun,
+  MapPin,
+  Search,
+  Navigation
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useLocation } from '../context/LocationContext';
@@ -41,7 +44,33 @@ interface ChatMessage {
   modelUsed?: string;
   isGemini?: boolean;
   emergencyCall?: boolean;
+  resolvedLocation?: string;
+  resolvedTelemetry?: {
+    temp: number;
+    humidity: number;
+    apparent_temperature?: number;
+    weather_description?: string;
+    risk_level?: string;
+    latitude?: number;
+    longitude?: number;
+    is_query_location?: boolean;
+  };
 }
+
+const POPULAR_QUICK_CITIES = [
+  { name: 'Delhi', fullName: 'Delhi, India', lat: 28.6139, lon: 77.2090 },
+  { name: 'Mumbai', fullName: 'Mumbai, Maharashtra, India', lat: 19.0760, lon: 72.8777 },
+  { name: 'Jaipur', fullName: 'Jaipur, Rajasthan, India', lat: 26.9124, lon: 75.7873 },
+  { name: 'Bengaluru', fullName: 'Bengaluru, Karnataka, India', lat: 12.9716, lon: 77.5946 },
+  { name: 'Kolkata', fullName: 'Kolkata, West Bengal, India', lat: 22.5726, lon: 88.3639 },
+  { name: 'Chennai', fullName: 'Chennai, Tamil Nadu, India', lat: 13.0827, lon: 80.2707 },
+  { name: 'Lucknow', fullName: 'Lucknow, Uttar Pradesh, India', lat: 26.8467, lon: 80.9462 },
+  { name: 'Ahmedabad', fullName: 'Ahmedabad, Gujarat, India', lat: 23.0225, lon: 72.5714 },
+  { name: 'Pune', fullName: 'Pune, Maharashtra, India', lat: 18.5204, lon: 73.8567 },
+  { name: 'Hyderabad', fullName: 'Hyderabad, Telangana, India', lat: 17.3850, lon: 78.4867 },
+  { name: 'Patna', fullName: 'Patna, Bihar, India', lat: 25.5941, lon: 85.1376 },
+  { name: 'Nagpur', fullName: 'Nagpur, Maharashtra, India', lat: 21.1458, lon: 79.0882 },
+];
 
 const INITIAL_SUGGESTIONS = [
   '💧 Hydration rules for 40°C heat',
@@ -107,6 +136,10 @@ export const HeatCopilot: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showTelemetryHUD, setShowTelemetryHUD] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [searchCityText, setSearchCityText] = useState('');
+  const [citySearchResults, setCitySearchResults] = useState<Array<{ name: string; latitude: number; longitude: number }>>([]);
+  const [isSearchingCity, setIsSearchingCity] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -153,11 +186,38 @@ export const HeatCopilot: React.FC = () => {
     },
   ]);
 
-  const { locationName, coords } = useLocation();
+  const { locationName, coords, setCoordsAndName, detectMyLocation, isLocating } = useLocation();
   const { user } = useAuth();
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
+
+  // City Search & Selection handlers
+  const handleSearchCity = async (val: string) => {
+    setSearchCityText(val);
+    if (val.trim().length < 2) {
+      setCitySearchResults([]);
+      return;
+    }
+    setIsSearchingCity(true);
+    try {
+      const res = await api.searchLocations(val.trim());
+      if (res && res.locations) {
+        setCitySearchResults(res.locations);
+      }
+    } catch {
+      // Search failed silently
+    } finally {
+      setIsSearchingCity(false);
+    }
+  };
+
+  const selectCity = (name: string, lat: number, lon: number) => {
+    setCoordsAndName({ lat, lon }, name);
+    setShowLocationModal(false);
+    setSearchCityText('');
+    setCitySearchResults([]);
+  };
 
   // Sync Telemetry with backend when coords change
   useEffect(() => {
@@ -413,6 +473,8 @@ export const HeatCopilot: React.FC = () => {
         modelUsed: res.model_used || 'gemini-2.0-flash',
         isGemini: res.is_gemini ?? true,
         emergencyCall: isEmergency,
+        resolvedLocation: res.resolved_location,
+        resolvedTelemetry: res.resolved_telemetry,
       };
 
       setMessages((prev) => [...prev, copilotMsg]);
@@ -570,11 +632,22 @@ export const HeatCopilot: React.FC = () => {
                     <Sparkles className="w-2.5 h-2.5" /> Gemini AI
                   </span>
                 </h3>
-                <p className="text-[10px] text-orange-100 truncate flex items-center gap-1">
-                  <span>📍 {locationName || 'Mumbai'}</span>
+                <div className="text-[10px] text-orange-100 truncate flex items-center gap-1 mt-0.5">
+                  <button
+                    onClick={() => {
+                      setShowLocationModal(!showLocationModal);
+                      setShowSettings(false);
+                    }}
+                    className="flex items-center gap-1 bg-black/15 hover:bg-black/25 px-1.5 py-0.5 rounded text-white font-medium transition-colors truncate max-w-[170px]"
+                    title="Click to switch city / zone"
+                  >
+                    <MapPin className="w-2.5 h-2.5 shrink-0" />
+                    <span className="truncate">{locationName || 'Mumbai'}</span>
+                    <ChevronDown className="w-2.5 h-2.5 opacity-80 shrink-0 ml-0.5" />
+                  </button>
                   <span>•</span>
-                  <span>{liveTelemetry.temp}°C {liveTelemetry.riskLevel} Risk</span>
-                </p>
+                  <span>{liveTelemetry.temp}°C {liveTelemetry.riskLevel}</span>
+                </div>
               </div>
             </div>
 
@@ -599,7 +672,10 @@ export const HeatCopilot: React.FC = () => {
 
               {/* Gemini Key Config */}
               <button
-                onClick={() => setShowSettings(!showSettings)}
+                onClick={() => {
+                  setShowSettings(!showSettings);
+                  setShowLocationModal(false);
+                }}
                 className={`p-1 rounded-md transition-colors ${showSettings ? 'bg-white/30' : 'hover:bg-white/20'}`}
                 title="Configure Gemini API Key"
               >
@@ -629,6 +705,7 @@ export const HeatCopilot: React.FC = () => {
                 onClick={() => {
                   setIsOpen(false);
                   setShowSettings(false);
+                  setShowLocationModal(false);
                   setShowTelemetryHUD(false);
                 }}
                 className="p-1 hover:bg-white/20 rounded-md transition-colors"
@@ -641,13 +718,108 @@ export const HeatCopilot: React.FC = () => {
 
           {!isMinimized && (
             <>
+              {/* Quick Location Switcher Modal */}
+              {showLocationModal && (
+                <div className="p-3.5 bg-orange-50/95 dark:bg-gray-800/95 border-b border-orange-200 dark:border-gray-700 text-xs space-y-2.5 animate-fadeIn shadow-inner">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-orange-500" />
+                      Select Monitored City or Heat Hub
+                    </span>
+                    <button
+                      onClick={() => setShowLocationModal(false)}
+                      className="p-1 hover:bg-orange-200/50 dark:hover:bg-gray-700 rounded text-gray-500"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Search Input */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={searchCityText}
+                      onChange={(e) => handleSearchCity(e.target.value)}
+                      placeholder="Search any city or district (e.g. Delhi, Jaipur, Bengaluru)..."
+                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    />
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2" />
+                  </div>
+
+                  {/* Search Results if any */}
+                  {isSearchingCity ? (
+                    <div className="text-[11px] text-gray-500 py-1 text-center">Searching cities...</div>
+                  ) : citySearchResults.length > 0 ? (
+                    <div className="max-h-36 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900">
+                      {citySearchResults.map((city, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => selectCity(city.name, city.latitude, city.longitude)}
+                          className="w-full px-2.5 py-1.5 text-left text-[11px] hover:bg-orange-50 dark:hover:bg-gray-800 flex items-center justify-between text-gray-800 dark:text-gray-200 transition-colors"
+                        >
+                          <span className="truncate">{city.name}</span>
+                          <span className="text-[10px] text-orange-600 dark:text-orange-400 font-medium shrink-0">Select</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {/* Popular Indian Cities Chips */}
+                  <div>
+                    <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                      Popular Heat Monitoring Zones
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {POPULAR_QUICK_CITIES.map((c) => (
+                        <button
+                          key={c.name}
+                          onClick={() => selectCity(c.fullName, c.lat, c.lon)}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${
+                            locationName?.toLowerCase().includes(c.name.toLowerCase())
+                              ? 'bg-orange-500 text-white border-orange-500 shadow-xs'
+                              : 'bg-white dark:bg-gray-700/70 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-orange-400'
+                          }`}
+                        >
+                          {c.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* GPS Detection Option */}
+                  <div className="pt-1 flex items-center justify-between text-[11px]">
+                    <button
+                      onClick={() => {
+                        detectMyLocation();
+                        setShowLocationModal(false);
+                      }}
+                      disabled={isLocating}
+                      className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 hover:underline font-medium"
+                    >
+                      <Navigation className="w-3 h-3" />
+                      <span>{isLocating ? 'Detecting GPS...' : 'Use My Current GPS'}</span>
+                    </button>
+                    <span className="text-[10px] text-gray-400 truncate max-w-[150px]">
+                      Active: {locationName?.split(',')[0] || 'Mumbai'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Telemetry HUD Strip (Expandable) */}
               {showTelemetryHUD && (
                 <div className="px-4 py-2.5 bg-gradient-to-b from-orange-50 to-white dark:from-gray-800 dark:to-gray-900 border-b border-orange-200 dark:border-gray-700 animate-fadeIn">
                   <div className="flex items-center justify-between text-[11px] mb-1.5 font-semibold text-orange-950 dark:text-orange-200">
                     <span className="flex items-center gap-1">
                       <Activity className="w-3.5 h-3.5 text-orange-500" />
-                      Live Synoptic Telemetry ({locationName || 'Mumbai'})
+                      Live Synoptic Telemetry
+                      <button
+                        onClick={() => setShowLocationModal(!showLocationModal)}
+                        className="underline hover:text-orange-600 font-semibold ml-0.5"
+                        title="Click to change location"
+                      >
+                        ({locationName || 'Mumbai'})
+                      </button>
                     </span>
                     <span className="text-[10px] px-1.5 py-0.2 rounded bg-orange-200/80 dark:bg-orange-900/80 text-orange-800 dark:text-orange-200 uppercase font-mono">
                       {liveTelemetry.riskLevel} Risk
@@ -794,6 +966,39 @@ export const HeatCopilot: React.FC = () => {
                         <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
                       ) : (
                         <div>
+                          {/* Query City Telemetry Badge & Quick Switch Button */}
+                          {msg.resolvedLocation && msg.resolvedTelemetry?.is_query_location && (
+                            <div className="mb-2.5 p-2 rounded-xl bg-orange-50/90 dark:bg-orange-950/60 border border-orange-200 dark:border-orange-800/60 flex flex-wrap items-center justify-between gap-1.5 text-[11px] text-orange-950 dark:text-orange-200">
+                              <div className="flex items-center gap-1.5 truncate">
+                                <MapPin className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400 shrink-0" />
+                                <span className="font-semibold truncate">{msg.resolvedLocation.split(',')[0]}:</span>
+                                <span className="text-gray-700 dark:text-gray-300">
+                                  {msg.resolvedTelemetry.temp}°C • {msg.resolvedTelemetry.humidity}% RH
+                                  {msg.resolvedTelemetry.apparent_temperature !== undefined && (
+                                    <span className="text-orange-600 dark:text-orange-400 font-medium ml-1">
+                                      (Feels {msg.resolvedTelemetry.apparent_temperature}°C)
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                              {msg.resolvedTelemetry.latitude !== undefined && msg.resolvedTelemetry.longitude !== undefined && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCoordsAndName(
+                                      { lat: msg.resolvedTelemetry!.latitude!, lon: msg.resolvedTelemetry!.longitude! },
+                                      msg.resolvedLocation!
+                                    );
+                                  }}
+                                  className="px-2 py-0.5 rounded-md bg-orange-500 hover:bg-orange-600 text-white font-medium text-[10px] transition-colors shadow-xs shrink-0 cursor-pointer"
+                                  title="Set this city as active dashboard zone"
+                                >
+                                  Set as Active Zone
+                                </button>
+                              )}
+                            </div>
+                          )}
+
                           {formatMarkdown(msg.text)}
 
                           {/* Emergency 108 Call Card if triggered */}

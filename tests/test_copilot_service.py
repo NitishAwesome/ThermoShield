@@ -82,6 +82,38 @@ class TestCopilotService(unittest.TestCase):
         res = self.client.post("/copilot/chat", json={"message": "   "})
         self.assertEqual(res.status_code, 400)
 
+    def test_copilot_city_detection_delhi(self):
+        payload = {
+            "message": "Delhi ka weather kaisa hai?",
+            "location": "Mumbai, Maharashtra, India",
+            "temperature_c": 36.5,
+            "humidity": 58.0
+        }
+        res = self.client.post("/copilot/chat", json=payload)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("reply", data)
+        self.assertIn("Delhi", data["reply"])
+        self.assertIn("Delhi", data.get("resolved_location", ""))
+        self.assertIsNotNone(data.get("resolved_telemetry"))
+        self.assertTrue(data["resolved_telemetry"]["is_query_location"])
+
+    def test_copilot_city_detection_jaipur(self):
+        payload = {
+            "message": "What is the temperature and forecast in Jaipur?",
+            "location": "Mumbai, Maharashtra, India",
+            "temperature_c": 36.5,
+            "humidity": 58.0
+        }
+        res = self.client.post("/copilot/chat", json=payload)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("reply", data)
+        self.assertIn("Jaipur", data["reply"])
+        self.assertIn("Jaipur", data.get("resolved_location", ""))
+        self.assertIsNotNone(data.get("resolved_telemetry"))
+        self.assertTrue(data["resolved_telemetry"]["is_query_location"])
+
 
 if __name__ == "__main__":
     unittest.main()
