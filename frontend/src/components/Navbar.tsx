@@ -29,6 +29,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useLocation } from '../context/LocationContext';
 import { useTranslation } from '../context/LanguageContext';
 import { LanguageSelector } from './LanguageSelector';
+import { useNotificationDecision } from '../context/NotificationDecisionContext';
 
 export const Navbar: React.FC = () => {
   const [dropdownOpen, setDropdownOpen] = useState<boolean>(false);
@@ -44,6 +45,7 @@ export const Navbar: React.FC = () => {
   const { theme, setTheme } = useTheme();
   const { locationName } = useLocation();
   const { t } = useTranslation();
+  const { eligibleEvents } = useNotificationDecision();
   const navigate = useNavigate();
   const routerLocation = useRouterLocation();
 
@@ -229,6 +231,11 @@ export const Navbar: React.FC = () => {
                 >
                   <Icon className="w-3.5 h-3.5" />
                   <span>{item.label}</span>
+                  {item.to === '/alerts' && eligibleEvents.length > 0 && (
+                    <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white animate-pulse">
+                      {eligibleEvents.length}
+                    </span>
+                  )}
                 </NavLink>
               );
             })}
@@ -402,6 +409,14 @@ export const Navbar: React.FC = () => {
                         <span>{t('nav.myHeatRisk')}</span>
                       </NavLink>
                       <NavLink
+                        to="/notification-settings"
+                        onClick={() => setDropdownOpen(false)}
+                        className="flex items-center space-x-2.5 px-3 py-2 text-xs ts-text-muted hover:ts-text-primary hover:bg-slate-800/60 rounded-xl transition-colors font-medium"
+                      >
+                        <Sliders className="w-4 h-4 text-amber-500" />
+                        <span>{t('notif.title', 'Notification Preferences')}</span>
+                      </NavLink>
+                      <NavLink
                         to="/alerts"
                         onClick={() => setDropdownOpen(false)}
                         className="flex items-center space-x-2.5 px-3 py-2 text-xs ts-text-muted hover:ts-text-primary hover:bg-slate-800/60 rounded-xl transition-colors"
@@ -461,7 +476,12 @@ export const Navbar: React.FC = () => {
                 }`
               }
             >
-              <Icon className="w-4 h-4 flex-shrink-0" />
+              <div className="relative">
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                {item.to === '/alerts' && eligibleEvents.length > 0 && (
+                  <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-slate-900 animate-pulse" />
+                )}
+              </div>
               <span className="text-[10px] mt-0.5 truncate text-center w-full">{displayLabel}</span>
             </NavLink>
           );

@@ -21,6 +21,7 @@ import {
   ShieldAlert,
   Users,
   AlertCircle,
+  Printer,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, Badge, Button } from '../components/ui';
 
@@ -306,16 +307,27 @@ export const Intervention: React.FC = () => {
               <span className="font-semibold ts-text-primary">{locationName.split(',')[0]}</span>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleSyncLive}
-            disabled={isSyncing}
-            leftIcon={<Zap className={`w-3.5 h-3.5 text-orange-600 dark:text-orange-400 ${isSyncing ? 'animate-bounce' : ''}`} />}
-            className="ml-auto sm:ml-1 text-xs cursor-pointer"
-          >
-            {isSyncing ? t('common.loading') : t('intervention.syncLiveBtn')}
-          </Button>
+          <div className="flex items-center gap-1.5 ml-auto sm:ml-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.print()}
+              leftIcon={<Printer className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />}
+              className="text-xs cursor-pointer print:hidden"
+            >
+              {t('intervention.exportBriefing', undefined, 'Export Briefing')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSyncLive}
+              disabled={isSyncing}
+              leftIcon={<Zap className={`w-3.5 h-3.5 text-orange-600 dark:text-orange-400 ${isSyncing ? 'animate-bounce' : ''}`} />}
+              className="text-xs cursor-pointer print:hidden"
+            >
+              {isSyncing ? t('common.loading') : t('intervention.syncLiveBtn')}
+            </Button>
+          </div>
         </div>
       </div>
 

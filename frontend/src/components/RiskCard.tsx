@@ -17,6 +17,7 @@ import { Card, Badge, MetricDisplay } from './ui';
 import { formatTemperature } from '../utils/risk';
 import { useTranslation } from '../context/LanguageContext';
 import { translateRiskLevel, translateAlertReason } from '../utils/translationHelpers';
+import { MetricExplainer } from './MetricExplainer';
 
 interface RiskCardProps {
   riskAssessment?: RiskAssessment;
@@ -134,8 +135,8 @@ export const RiskCard: React.FC<RiskCardProps> = ({
                 <Activity className="w-4 h-4 text-orange-400" />
                 {t('riskCard.heatStrainIndex')}
               </span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border ts-border ts-text-subtle font-mono">
-                {riskAssessment?.primary_index || 'WBGT'}
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border ts-border ts-text-subtle font-mono" title={t('dashboard.wbgtExplanation', 'Wet Bulb Globe Temperature: standard human heat stress metric combining sun, humidity, and wind')}>
+                {riskAssessment?.primary_index || 'WBGT'}{wbgt !== undefined ? ` · ${wbgt.toFixed(1)}°C` : ''}
               </span>
             </div>
 
@@ -174,6 +175,7 @@ export const RiskCard: React.FC<RiskCardProps> = ({
             <p className="text-[11px] ts-text-subtle mt-1.5 leading-tight">
               {t('riskCard.physiologicalStrain')}
             </p>
+            <MetricExplainer metricType="wbgt" className="mt-2.5" />
           </div>
 
           {/* 2. Civic Health Risk Score (ML Model Output) */}
@@ -213,6 +215,7 @@ export const RiskCard: React.FC<RiskCardProps> = ({
             <p className="text-[11px] ts-text-subtle mt-1.5 leading-tight">
               {t('riskCard.healthcareDemand')}
             </p>
+            <MetricExplainer metricType="riskScore" className="mt-2.5" />
           </div>
         </div>
 

@@ -45,6 +45,14 @@ const Profile = lazy(() =>
   import('./pages/Profile').then((m) => ({ default: m.Profile }))
 );
 
+const NotificationSettings = lazy(() =>
+  import('./pages/NotificationSettings').then((m) => ({
+    default: m.NotificationSettings,
+  }))
+);
+
+import { NotificationDecisionProvider } from './context/NotificationDecisionContext';
+
 export const App: React.FC = () => {
   return (
     <ThemeProvider>
@@ -52,12 +60,13 @@ export const App: React.FC = () => {
         <AuthProvider>
           <ProfileProvider>
             <LocationProvider>
-              <Router
-                future={{
-                  v7_startTransition: true,
-                  v7_relativeSplatPath: true,
-                }}
-              >
+              <NotificationDecisionProvider>
+                <Router
+                  future={{
+                    v7_startTransition: true,
+                    v7_relativeSplatPath: true,
+                  }}
+                >
                 <div className="min-h-screen flex flex-col font-sans selection:bg-orange-500 selection:text-white transition-colors duration-200">
 
                   {/* Top Navigation */}
@@ -73,6 +82,15 @@ export const App: React.FC = () => {
 
                         <Route path="/profile" element={<Profile />} />
                         <Route path="/my-profile" element={<Profile />} />
+
+                        <Route
+                          path="/notification-settings"
+                          element={<NotificationSettings />}
+                        />
+                        <Route
+                          path="/notifications"
+                          element={<NotificationSettings />}
+                        />
 
                         <Route
                           path="/personal-risk"
@@ -148,7 +166,8 @@ export const App: React.FC = () => {
                   <HeatCopilot />
                 </div>
               </Router>
-            </LocationProvider>
+            </NotificationDecisionProvider>
+          </LocationProvider>
           </ProfileProvider>
         </AuthProvider>
       </LanguageProvider>

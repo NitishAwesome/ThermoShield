@@ -31,7 +31,7 @@ const INITIAL_SUGGESTIONS = [
   '💧 Hydration rules for 40°C heat',
   '🚨 Heat stroke emergency first aid',
   '👷 Work-rest cycle for outdoor labor',
-  '👴 Precautions for elderly & kids',
+  '🔔 Explain my smart notification settings',
 ];
 
 const GEMINI_STORAGE_KEY = 'thermoshield_gemini_key';

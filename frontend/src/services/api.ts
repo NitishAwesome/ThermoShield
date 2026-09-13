@@ -214,6 +214,37 @@ export const api = {
     return res.data;
   },
 
+  // Proactive Background Early-Warning Monitoring Engine Status
+  getAlertEngineStatus: async (): Promise<{
+    daemon_running: boolean;
+    last_cycle_timestamp: string | null;
+    total_cycles_completed: number;
+    monitored_areas_count: number;
+    monitored_areas: string[];
+    last_cycle_results: any[];
+    engine: {
+      engine_active: boolean;
+      monitored_locations_tracked: number;
+      cooldown_records_active: number;
+      recent_dispatches_count: number;
+      recent_dispatches: any[];
+    };
+  }> => {
+    const res = await apiClient.get('/alerts/engine-status');
+    return res.data;
+  },
+
+  // Trigger On-Demand Proactive Background Cycle
+  triggerAlertEngineCycle: async (): Promise<{
+    status: string;
+    message: string;
+    results: any[];
+    telemetry: any;
+  }> => {
+    const res = await apiClient.post('/alerts/engine-trigger');
+    return res.data;
+  },
+
   // Heatwave AI Copilot (Dr. ThermoShield)
   chatWithCopilot: async (data: {
     message: string;

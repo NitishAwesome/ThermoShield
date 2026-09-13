@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Info,
 } from 'lucide-react';
 import { AreaRiskItem } from '../types';
 import { api } from '../services/api';
@@ -55,6 +56,11 @@ export const AreaRiskShowcase: React.FC<AreaRiskShowcaseProps> = ({
   const [selectedZone, setSelectedZone] = useState<string>('ALL');
   const [selectedSeverity, setSelectedSeverity] = useState<'ALL' | 'CRITICAL_HIGH'>('ALL');
   const [showAllAreas, setShowAllAreas] = useState<boolean>(false);
+  const [expandedWhy, setExpandedWhy] = useState<Record<string, boolean>>({});
+
+  const toggleWhyRisk = (areaName: string) => {
+    setExpandedWhy((prev) => ({ ...prev, [areaName]: !prev[areaName] }));
+  };
 
   // Responsive initial limit: 3 cards on mobile (< 768px), 6 cards on tablet/desktop
   const [isMobile, setIsMobile] = useState<boolean>(() => {
@@ -550,6 +556,45 @@ export const AreaRiskShowcase: React.FC<AreaRiskShowcaseProps> = ({
                     <div className="mt-2.5 text-xs ts-text-muted flex items-start space-x-1.5 leading-snug">
                       <AlertTriangle className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                       <span><strong className="ts-text-primary font-semibold">{t('matrix.localVulnerability')}:</strong> {translateVulnerabilityTag(area.vulnerability_tag, t)}</span>
+                    </div>
+
+                    {/* Compact "Why this risk?" Explainability Interaction */}
+                    <div className="mt-2 pt-2 border-t ts-border">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleWhyRisk(area.name);
+                        }}
+                        className="text-[11px] font-bold text-orange-600 dark:text-orange-400 hover:underline flex items-center space-x-1 cursor-pointer"
+                      >
+                        <Info className="w-3 h-3" />
+                        <span>{t('matrix.whyThisRisk', 'Why this risk?')}</span>
+                        <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${expandedWhy[area.name] ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {expandedWhy[area.name] && (
+                        <div className="mt-2 p-2.5 rounded-xl ts-card-subtle border ts-border text-[11px] space-y-1.5 animate-ts-fade-in">
+                          <div className="flex items-start space-x-2">
+                            <span className="font-bold text-orange-500">1.</span>
+                            <span className="ts-text-muted">
+                              <strong className="ts-text-primary">{t('matrix.driverHeat', 'Afternoon Ambient Temperature')}:</strong> {area.temperature_c.toFixed(1)}°C
+                            </span>
+                          </div>
+                          <div className="flex items-start space-x-2">
+                            <span className="font-bold text-orange-500">2.</span>
+                            <span className="ts-text-muted">
+                              <strong className="ts-text-primary">{t('matrix.driverWbgt', 'Elevated Wet-Bulb (WBGT)')}:</strong> {area.wbgt_c.toFixed(1)}°C ({t('matrix.driverWbgtDesc', 'limits sweat evaporation')})
+                            </span>
+                          </div>
+                          <div className="flex items-start space-x-2">
+                            <span className="font-bold text-orange-500">3.</span>
+                            <span className="ts-text-muted">
+                              <strong className="ts-text-primary">{t('matrix.driverVulnerable', 'Vulnerable Exposure')}:</strong> {translateVulnerabilityTag(area.vulnerability_tag, t)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

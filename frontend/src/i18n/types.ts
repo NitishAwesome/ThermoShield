@@ -575,6 +575,7 @@ export interface TranslationDictionary {
   'intervention.actionCoolingShelters': string;
   'intervention.actionEmergencyAlert': string;
   'intervention.actionStandardProtocols': string;
+  'intervention.exportBriefing'?: string;
 
   // Thermal Card & Environmental Explanations
   'thermalCard.humidityCooling': string;
@@ -898,5 +899,318 @@ export interface TranslationDictionary {
   'alerts.advNormalConditions': string;
   'alerts.advHighHumidity': string;
   'alerts.advSolarLoad': string;
+
+  // Notification & Safety Preferences
+  'notif.title': string;
+  'notif.subtitle': string;
+  'notif.badge': string;
+  'notif.modeTitle': string;
+  'notif.modeSubtitle': string;
+  'notif.modeEssential': string;
+  'notif.modeEssentialDesc': string;
+  'notif.modeSmart': string;
+  'notif.modeSmartDesc': string;
+  'notif.modePersonalized': string;
+  'notif.modePersonalizedDesc': string;
+  'notif.modeQuiet': string;
+  'notif.modeQuietDesc': string;
+  'notif.activeModeNotice': string;
+  'notif.customizeBtn': string;
+  'notif.saveSuccess': string;
+  'notif.resetToDefaults': string;
+  'notif.statusSaved': string;
+
+  // Category A: Heat & Safety Alerts
+  'notif.catA_Title': string;
+  'notif.catA_Desc': string;
+  'notif.critRiskTitle': string;
+  'notif.critRiskDesc': string;
+  'notif.extremeWarnTitle': string;
+  'notif.extremeWarnDesc': string;
+  'notif.suddenWorsenTitle': string;
+  'notif.suddenWorsenDesc': string;
+  'notif.persRiskTitle': string;
+  'notif.persRiskDesc': string;
+
+  // Category B: Personal Reminders
+  'notif.catB_Title': string;
+  'notif.catB_Desc': string;
+  'notif.smartHydrationTitle': string;
+  'notif.smartHydrationDesc': string;
+  'notif.restBreaksTitle': string;
+  'notif.restBreaksDesc': string;
+  'notif.outdoorExposureTitle': string;
+  'notif.outdoorExposureDesc': string;
+  'notif.safetyActionsTitle': string;
+  'notif.safetyActionsDesc': string;
+
+  // Category C: Preferred Conditions
+  'notif.catC_Title': string;
+  'notif.catC_Desc': string;
+  'notif.saferWindowTitle': string;
+  'notif.saferWindowDesc': string;
+  'notif.sunlightDecTitle': string;
+  'notif.sunlightDecDesc': string;
+  'notif.tempThresholdTitle': string;
+  'notif.tempThresholdDesc': string;
+  'notif.rainAlertTitle': string;
+  'notif.rainAlertDesc': string;
+  'notif.shadeHoursTitle': string;
+  'notif.shadeHoursDesc': string;
+
+  // Category D: Location & Context
+  'notif.catD_Title': string;
+  'notif.catD_Desc': string;
+  'notif.autoLocationTitle': string;
+  'notif.autoLocationDesc': string;
+  'notif.currentLocAlertsTitle': string;
+  'notif.currentLocAlertsDesc': string;
+  'notif.severeCheckInTitle': string;
+  'notif.severeCheckInDesc': string;
+  'notif.privacyNotice': string;
+
+  // Category E: Family & Vulnerable Protection
+  'notif.catE_Title': string;
+  'notif.catE_Desc': string;
+  'notif.vulnFamilyTitle': string;
+  'notif.vulnFamilyDesc': string;
+  'notif.selectedProfilesTitle': string;
+  'notif.selectedProfilesDesc': string;
+  'notif.severeFamilyCheckTitle': string;
+  'notif.severeFamilyCheckDesc': string;
+
+  // Role notes & badges
+  'notif.roleResponderNotice': string;
+  'notif.roleOfficialNotice': string;
+  'notif.roleAnalystNotice': string;
+  'notif.recommendedBadge': string;
+  'notif.essentialBadge': string;
+  'notif.optionalBadge': string;
+
+  // Smart Notification Decision Engine
+  'engine.liveFeedTitle': string;
+  'engine.liveFeedSubtitle': string;
+  'engine.activeModeNotice': string;
+  'engine.eligibleCount': string;
+  'engine.suppressedCount': string;
+  'engine.cooldownNotice': string;
+  'engine.clearCooldowns': string;
+  'engine.simulateSpike': string;
+  'engine.simulateModerate': string;
+  'engine.simulateNormal': string;
+  'engine.clearSimulation': string;
+  'engine.simulationActive': string;
+  'engine.eventRiskEscalationTitle': string;
+  'engine.eventRiskEscalationMsg': string;
+  'engine.eventWorseningTitle': string;
+  'engine.eventWorseningMsg': string;
+  'engine.eventHydrationTitle': string;
+  'engine.eventHydrationMsg': string;
+  'engine.eventRestTitle': string;
+  'engine.eventRestMsg': string;
+  'engine.eventSaferWindowTitle': string;
+  'engine.eventSaferWindowMsg': string;
+  'engine.suppressedReasonMode': string;
+  'engine.suppressedReasonPref': string;
+  'engine.suppressedReasonCooldown': string;
+  'engine.acknowledge': string;
+  'engine.acknowledged': string;
+  'engine.noActiveAlerts': string;
+  'engine.diagnosticsTitle': string;
+  'engine.eventSaferWindowActiveTitle': string;
+  'engine.eventSaferWindowActiveMsg': string;
+
+  // Safer Outdoor Window (Thermal Relief Window)
+  'outdoorWindow.title': string;
+  'outdoorWindow.subtitle': string;
+  'outdoorWindow.question': string;
+  'outdoorWindow.activeNow': string;
+  'outdoorWindow.bestUpcoming': string;
+  'outdoorWindow.nextTomorrow': string;
+  'outdoorWindow.noWindow': string;
+  'outdoorWindow.peakHeat': string;
+  'outdoorWindow.apparentDrop': string;
+  'outdoorWindow.reliefAvg': string;
+  'outdoorWindow.whyThisWindow': string;
+  'outdoorWindow.whyThisWindowSubtitle': string;
+  'outdoorWindow.factorApparentTemp': string;
+  'outdoorWindow.factorApparentTempDesc': string;
+  'outdoorWindow.factorSolar': string;
+  'outdoorWindow.factorSolarDesc': string;
+  'outdoorWindow.factorCooling': string;
+  'outdoorWindow.factorCoolingDesc': string;
+  'outdoorWindow.factorPhysiological': string;
+  'outdoorWindow.factorPhysiologicalDesc': string;
+  'outdoorWindow.recStandard': string;
+  'outdoorWindow.recElevated': string;
+  'outdoorWindow.recCritical': string;
+  'outdoorWindow.guidanceStandard': string;
+  'outdoorWindow.guidanceElevated': string;
+  'outdoorWindow.guidanceCritical': string;
+  'outdoorWindow.noReliefRecommendation': string;
+  'outdoorWindow.noReliefGuidance': string;
+  'outdoorWindow.noReliefActivities': string;
+  'outdoorWindow.activitiesStandard': string;
+  'outdoorWindow.activitiesElevated': string;
+  'outdoorWindow.activitiesCritical': string;
+  'outdoorWindow.tierStandardReason': string;
+  'outdoorWindow.tierOutdoorWorkerReason': string;
+  'outdoorWindow.tierOlderAdultReason': string;
+  'outdoorWindow.tierElevatedReason': string;
+  'outdoorWindow.tierCriticalReason': string;
+  'outdoorWindow.hourlyTimeline': string;
+  'outdoorWindow.saferHours': string;
+  'outdoorWindow.peakHours': string;
+  'outdoorWindow.ctaForecast': string;
+  'outdoorWindow.notifyMe': string;
+  'outdoorWindow.notificationActive': string;
+  'outdoorWindow.disclaimer': string;
+
+  // Location & Context Safety
+  'contextSafety.locationUpdateBadge': string;
+  'contextSafety.privacyGuaranteed': string;
+  'contextSafety.locationPromptTitle': string;
+  'contextSafety.locationPromptDesc': string;
+  'contextSafety.locationPrivacyStatement': string;
+  'contextSafety.confirmUpdate': string;
+  'contextSafety.keepCurrent': string;
+  'contextSafety.checkInBadge': string;
+  'contextSafety.contextualTuning': string;
+  'contextSafety.activeGuidanceTitle': string;
+  'contextSafety.promptQuestion': string;
+  'contextSafety.changeStatus': string;
+  'contextSafety.promptSubtitle': string;
+  'contextSafety.optionIndoors': string;
+  'contextSafety.optionIndoorsSub': string;
+  'contextSafety.optionOutdoors': string;
+  'contextSafety.optionOutdoorsSub': string;
+  'contextSafety.optionTravelling': string;
+  'contextSafety.optionTravellingSub': string;
+  'contextSafety.optionPreferNotToSay': string;
+  'contextSafety.optionPreferNotToSaySub': string;
+  'contextSafety.currentSetting': string;
+  'contextSafety.statusOutdoorsBadge': string;
+  'contextSafety.statusIndoorsBadge': string;
+  'contextSafety.statusTravellingBadge': string;
+  'contextSafety.statusGeneralBadge': string;
+  'contextSafety.outdoorShadeTitle': string;
+  'contextSafety.outdoorShadeDesc': string;
+  'contextSafety.outdoorRestTitle': string;
+  'contextSafety.outdoorRestDesc': string;
+  'contextSafety.outdoorHydrationTitle': string;
+  'contextSafety.outdoorHydrationDesc': string;
+  'contextSafety.outdoorExhaustionTitle': string;
+  'contextSafety.outdoorExhaustionDesc': string;
+  'contextSafety.indoorCoolingTitle': string;
+  'contextSafety.indoorCoolingDesc': string;
+  'contextSafety.indoorHydrationTitle': string;
+  'contextSafety.indoorHydrationDesc': string;
+  'contextSafety.indoorUpperFloorTitle': string;
+  'contextSafety.indoorUpperFloorDesc': string;
+  'contextSafety.indoorErrandPlanTitle': string;
+  'contextSafety.indoorErrandPlanDesc': string;
+  'contextSafety.travelVehicleWarningTitle': string;
+  'contextSafety.travelVehicleWarningDesc': string;
+  'contextSafety.travelWaterFlaskTitle': string;
+  'contextSafety.travelWaterFlaskDesc': string;
+  'contextSafety.travelTransitShadeTitle': string;
+  'contextSafety.travelTransitShadeDesc': string;
+  'contextSafety.travelVentilationTitle': string;
+  'contextSafety.travelVentilationDesc': string;
+  'contextSafety.generalPrecautionTitle': string;
+  'contextSafety.generalPrecautionDesc': string;
+  'contextSafety.disclaimer': string;
+
+  // Family & Vulnerable Protection
+  'familyProtection.badge': string;
+  'familyProtection.voluntaryNotice': string;
+  'familyProtection.headline': string;
+  'familyProtection.checkedConfirmed': string;
+  'familyProtection.markAsChecked': string;
+  'familyProtection.addProfile': string;
+  'familyProtection.introText': string;
+  'familyProtection.formTitle': string;
+  'familyProtection.nicknamePlaceholder': string;
+  'familyProtection.catElderTitle': string;
+  'familyProtection.catElderTag': string;
+  'familyProtection.catElderAdvice': string;
+  'familyProtection.catChildTitle': string;
+  'familyProtection.catChildTag': string;
+  'familyProtection.catChildAdvice': string;
+  'familyProtection.catWorkerTitle': string;
+  'familyProtection.catWorkerTag': string;
+  'familyProtection.catWorkerAdvice': string;
+  'familyProtection.catSpecialTitle': string;
+  'familyProtection.catSpecialTag': string;
+  'familyProtection.catSpecialAdvice': string;
+  'familyProtection.actionTip': string;
+  'familyProtection.hydrationPriority': string;
+  'familyProtection.privacyFootnote': string;
+
+  // Engine Additions
+  'engine.eventFamilyVulnerableTitle': string;
+  'engine.eventFamilyVulnerableMsg': string;
+  'engine.eventSevereCheckInTitle': string;
+  'engine.eventSevereCheckInMsg': string;
+  'engine.actionFamilyCheck': string;
+  'engine.actionCheckInNow': string;
+  'common.dismissFor4Hours': string;
+
+  // Heat Risk Evolution & Change Intelligence
+  'evolution.title'?: string;
+  'evolution.worsening'?: string;
+  'evolution.stable'?: string;
+  'evolution.improving'?: string;
+  'evolution.forecastInsight'?: string;
+  'evolution.trajectoryLabel'?: string;
+  'evolution.peakBadge'?: string;
+
+  // Notification Transparency Preview
+  'notif.howAlertsWorkTitle'?: string;
+  'notif.howAlertsWorkSubtitle'?: string;
+  'notif.mandatorySafety'?: string;
+  'notif.smartDecision'?: string;
+  'notif.optionalPersonal'?: string;
+  'notif.exampleCritical'?: string;
+  'notif.exampleCriticalDesc'?: string;
+  'notif.exampleImportant'?: string;
+  'notif.exampleImportantDesc'?: string;
+  'notif.exampleRoutine'?: string;
+  'notif.exampleRoutineDesc'?: string;
+
+  // Area Risk Explainability
+  'matrix.whyThisRisk'?: string;
+  'matrix.driverHeat'?: string;
+  'matrix.driverWbgt'?: string;
+  'matrix.driverWbgtDesc'?: string;
+  'matrix.driverVulnerable'?: string;
+
+  // Personal Risk 3-Tier Hierarchy
+  'risk.categoryEnvironmental'?: string;
+  'risk.categoryPersonal'?: string;
+  'risk.categoryProtective'?: string;
+  'risk.categoryEnvironmentalDesc'?: string;
+  'risk.categoryPersonalDesc'?: string;
+  // Metric Explanations (What does this mean?)
+  'explainer.whatDoesThisMean'?: string;
+  'explainer.meaning'?: string;
+  'explainer.whyItMatters'?: string;
+  'explainer.suggestedAction'?: string;
+  'explainer.wbgtMeaning'?: string;
+  'explainer.wbgtWhy'?: string;
+  'explainer.wbgtAction'?: string;
+  'explainer.riskScoreMeaning'?: string;
+  'explainer.riskScoreWhy'?: string;
+  'explainer.riskScoreAction'?: string;
+  'explainer.heatIndexMeaning'?: string;
+  'explainer.heatIndexWhy'?: string;
+  'explainer.heatIndexAction'?: string;
+  'explainer.cloMeaning'?: string;
+  'explainer.cloWhy'?: string;
+  'explainer.cloAction'?: string;
+  'explainer.metabolicMeaning'?: string;
+  'explainer.metabolicWhy'?: string;
+  'explainer.metabolicAction'?: string;
 }
+
 

@@ -26,6 +26,15 @@ export interface WeatherCondition {
   wind_direction?: number;
 }
 
+export interface HourlyForecast {
+  time: string[];
+  temperature: number[];
+  humidity: number[];
+  apparent_temperature: number[];
+  uv_index: number[];
+  is_day: number[];
+}
+
 export interface DailyForecast {
   dates: string[];
   max_temperature: number[];
@@ -34,6 +43,7 @@ export interface DailyForecast {
   apparent_temperature_min?: number[];
   uv_index_max?: number[];
   weather_code?: number[];
+  hourly?: HourlyForecast;
 }
 
 export interface WeatherResponse {
@@ -107,6 +117,7 @@ export interface ThermalResponse {
       solar_radiation_wm2: number | null;
     };
   };
+  forecast?: DailyForecast;
 }
 
 export interface MLRiskData {
@@ -289,6 +300,52 @@ export interface UserEmergencyPreparedness {
   knowsCoolingCenter: boolean;
 }
 
+export type NotificationMode = 'essential' | 'smart' | 'personalized' | 'quiet';
+
+export interface HeatSafetyAlertPreferences {
+  criticalRiskChanges: boolean;
+  extremeWarnings: boolean;
+  suddenWorsening: boolean;
+  personalRiskChanges: boolean;
+}
+
+export interface PersonalReminderPreferences {
+  smartHydration: boolean;
+  restBreaks: boolean;
+  outdoorExposure: boolean;
+  safetyActions: boolean;
+}
+
+export interface PreferredConditionsPreferences {
+  saferConditionsWindow: boolean;
+  sunlightDecrease: boolean;
+  temperatureThreshold: boolean;
+  rainConditions: boolean;
+  shadeFriendlyHours: boolean;
+}
+
+export interface LocationContextPreferences {
+  autoLocationMonitoring: boolean;
+  useCurrentLocationForAlerts: boolean;
+  severeHeatCheckIn: boolean;
+}
+
+export interface FamilyVulnerablePreferences {
+  vulnerableFamilyReminders: boolean;
+  selectedProfilesAlerts: boolean;
+  severeHeatFamilyCheck: boolean;
+}
+
+export interface NotificationPreferences {
+  mode: NotificationMode;
+  heatSafety: HeatSafetyAlertPreferences;
+  personalReminders: PersonalReminderPreferences;
+  preferredConditions: PreferredConditionsPreferences;
+  locationContext: LocationContextPreferences;
+  familyProtection: FamilyVulnerablePreferences;
+  updatedAt?: string;
+}
+
 export interface UserPreferences {
   preferredLanguage: string;
   autoSyncLocation: boolean;
@@ -321,6 +378,28 @@ export interface UserProfile {
   exposure: UserExposureProfile;
   preparedness: UserEmergencyPreparedness;
   preferences: UserPreferences;
+  notificationPreferences?: NotificationPreferences;
+  familyProtectionMembers?: FamilyVulnerableMember[];
 
   updatedAt?: string;
 }
+
+export type SituationalContextType = 'indoors' | 'outdoors' | 'travelling' | 'prefer_not_to_say';
+
+export interface SituationalCheckInState {
+  currentContext: SituationalContextType | null;
+  checkedInAt: number | null; // timestamp in ms
+  dismissedUntil: number | null; // timestamp in ms
+}
+
+export type VulnerableCategory = 'older_adult' | 'child' | 'outdoor_worker' | 'special_care';
+
+export interface FamilyVulnerableMember {
+  id: string;
+  category: VulnerableCategory;
+  nickname?: string;
+  notes?: string;
+  addedAt: string;
+}
+
+export * from './notifications';
