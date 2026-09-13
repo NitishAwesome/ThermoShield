@@ -26,7 +26,7 @@ class CopilotChatResponse(BaseModel):
     suggested_questions: List[str] = []
     safety_tier: str
     timestamp: str
-    model_used: Optional[str] = "gemini-2.0-flash"
+    model_used: Optional[str] = "gemini-3.6-flash"
     is_gemini: Optional[bool] = False
     emergency_call: Optional[bool] = False
     resolved_location: Optional[str] = None
@@ -75,6 +75,6 @@ def copilot_health():
     return {
         "status": "healthy",
         "llm_enabled": bool(copilot_engine.gemini_key or copilot_engine.openai_key),
-        "default_model": "gemini-2.0-flash",
+        "default_model": "gemini-3.6-flash",
         "engine": "ThermoShield-Gemini-Biometeorological-Copilot-v2"
     }
