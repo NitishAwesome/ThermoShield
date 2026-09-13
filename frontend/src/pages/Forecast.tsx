@@ -3,6 +3,8 @@ import { api } from '../services/api';
 import { ForecastResponse } from '../types';
 import { LocationSearch } from '../components/LocationSearch';
 import { ForecastChart } from '../components/ForecastChart';
+import { RiskEvolutionTimeline } from '../components/RiskEvolutionTimeline';
+import { SaferOutdoorWindowCard } from '../components/SaferOutdoorWindowCard';
 import { LoadingState } from '../components/LoadingState';
 import { Calendar, Thermometer, Sun, CloudSun, AlertTriangle, CheckCircle, RefreshCw, Info } from 'lucide-react';
 import { formatTemperature } from '../utils/risk';
@@ -100,6 +102,12 @@ export const Forecast: React.FC = () => {
         <LoadingState message={t('common.loading', 'Loading multi-day meteorological forecast...')} />
       ) : forecastData ? (
         <div className="space-y-6">
+          {/* Heat Risk Evolution & Change Intelligence */}
+          <RiskEvolutionTimeline forecast={forecastData.forecast} />
+
+          {/* Safer Outdoor Window / Thermal Relief Window Card */}
+          <SaferOutdoorWindowCard forecast={forecastData.forecast} />
+
           {/* Visual Trend Chart */}
           <ForecastChart forecast={forecastData.forecast} />
 
