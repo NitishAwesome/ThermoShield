@@ -13,6 +13,11 @@ import { ThermalCard } from '../components/ThermalCard';
 import { RiskDrivers } from '../components/RiskDrivers';
 import { RiskMap } from '../components/RiskMap';
 import { ForecastChart } from '../components/ForecastChart';
+import { RiskEvolutionTimeline } from '../components/RiskEvolutionTimeline';
+import { SaferOutdoorWindowCard } from '../components/SaferOutdoorWindowCard';
+import { LocationConfirmationBanner } from '../components/LocationConfirmationBanner';
+import { SevereHeatCheckInCard } from '../components/SevereHeatCheckInCard';
+import { VulnerableFamilyProtectionCard } from '../components/VulnerableFamilyProtectionCard';
 import { AlertBanner } from '../components/AlertBanner';
 import { LoadingState } from '../components/LoadingState';
 import { AlertCircle, RefreshCw, HeartPulse, Sparkles, ArrowRight, Sliders, Building2, Flame, BarChart2, Zap, Layers, Bell, Calendar, ShieldCheck } from 'lucide-react';
@@ -30,7 +35,7 @@ import { useTranslation } from '../context/LanguageContext';
 
 export const Dashboard: React.FC = () => {
   const { t } = useTranslation();
-  const { coords, locationName, isLocating, setLocation, setCoordsAndName, detectMyLocation } = useLocation();
+  const { coords, locationName, isLocating, setLocation, setCoordsAndName, detectMyLocation, checkLocationMismatch } = useLocation();
   const { user, isAuthenticated } = useAuth();
   const { profile } = useProfile();
 
@@ -57,6 +62,7 @@ export const Dashboard: React.FC = () => {
       setWeatherData({
         location: cached.thermal.location,
         weather: cached.thermal.weather,
+        forecast: cached.thermal.forecast,
       });
       if (cached.risk) setRiskData(cached.risk);
       if (cached.mapLocations) setMapLocations(cached.mapLocations);
@@ -88,6 +94,7 @@ export const Dashboard: React.FC = () => {
         setWeatherData({
           location: thermalRes.value.location,
           weather: thermalRes.value.weather,
+          forecast: thermalRes.value.forecast,
         });
         setError(null);
       } else {
@@ -146,6 +153,13 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     fetchData(coords.lat, coords.lon);
   }, [coords.lat, coords.lon]);
+
+  // Check for location change if auto-monitoring preference is active
+  useEffect(() => {
+    if (profile.notificationPreferences?.locationContext?.autoLocationMonitoring) {
+      checkLocationMismatch();
+    }
+  }, [profile.notificationPreferences?.locationContext?.autoLocationMonitoring, checkLocationMismatch]);
 
   useEffect(() => {
     const locationId = riskData?.location?.id;
@@ -290,6 +304,9 @@ export const Dashboard: React.FC = () => {
       {/* Role Welcome Banner (Landing page default: full details view, expandable / collapsible) */}
       <RoleWelcomeBanner user={user} initialMode="full" />
 
+      {/* Location Confirmation Banner (Appears when location update is detected) */}
+      <LocationConfirmationBanner />
+
       {/* Top Controls: Search Bar & Location Detect */}
       <div className="relative z-10 ts-card p-3 sm:p-4 shadow-lg">
         <LocationSearch
@@ -360,6 +377,34 @@ export const Dashboard: React.FC = () => {
 
             <WeatherCard weather={thermalData?.weather || weatherData?.weather} />
           </div>
+
+          {/* Heat Risk Evolution & Change Intelligence */}
+          <RiskEvolutionTimeline
+            forecast={thermalData?.forecast || weatherData?.forecast}
+            weather={thermalData?.weather || weatherData?.weather}
+            currentRiskLevel={thermalData?.thermal?.risk_assessment?.level || riskData?.risk?.risk_level}
+          />
+
+          {/* Safer Outdoor Window / Thermal Relief Window Card */}
+          <SaferOutdoorWindowCard
+            forecast={thermalData?.forecast || weatherData?.forecast}
+            weather={thermalData?.weather || weatherData?.weather}
+            currentRiskLevel={thermalData?.thermal?.risk_assessment?.level || riskData?.risk?.risk_level}
+          />
+
+          {/* Severe Heat Safety Check-In & Contextual Guidance Card */}
+          <SevereHeatCheckInCard
+            currentRiskLevel={thermalData?.thermal?.risk_assessment?.level || riskData?.risk?.risk_level}
+            temperature={thermalData?.weather?.temperature}
+            wbgt={thermalData?.thermal?.indices?.wbgt_c}
+          />
+
+          {/* Vulnerable Family Protection Card */}
+          <VulnerableFamilyProtectionCard
+            currentRiskLevel={thermalData?.thermal?.risk_assessment?.level || riskData?.risk?.risk_level}
+            temperature={thermalData?.weather?.temperature}
+            wbgt={thermalData?.thermal?.indices?.wbgt_c}
+          />
 
           {/* Live Firebase Risk Sync Indicator */}
           {liveRisk && (
