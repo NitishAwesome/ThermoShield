@@ -1,7 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.schemas import PersonalRiskInput, PersonalRiskResponse
 from app.services.personal_risk import calculate_personal_risk
+from app.auth.router import get_current_user
+from app.database.models import User
 
 
 router = APIRouter(
@@ -11,7 +13,10 @@ router = APIRouter(
 
 
 @router.post("/calculate", response_model=PersonalRiskResponse)
-def calculate_risk(data: PersonalRiskInput):
+def calculate_risk(
+    data: PersonalRiskInput,
+    current_user: User = Depends(get_current_user),
+):
     result = calculate_personal_risk(
         age=data.age,
         smoking=data.smoking,

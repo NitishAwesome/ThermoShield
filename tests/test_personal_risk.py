@@ -70,7 +70,32 @@ class TestPersonalRisk(unittest.TestCase):
         factors = [f["factor"] for f in result["risk_factors_breakdown"]]
         self.assertIn("Pregnancy", factors)
 
-    def test_api_personal_risk_endpoint(self):
+    def test_api_personal_risk_endpoint_unauthenticated_rejected(self):
+        payload = {
+            "age": 45,
+            "smoking": False,
+            "health_conditions": ["hypertension"],
+            "physical_activity": "moderate",
+            "temperature_c": 37.0,
+            "wbgt_c": 28.5
+        }
+        res = self.client.post("/personal-risk/calculate", json=payload)
+        self.assertEqual(res.status_code, 401)
+
+    def test_api_personal_risk_endpoint_authenticated(self):
+        import uuid
+        unique_id = uuid.uuid4().hex[:8]
+        reg_res = self.client.post("/auth/register", json={
+            "name": f"Risk Tester {unique_id}",
+            "email": f"risk_tester_{unique_id}@example.com",
+            "phone_number": f"+9198{unique_id[:8]}",
+            "password": "SecurePassword123!",
+            "role": "user"
+        })
+        self.assertEqual(reg_res.status_code, 201)
+        token = reg_res.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
         payload = {
             "age": 45,
             "smoking": False,
@@ -83,7 +108,7 @@ class TestPersonalRisk(unittest.TestCase):
             "temperature_c": 37.0,
             "wbgt_c": 28.5
         }
-        res = self.client.post("/personal-risk/calculate", json=payload)
+        res = self.client.post("/personal-risk/calculate", json=payload, headers=headers)
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertIn("risk_score", data)

@@ -11,6 +11,7 @@ import {
   LogIn,
   LogOut,
   UserPlus,
+  Lock,
   ChevronDown,
   ShieldCheck,
   Building2,
@@ -229,6 +230,9 @@ export const Navbar: React.FC = () => {
                 >
                   <Icon className="w-3.5 h-3.5" />
                   <span>{item.label}</span>
+                  {item.to === '/personal-risk' && !isAuthenticated && (
+                    <Lock className="w-3 h-3 text-amber-500 dark:text-amber-400 ml-0.5 opacity-80" />
+                  )}
                 </NavLink>
               );
             })}
@@ -270,7 +274,12 @@ export const Navbar: React.FC = () => {
                       >
                         <Icon className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
                         <div>
-                          <div className="font-semibold text-xs">{item.label}</div>
+                          <div className="font-semibold text-xs flex items-center gap-1">
+                            <span>{item.label}</span>
+                            {item.to === '/personal-risk' && !isAuthenticated && (
+                              <Lock className="w-3 h-3 text-amber-500 dark:text-amber-400 opacity-80" />
+                            )}
+                          </div>
                           <div className="text-[10.5px] ts-text-subtle leading-tight">{item.description}</div>
                         </div>
                       </NavLink>
@@ -462,7 +471,12 @@ export const Navbar: React.FC = () => {
               }
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
-              <span className="text-[10px] mt-0.5 truncate text-center w-full">{displayLabel}</span>
+              <span className="text-[10px] mt-0.5 truncate text-center w-full flex items-center justify-center gap-0.5">
+                <span>{displayLabel}</span>
+                {item.to === '/personal-risk' && !isAuthenticated && (
+                  <Lock className="w-2.5 h-2.5 text-amber-500 opacity-80" />
+                )}
+              </span>
             </NavLink>
           );
         })}
@@ -506,7 +520,12 @@ export const Navbar: React.FC = () => {
               >
                 <Icon className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0" />
                 <div>
-                  <div className="font-semibold text-xs">{item.label}</div>
+                  <div className="font-semibold text-xs flex items-center gap-1">
+                    <span>{item.label}</span>
+                    {item.to === '/personal-risk' && !isAuthenticated && (
+                      <Lock className="w-3 h-3 text-amber-500 dark:text-amber-400 opacity-80" />
+                    )}
+                  </div>
                   <div className="text-[10px] ts-text-subtle">{item.description}</div>
                 </div>
               </NavLink>
