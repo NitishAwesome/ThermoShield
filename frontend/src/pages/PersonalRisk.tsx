@@ -28,6 +28,8 @@ import { api } from '../services/api';
 import { PersonalRiskRequest, PersonalRiskResult } from '../types';
 import { getRiskColor } from '../utils/risk';
 import { Card, CardHeader, CardContent, Badge, Button, EmptyState } from '../components/ui';
+import { SaferOutdoorWindowCard } from '../components/SaferOutdoorWindowCard';
+import { MetricExplainer } from '../components/MetricExplainer';
 import { useTranslation } from '../context/LanguageContext';
 import {
   translateSafetyRecommendation,
@@ -756,12 +758,12 @@ export const PersonalRisk: React.FC = () => {
               <Card>
                 <CardHeader
                   title={t('risk.section2Title', 'Why is your risk at this level?')}
-                  subtitle={t('risk.section2Subtitle')}
+                  subtitle={t('risk.section2Subtitle', 'Hierarchical breakdown of environmental, personal, and protective factors.')}
                 />
-                <CardContent className="space-y-2.5">
+                <CardContent className="space-y-3.5">
                   <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-xs leading-relaxed ts-text-primary">
                     {result.risk_level.toUpperCase() === 'LOW' ? (
-                      <span>{t('risk.whyAtThisLevelComfort')}</span>
+                      <span>{t('risk.whyAtThisLevelComfort', 'Your physical exposure parameters are within comfortable human physiological limits.')}</span>
                     ) : (
                       <span>
                         {t('risk.whyAtThisLevel', {
@@ -784,28 +786,103 @@ export const PersonalRisk: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Top contributing factors */}
-                  <div className="space-y-2 pt-1">
-                    {result.risk_factors_breakdown.slice(0, 4).map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="p-2.5 rounded-xl ts-card-subtle border ts-border flex items-center justify-between text-xs"
-                      >
-                        <div className="pr-3">
-                          <div className="font-bold ts-text-primary">{translateRiskFactor(item.factor, t)}</div>
-                          <div className="text-[11px] ts-text-muted mt-0.5">{translateFactorDescription(item.description, t)}</div>
-                        </div>
-                        <span
-                          className={`font-mono font-bold text-xs px-2.5 py-0.5 rounded-lg flex-shrink-0 ${
-                            item.contribution > 0
-                              ? 'bg-red-500/15 text-red-700 dark:text-red-300 border border-red-500/30'
-                              : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
-                          }`}
-                        >
-                          {item.contribution > 0 ? `+${item.contribution}` : `${item.contribution}`} pts
+                  {/* 3-Tier Categorized Factors Breakdown */}
+                  <div className="space-y-3 pt-1">
+                    {/* 1. Environmental Factors */}
+                    <div className="p-3 rounded-xl ts-card-subtle border ts-border">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-bold ts-text-primary flex items-center gap-1.5">
+                          <span>🔥</span>
+                          <span>{t('risk.categoryEnvironmental', 'Environmental Factors')}</span>
+                        </span>
+                        <span className="text-[10px] font-semibold text-orange-600 dark:text-orange-400">
+                          {temperature.toFixed(1)}°C · {Math.round(humidity)}% RH
                         </span>
                       </div>
-                    ))}
+                      <p className="text-[11px] ts-text-muted mb-2">
+                        {t('risk.categoryEnvironmentalDesc', 'Ambient heat & humidity limiting your physiological cooling capacity.')}
+                      </p>
+                      <div className="space-y-1.5">
+                        {result.risk_factors_breakdown
+                          .filter((item) => {
+                            const f = item.factor.toLowerCase();
+                            return f.includes('temp') || f.includes('heat') || f.includes('wbgt') || f.includes('humidity') || f.includes('weather');
+                          })
+                          .slice(0, 2)
+                          .map((item, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-xs py-1 border-t ts-border">
+                              <span className="ts-text-muted">{translateRiskFactor(item.factor, t)}</span>
+                              <span className="font-mono font-bold text-red-600 dark:text-red-400">+{item.contribution} pts</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+
+                    {/* 2. Personal Factors */}
+                    <div className="p-3 rounded-xl ts-card-subtle border ts-border">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-bold ts-text-primary flex items-center gap-1.5">
+                          <span>👤</span>
+                          <span>{t('risk.categoryPersonal', 'Personal Factors')}</span>
+                        </span>
+                        <span className="text-[10px] font-semibold ts-text-subtle">
+                          {age} yrs · {outdoorExposureHours}h outdoor
+                        </span>
+                      </div>
+                      <p className="text-[11px] ts-text-muted mb-2">
+                        {t('risk.categoryPersonalDesc', 'Individual attributes and habits altering personal heat vulnerability.')}
+                      </p>
+                      <div className="space-y-1.5">
+                        {result.risk_factors_breakdown
+                          .filter((item) => {
+                            const f = item.factor.toLowerCase();
+                            const isEnv = f.includes('temp') || f.includes('heat') || f.includes('wbgt') || f.includes('humidity') || f.includes('weather');
+                            const isProt = item.contribution < 0 || f.includes('cooling') || f.includes('shade') || f.includes('acclimatized');
+                            return !isEnv && !isProt;
+                          })
+                          .slice(0, 3)
+                          .map((item, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-xs py-1 border-t ts-border">
+                              <div>
+                                <span className="font-semibold ts-text-primary">{translateRiskFactor(item.factor, t)}</span>
+                                <div className="text-[10px] ts-text-muted">{translateFactorDescription(item.description, t)}</div>
+                              </div>
+                              <span className="font-mono font-bold text-red-600 dark:text-red-400">+{item.contribution} pts</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+
+                    {/* 3. Protective Factors */}
+                    <div className="p-3 rounded-xl ts-card-subtle border border-emerald-500/30 bg-emerald-500/5">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                          <span>🛡️</span>
+                          <span>{t('risk.categoryProtective', 'Protective Factors')}</span>
+                        </span>
+                        <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                          {isAcclimatized ? 'Acclimatized' : 'High Vigilance'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] ts-text-muted mb-2">
+                        {t('risk.categoryProtectiveDesc', 'Active cooling access, hydration, and shade mitigating heat strain.')}
+                      </p>
+                      <div className="space-y-1.5">
+                        {result.risk_factors_breakdown
+                          .filter((item) => item.contribution <= 0 || item.factor.toLowerCase().includes('acclimatized'))
+                          .map((item, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-xs py-1 border-t border-emerald-500/20">
+                              <span className="ts-text-muted">{translateRiskFactor(item.factor, t)}</span>
+                              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{item.contribution} pts</span>
+                            </div>
+                          ))}
+                        {result.risk_factors_breakdown.filter((item) => item.contribution <= 0 || item.factor.toLowerCase().includes('acclimatized')).length === 0 && (
+                          <div className="text-[10.5px] text-emerald-700 dark:text-emerald-400 italic">
+                            Hydration target ({result.recommended_water_intake_ml_hr} mL/hr) and work-rest pauses provide active protection.
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -820,9 +897,21 @@ export const PersonalRisk: React.FC = () => {
         </div>
       </div>
 
-      {/* FULL-WIDTH DECISION SUPPORT: Action Checklist & Scientific Methodology */}
+      {/* FULL-WIDTH DECISION SUPPORT: Relief Window, Action Checklist & Scientific Methodology */}
       {result && (
         <div className="space-y-6">
+          {/* PERSONALIZED SAFER OUTDOOR WINDOW */}
+          <SaferOutdoorWindowCard
+            currentRiskLevel={result.risk_level}
+            weather={{
+              temperature,
+              humidity,
+              apparent_temperature: apparentTemp,
+              uv_index: uvIndex,
+              wind_speed: 3.0,
+            } as any}
+          />
+
           {/* SECTION 3: WHAT YOU CAN DO NOW */}
           <Card variant="elevated" className="overflow-hidden">
             <CardHeader
@@ -931,6 +1020,12 @@ export const PersonalRisk: React.FC = () => {
                     <span className="text-[10px] ts-text-subtle block">UV Index</span>
                     <span className="font-mono font-bold ts-text-primary text-sm">{uvIndex.toFixed(1)}</span>
                   </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-1 border-t ts-border">
+                  <MetricExplainer metricType="wbgt" customLabel={t('explainer.whatDoesThisMean', undefined, 'What is WBGT?')} />
+                  <MetricExplainer metricType="clo" customLabel={t('explainer.whatDoesThisMean', undefined, 'What is clo (clothing rating)?')} />
+                  <MetricExplainer metricType="metabolic" customLabel={t('explainer.whatDoesThisMean', undefined, 'What is Metabolic Work Rate?')} />
                 </div>
 
                 <div className="text-[11px] ts-text-muted leading-relaxed p-3 rounded-xl ts-card-subtle border ts-border">

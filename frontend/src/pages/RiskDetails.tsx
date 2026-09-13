@@ -26,6 +26,7 @@ import { getCachedData, setCachedData } from '../services/cache';
 import { useLocation } from '../context/LocationContext';
 import { useTranslation } from '../context/LanguageContext';
 import { Card, CardHeader, CardContent, Badge, Button } from '../components/ui';
+import { MetricExplainer } from '../components/MetricExplainer';
 
 // Utility for natural, clear plain-language phrasing
 const toPlainLanguage = (text?: string): string => {
@@ -143,10 +144,10 @@ export const RiskDetails: React.FC = () => {
           </Badge>
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold ts-text-primary font-sans mt-0.5">
-          {t('riskDetails.title')}
+          {t('riskDetails.title', undefined, 'Why Is This Area At Risk? (Risk Analysis)')}
         </h1>
         <p className="text-sm ts-text-muted mt-1">
-          {t('riskDetails.subtitle')} ({locationName})
+          {t('riskDetails.subtitle', undefined, 'Clear breakdown of heat drivers, humidity impact, wet-bulb thermal stress, and health projections.')} ({locationName})
         </p>
       </div>
 
@@ -416,6 +417,13 @@ export const RiskDetails: React.FC = () => {
                     {t('thermalCard.wetBulbDesc')}
                   </p>
                 </div>
+              </div>
+
+              {/* Compact Metric Explanations for Plain Language Readability */}
+              <div className="flex flex-wrap gap-2 pt-3 border-t ts-border mt-3">
+                <MetricExplainer metricType="wbgt" customLabel={t('explainer.whatDoesThisMean', undefined, 'What is WBGT?')} />
+                <MetricExplainer metricType="heatIndex" customLabel={t('explainer.whatDoesThisMean', undefined, 'What is Heat Index?')} />
+                <MetricExplainer metricType="riskScore" customLabel={t('explainer.whatDoesThisMean', undefined, 'How is Risk Score calculated?')} />
               </div>
             </CardContent>
           </Card>
