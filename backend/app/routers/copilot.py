@@ -19,6 +19,8 @@ class CopilotChatRequest(BaseModel):
     user_role: Optional[str] = Field("citizen", description="User persona (citizen, official, responder, analyst)")
     conversation_history: Optional[List[Dict[str, str]]] = Field(default=[], description="Previous conversation turns [{'role': 'user'|'model', 'text': '...'}]")
     api_key: Optional[str] = Field(None, description="Optional Google Gemini API key passed from client")
+    latitude: Optional[float] = Field(None, description="Optional client coordinates latitude")
+    longitude: Optional[float] = Field(None, description="Optional client coordinates longitude")
 
 
 class CopilotChatResponse(BaseModel):
@@ -26,8 +28,13 @@ class CopilotChatResponse(BaseModel):
     suggested_questions: List[str] = []
     safety_tier: str
     timestamp: str
-    model_used: Optional[str] = "gemini-2.0-flash"
+    model_used: Optional[str] = "gemini-3.5-flash-lite"
     is_gemini: Optional[bool] = False
+    emergency_call: Optional[bool] = False
+    resolved_location: Optional[str] = None
+    resolved_telemetry: Optional[Dict[str, Any]] = None
+    rag_sources: Optional[List[str]] = Field(default=[], description="Authoritative RAG documents and standards utilized")
+    grounded_authority: Optional[str] = Field(default="NDMA / IMD / WHO Guidelines", description="Primary regulatory standard")
 
 
 @router.post("/chat", response_model=CopilotChatResponse)
@@ -54,7 +61,9 @@ async def chat_with_copilot(payload: CopilotChatRequest):
             risk_score=payload.risk_score,
             user_role=payload.user_role,
             conversation_history=payload.conversation_history,
-            api_key=payload.api_key
+            api_key=payload.api_key,
+            latitude=payload.latitude,
+            longitude=payload.longitude
         )
         return CopilotChatResponse(**response_data)
     except Exception as exc:
@@ -72,6 +81,7 @@ def copilot_health():
     return {
         "status": "healthy",
         "llm_enabled": bool(copilot_engine.gemini_key or copilot_engine.openai_key),
-        "default_model": "gemini-2.0-flash",
-        "engine": "ThermoShield-Gemini-Biometeorological-Copilot-v2"
+        "rag_enabled": True,
+        "default_model": "gemini-3.5-flash-lite",
+        "engine": "ThermoShield-Gemini-RAG-Biometeorological-Copilot-v3"
     }

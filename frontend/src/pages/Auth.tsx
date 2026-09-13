@@ -124,12 +124,14 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
     }
   }, []);
 
+  const targetUrl = (location.state as any)?.from || '/';
+
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/', { replace: true });
+      navigate(targetUrl, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, targetUrl]);
 
   // Compute password strength for registration
   const calculatePasswordStrength = (pass: string) => {
@@ -195,7 +197,7 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
     try {
       await loginWithGoogle(credential, selectedRole || role);
       setSuccessMsg('Successfully authenticated with Google! Redirecting...');
-      setTimeout(() => navigate('/'), 600);
+      setTimeout(() => navigate(targetUrl), 600);
     } catch (err: any) {
       setLocalError(err.message || 'Google authentication failed. Please try again.');
     } finally {
@@ -240,7 +242,7 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
       try {
         await login({ email: email.trim(), password });
         setSuccessMsg('Signed in successfully! Redirecting...');
-        setTimeout(() => navigate('/'), 600);
+        setTimeout(() => navigate(targetUrl), 600);
       } catch (err: any) {
         setLocalError(err.message || 'Authentication failed. Please verify your credentials.');
       } finally {
@@ -275,7 +277,7 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
           role,
         });
         setSuccessMsg('Account registered successfully! Welcome to ThermoShield.');
-        setTimeout(() => navigate('/'), 600);
+        setTimeout(() => navigate(targetUrl), 600);
       } catch (err: any) {
         setLocalError(err.message || 'Registration failed. Please check your details.');
       } finally {

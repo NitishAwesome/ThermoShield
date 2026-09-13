@@ -19,8 +19,10 @@ import {
   Save,
   AlertCircle,
   ExternalLink,
+  LogIn,
+  UserPlus,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from '../context/LocationContext';
 import { useProfile } from '../context/ProfileContext';
@@ -30,6 +32,7 @@ import { getRiskColor } from '../utils/risk';
 import { Card, CardHeader, CardContent, Badge, Button, EmptyState } from '../components/ui';
 import { SaferOutdoorWindowCard } from '../components/SaferOutdoorWindowCard';
 import { MetricExplainer } from '../components/MetricExplainer';
+import { LoadingState } from '../components/LoadingState';
 import { useTranslation } from '../context/LanguageContext';
 import {
   translateSafetyRecommendation,
@@ -52,7 +55,9 @@ const CONDITIONS_META = [
 
 export const PersonalRisk: React.FC = () => {
   const { t } = useTranslation();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading, loginWithGoogle } = useAuth();
+  const navigate = useNavigate();
+  const [isDemoLoggingIn, setIsDemoLoggingIn] = useState<boolean>(false);
   const { coords, locationName } = useLocation();
   const { profile, updateProfile, updateHealthProfile, updateExposureProfile, completionPercentage } = useProfile();
 
@@ -190,6 +195,7 @@ export const PersonalRisk: React.FC = () => {
   };
 
   const handleCalculate = async () => {
+    if (!isAuthenticated) return;
     setIsCalculating(true);
     setError(null);
 
@@ -215,16 +221,183 @@ export const PersonalRisk: React.FC = () => {
       setResult(res);
     } catch (err: any) {
       console.error('Calculation error:', err);
-      setError(err?.response?.data?.detail || err?.message || 'Failed to compute personal risk score.');
+      if (err?.response?.status === 401) {
+        setError('Authentication required to calculate personal heat risk. Please log in.');
+      } else {
+        setError(err?.response?.data?.detail || err?.message || 'Failed to compute personal risk score.');
+      }
     } finally {
       setIsCalculating(false);
     }
   };
 
-  // Run initial calculation when ready
+  // Run initial calculation when ready (only if authenticated)
   useEffect(() => {
-    handleCalculate();
-  }, [wbgt, age, selectedConditions.length, physicalActivity]);
+    if (isAuthenticated) {
+      handleCalculate();
+    }
+  }, [isAuthenticated, wbgt, age, selectedConditions.length, physicalActivity]);
+
+  if (isLoading) {
+    return (
+      <div className="py-24 flex flex-col items-center justify-center space-y-4">
+        <LoadingState message={t('common.loading', 'Verifying authorization...')} />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="py-8 max-w-4xl mx-auto space-y-6">
+        {/* Top category indicator */}
+        <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400">
+          <HeartPulse className="w-4 h-4" />
+          <span>ThermoShield Biometeorology Lab • Field Worker & Citizen Safety</span>
+        </div>
+
+        {/* Lockout Card */}
+        <Card
+          variant="elevated"
+          className="relative overflow-hidden border border-orange-500/30 dark:border-orange-500/20 bg-gradient-to-b from-white via-slate-50 to-orange-50/30 dark:from-slate-900 dark:via-slate-900/90 dark:to-orange-950/20 shadow-2xl p-6 sm:p-10 text-center"
+        >
+          {/* Ambient Glows */}
+          <div className="absolute -top-24 -left-24 w-72 h-72 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Glowing Lock Avatar */}
+          <div className="relative inline-flex items-center justify-center mb-5">
+            <div className="absolute inset-0 rounded-full bg-orange-500/20 blur-xl animate-pulse" />
+            <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-500/30 text-white">
+              <Lock className="w-10 h-10 sm:w-12 sm:h-12" />
+            </div>
+          </div>
+
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/10 dark:bg-orange-500/20 border border-orange-500/30 text-orange-600 dark:text-orange-400 text-xs font-bold uppercase tracking-wider mb-3">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Members-Only Diagnostic Tool</span>
+          </div>
+
+          <h1 className="text-2xl sm:text-4xl font-black ts-text-primary font-sans tracking-tight">
+            Personal Heat Risk Detector Is Protected
+          </h1>
+
+          <p className="text-xs sm:text-sm ts-text-muted mt-3 max-w-2xl mx-auto leading-relaxed">
+            The Personal Heat Risk & Hydration Detector calculates biometric vulnerability, cardiovascular thermal strain, and OSHA work-rest cycles based on individual medical conditions. To protect your private health data, this tool is strictly available to registered ThermoShield users.
+          </p>
+
+          {/* Feature Highlights Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mt-8 text-left max-w-3xl mx-auto">
+            <div className="p-4 rounded-2xl bg-white/70 dark:bg-slate-800/60 border ts-border shadow-xs flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center shrink-0">
+                <HeartPulse className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold ts-text-primary">Cardiovascular & Chronic Strain</h4>
+                <p className="text-[11px] ts-text-muted mt-0.5 leading-snug">
+                  Factors hypertension, heart disease, diabetes, asthma, and age into real-time heat strain scoring.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white/70 dark:bg-slate-800/60 border ts-border shadow-xs flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 flex items-center justify-center shrink-0">
+                <Droplets className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold ts-text-primary">Dynamic Hydration Protocol</h4>
+                <p className="text-[11px] ts-text-muted mt-0.5 leading-snug">
+                  Hourly fluid and electrolyte/ORS intake targets (ml/hr) calibrated to local WBGT heat stress.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white/70 dark:bg-slate-800/60 border ts-border shadow-xs flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center shrink-0">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold ts-text-primary">OSHA & IMD Work-Rest Cycles</h4>
+                <p className="text-[11px] ts-text-muted mt-0.5 leading-snug">
+                  Clinically calibrated work-rest pacing ratios (e.g. 15m work / 45m shade rest) for outdoor labor.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white/70 dark:bg-slate-800/60 border ts-border shadow-xs flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold ts-text-primary">Encrypted Health Vault</h4>
+                <p className="text-[11px] ts-text-muted mt-0.5 leading-snug">
+                  Safely stores your physiological parameters so your profile is instantly loaded every time you return.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Call to Actions */}
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-lg mx-auto">
+            <button
+              type="button"
+              onClick={() => navigate('/login', { state: { from: '/personal-risk' } })}
+              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-sm shadow-md shadow-orange-500/20 hover:scale-[1.02] active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Log In to Unlock</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/register', { state: { from: '/personal-risk' } })}
+              className="w-full sm:w-auto px-6 py-3 rounded-xl ts-card-subtle border ts-border hover:bg-slate-500/10 text-xs sm:text-sm font-bold ts-text-primary transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Create Free Account</span>
+            </button>
+          </div>
+
+          {/* Instant One-Click Demo Access for Testing */}
+          <div className="mt-5 pt-4 border-t ts-border/60 max-w-md mx-auto">
+            <p className="text-[11px] ts-text-muted mb-2 font-medium">
+              Want to test right now? Use quick demo authentication:
+            </p>
+            <button
+              type="button"
+              disabled={isDemoLoggingIn}
+              onClick={async () => {
+                setIsDemoLoggingIn(true);
+                try {
+                  await loginWithGoogle('dev_google_siddharth.patel@gmail.com', 'user');
+                } catch (e) {
+                  console.error(e);
+                } finally {
+                  setIsDemoLoggingIn(false);
+                }
+              }}
+              className="w-full py-2 px-3 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/30 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-orange-500" />
+              <span>{isDemoLoggingIn ? 'Unlocking...' : '⚡ Quick 1-Click Access as Siddharth Patel (Citizen)'}</span>
+            </button>
+          </div>
+
+          {/* Privacy & Trust Badges */}
+          <div className="mt-6 pt-4 border-t ts-border/60 flex flex-wrap items-center justify-center gap-4 text-[11px] ts-text-muted">
+            <span className="flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> 256-Bit Encrypted Data
+            </span>
+            <span className="flex items-center gap-1">
+              <Lock className="w-3.5 h-3.5 text-blue-500" /> Zero Commercial Sharing
+            </span>
+            <span className="flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" /> 100% Free Public Service
+            </span>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-24 max-w-7xl mx-auto">

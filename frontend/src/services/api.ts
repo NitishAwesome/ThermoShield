@@ -256,6 +256,8 @@ export const api = {
     user_role?: string;
     conversation_history?: Array<{ role: string; text: string }>;
     api_key?: string;
+    latitude?: number;
+    longitude?: number;
   }): Promise<{
     reply: string;
     suggested_questions: string[];
@@ -263,6 +265,20 @@ export const api = {
     timestamp: string;
     model_used?: string;
     is_gemini?: boolean;
+    emergency_call?: boolean;
+    resolved_location?: string;
+    resolved_telemetry?: {
+      temp: number;
+      humidity: number;
+      apparent_temperature?: number;
+      weather_description?: string;
+      risk_level?: string;
+      latitude?: number;
+      longitude?: number;
+      is_query_location?: boolean;
+    };
+    rag_sources?: string[];
+    grounded_authority?: string;
   }> => {
     const res = await apiClient.post<{
       reply: string;
@@ -271,6 +287,20 @@ export const api = {
       timestamp: string;
       model_used?: string;
       is_gemini?: boolean;
+      emergency_call?: boolean;
+      resolved_location?: string;
+      resolved_telemetry?: {
+        temp: number;
+        humidity: number;
+        apparent_temperature?: number;
+        weather_description?: string;
+        risk_level?: string;
+        latitude?: number;
+        longitude?: number;
+        is_query_location?: boolean;
+      };
+      rag_sources?: string[];
+      grounded_authority?: string;
     }>('/copilot/chat', data);
     return res.data;
   },
