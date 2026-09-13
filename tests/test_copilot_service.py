@@ -52,6 +52,7 @@ class TestCopilotService(unittest.TestCase):
         data = res.json()
         self.assertIn("108", data["reply"])
         self.assertEqual(data["safety_tier"], "EMERGENCY")
+        self.assertTrue(data.get("emergency_call"))
 
     def test_copilot_occupational_work_cycle(self):
         payload = {
@@ -64,6 +65,18 @@ class TestCopilotService(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertIn("WBGT", data["reply"].upper())
+
+    def test_copilot_hinglish_query(self):
+        payload = {
+            "message": "garmi me loo se bachne ke liye kya piye?",
+            "temperature_c": 40.0,
+            "user_role": "citizen"
+        }
+        res = self.client.post("/copilot/chat", json=payload)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("reply", data)
+        self.assertTrue(len(data["reply"]) > 50)
 
     def test_copilot_empty_message_rejected(self):
         res = self.client.post("/copilot/chat", json={"message": "   "})

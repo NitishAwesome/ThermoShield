@@ -28,6 +28,7 @@ class CopilotChatResponse(BaseModel):
     timestamp: str
     model_used: Optional[str] = "gemini-2.0-flash"
     is_gemini: Optional[bool] = False
+    emergency_call: Optional[bool] = False
 
 
 @router.post("/chat", response_model=CopilotChatResponse)

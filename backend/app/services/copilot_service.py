@@ -128,13 +128,16 @@ class ThermoShieldCopilot:
 
         system_instruction = (
             "You are Dr. ThermoShield, an empathetic, highly knowledgeable AI biometeorologist and heatwave health advisor "
-            "for the ThermoShield Early Warning System (SIH26083). Ground your responses in IMD, NDMA, and WHO biometeorological guidelines.\n\n"
-            f"Active Environmental Context: {system_context}\n\n"
+            "for the ThermoShield Early Warning Decision Support System (SIH26083). Ground your responses in IMD, NDMA, and WHO biometeorological guidelines.\n\n"
+            f"Active Environmental Telemetry Context: {system_context}\n\n"
             "Style Guidelines:\n"
-            "1. Address the user's specific question directly with clear, engaging, conversational language.\n"
-            "2. Use structured markdown: bold headings, bullet points, and exact numbers (e.g. mL of water, minutes of rest, specific temperature thresholds).\n"
-            "3. If severe heat illness or heat stroke is suspected (temp > 40°C, delirium, stopped sweating), prioritize emergency cooling and dialing 108/112 immediately.\n"
-            "4. Keep answers concise, highly practical, and easy to read on mobile devices."
+            "1. Multilingual Agility: Fluently understand and respond in the language used by the citizen (English, Hindi, Hinglish, or regional Indian languages). "
+            "If asked in Hindi/Hinglish (e.g. 'pani kitna pina chahiye', 'loo se kaise bache'), provide warm, natural, and medically accurate advice in that language.\n"
+            "2. Address the user's specific question directly with clear, engaging, conversational language.\n"
+            "3. Use structured markdown: bold headings, bullet points, and exact numbers (e.g. mL of water, minutes of rest, specific temperature thresholds).\n"
+            "4. Recommend traditional, scientifically proven Indian heat remedies alongside modern electrolytes: ORS, Aam Panna (raw mango cooler), Sattu sharbat, Chaas (salted buttermilk), and fresh coconut water.\n"
+            "5. Emergency Protocol: If severe heat illness or heat stroke is suspected (temp > 40°C, delirium, stopped sweating, vomiting, confusion), urgently advise calling 108/112 ambulance and starting aggressive cooling immediately.\n"
+            "6. Keep answers concise, actionable, and easy to read on mobile devices."
         )
 
         payload = {
@@ -200,7 +203,7 @@ class ThermoShieldCopilot:
         hi_str = f"{heat_index_c:.1f}°C" if heat_index_c > current_temp else f"{current_temp:.1f}°C"
 
         # 1. Heat Emergency / Heat Stroke
-        if any(w in q for w in ["stroke", "exhaustion", "emergency", "faint", "unconscious", "first aid", "cramps", "sick", "vomit", "collapse"]):
+        if any(w in q for w in ["stroke", "exhaustion", "emergency", "faint", "unconscious", "first aid", "cramps", "sick", "vomit", "collapse", "behosh", "chakar", "chakkar", "108"]):
             return {
                 "reply": (
                     f"⚠️ **Emergency Heat Illness Protocol for {current_loc}**\n\n"
@@ -214,11 +217,12 @@ class ThermoShieldCopilot:
                     "Where can I find the nearest cooling shelter?"
                 ],
                 "safety_tier": "EMERGENCY",
+                "emergency_call": True,
                 "model_used": "biomet-expert-engine"
             }
 
         # 2. Hydration & Fluids
-        if any(w in q for w in ["water", "drink", "hydration", "dehydration", "ors", "electrolyte", "thirst", "cold water"]):
+        if any(w in q for w in ["water", "drink", "hydration", "dehydration", "ors", "electrolyte", "thirst", "cold water", "pani", "paani", "pyaas", "nimbu", "sattu", "panna", "chaas", "loo"]):
             fluid_amount = "500 mL every 20-25 minutes" if current_temp >= 38 else "250-300 mL every 30 minutes"
             daily_target = "3.5 to 4.5 Liters" if current_temp >= 38 else "3.0 Liters"
             return {
@@ -228,8 +232,9 @@ class ThermoShieldCopilot:
                     f"1. **Active Intake Rate:** Consume **{fluid_amount}** while active or working outdoors.\n"
                     f"2. **Daily Baseline Volume:** Target at least **{daily_target}** of fluids across the day, drinking ahead of thirst cues.\n"
                     f"3. **Electrolyte Strategy:** Sweat depletes sodium and potassium. Mix 1 sachet of **Oral Rehydration Salts (ORS)** in 1L of water, or drink coconut water / lemon water with rock salt.\n"
-                    f"4. **Temperature Check:** Drink cool (15–20°C) water rather than freezing ice water to maximize gastrointestinal absorption and avoid vascular shock.\n"
-                    f"5. **Avoid:** Dark teas, strong coffee, carbonated sugary sodas, and alcohol, as they trigger diuresis and deplete intracellular volume."
+                    f"4. **Traditional Cooling Drinks:** Natural coolers like **Aam Panna** (raw mango drink with roasted cumin), **Sattu sharbat** (roasted gram drink), and **Chaas** (salted buttermilk) help maintain core electrolyte balance and defend against 'Loo' winds.\n"
+                    f"5. **Temperature Check:** Drink cool (15–20°C) water rather than freezing ice water to maximize gastrointestinal absorption and avoid vascular shock.\n"
+                    f"6. **Avoid:** Dark teas, strong coffee, carbonated sugary sodas, and alcohol, as they trigger diuresis and accelerate dehydration."
                 ),
                 "suggested_questions": [
                     "Can I drink cold water immediately after coming from outside?",
@@ -237,11 +242,12 @@ class ThermoShieldCopilot:
                     "How to keep infants and children hydrated?"
                 ],
                 "safety_tier": current_risk,
+                "emergency_call": False,
                 "model_used": "biomet-expert-engine"
             }
 
         # 3. Vulnerable Populations (Elderly, Kids, Pregnant)
-        if any(w in q for w in ["child", "kid", "baby", "infant", "elderly", "senior", "pregnant", "vulnerable", "old"]):
+        if any(w in q for w in ["child", "kid", "baby", "infant", "elderly", "senior", "pregnant", "vulnerable", "old", "bacha", "bache", "bujurg", "dadaji", "nanaji", "maa"]):
             return {
                 "reply": (
                     f"👵 **Vulnerable Demographic Heat Defense for {current_loc}**\n\n"
@@ -264,6 +270,7 @@ class ThermoShieldCopilot:
                     "Emergency cooling techniques for high fever in heatwaves"
                 ],
                 "safety_tier": current_risk,
+                "emergency_call": False,
                 "model_used": "biomet-expert-engine"
             }
 
@@ -368,14 +375,20 @@ class ThermoShieldCopilot:
         )
 
         if gemini_result and gemini_result.get("reply"):
+            reply_text = gemini_result["reply"]
+            is_emergency = (
+                (risk_level or "").upper() == "EXTREME"
+                or any(w in query.lower() or w in reply_text.lower() for w in ["stroke", "unconscious", "collapse", "emergency", "108", "faint", "behosh", "seizure"])
+            )
             return {
-                "reply": gemini_result["reply"],
+                "reply": reply_text,
                 "suggested_questions": [
                     "What hydration rate matches my activity level?",
                     "What are warning signs of heat exhaustion?",
                     "What work-rest break schedule should I follow?"
                 ],
-                "safety_tier": (risk_level or "MODERATE").upper(),
+                "safety_tier": "EMERGENCY" if is_emergency else (risk_level or "MODERATE").upper(),
+                "emergency_call": is_emergency,
                 "model_used": gemini_result.get("model", "gemini-2.0-flash"),
                 "is_gemini": True,
                 "timestamp": datetime.now(timezone.utc).isoformat()

@@ -232,6 +232,7 @@ export const api = {
     timestamp: string;
     model_used?: string;
     is_gemini?: boolean;
+    emergency_call?: boolean;
   }> => {
     const res = await apiClient.post<{
       reply: string;
@@ -240,6 +241,7 @@ export const api = {
       timestamp: string;
       model_used?: string;
       is_gemini?: boolean;
+      emergency_call?: boolean;
     }>('/copilot/chat', data);
     return res.data;
   },
