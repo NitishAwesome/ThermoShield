@@ -115,3 +115,22 @@ def send_notification_email(
         logger.error(f"Failed to send email alert to {to_clean}: {e}")
         return {"status": "error", "message": str(e), "recipient": to_clean}
 
+
+def is_smtp_configured() -> bool:
+    """
+    Checks whether SMTP credentials (MAIL_USERNAME and MAIL_PASSWORD) are configured in the environment.
+    """
+    from dotenv import load_dotenv
+    from pathlib import Path
+
+    root_env = Path(__file__).resolve().parent.parent.parent.parent / ".env"
+    if root_env.exists():
+        load_dotenv(root_env, override=False)
+    backend_env = Path(__file__).resolve().parent.parent.parent / ".env"
+    if backend_env.exists():
+        load_dotenv(backend_env, override=False)
+
+    sender_email = (os.getenv("MAIL_USERNAME") or "").strip()
+    sender_password = (os.getenv("MAIL_PASSWORD") or "").strip()
+    return bool(sender_email and sender_password)
+

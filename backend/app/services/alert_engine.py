@@ -14,7 +14,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from app.database.models import User, Location, Alert
-from app.services.email import send_notification_email
+from app.services.email import send_notification_email, is_smtp_configured
 from app.services.email_templates import generate_action_first_alert_html
 
 logger = logging.getLogger(__name__)
@@ -57,6 +57,7 @@ def get_engine_status_summary() -> Dict[str, Any]:
     """Returns engine telemetry for diagnostics and frontend inspection."""
     return {
         "engine_active": True,
+        "email_dispatch_configured": is_smtp_configured(),
         "monitored_locations_tracked": len(_LOCATION_STATE_REGISTRY),
         "cooldown_records_active": len(_CITIZEN_COOLDOWN_REGISTRY),
         "recent_dispatches_count": len(_RECENT_DISPATCH_LOG),

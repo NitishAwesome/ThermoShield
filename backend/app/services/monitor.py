@@ -49,7 +49,8 @@ class BackgroundMonitorDaemon:
             "monitored_areas_count": len(MONITORED_MUNICIPAL_AREAS),
             "monitored_areas": [a["name"] for a in MONITORED_MUNICIPAL_AREAS],
             "last_cycle_results": self.last_results,
-            "engine": engine_summary
+            "engine": engine_summary,
+            "email_dispatch_configured": engine_summary.get("email_dispatch_configured", False)
         }
 
     async def evaluate_single_location(self, area: Dict[str, Any], db) -> Dict[str, Any]:
