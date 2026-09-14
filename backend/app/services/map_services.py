@@ -327,12 +327,15 @@ async def _evaluate_single_area(area_cfg: Dict[str, Any]) -> Dict[str, Any]:
         "longitude": lon,
         "temperature_c": round(temp, 1),
         "humidity_pct": round(rh, 1),
+        "wind_speed_mps": round(wind, 1),
         "wbgt_c": wbgt,
         "risk_score": risk_score,
         "risk_level": risk_level,
         "vulnerability_tag": area_cfg["vulnerability_tag"],
         "summary_advisory": summary_advisory,
+        "area_type": area_cfg.get("area_type", "regional_centroid"),
     }
+
 
 
 async def get_all_areas_risk_overview() -> Dict[str, Any]:
