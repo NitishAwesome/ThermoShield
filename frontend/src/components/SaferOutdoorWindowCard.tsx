@@ -239,7 +239,7 @@ export const SaferOutdoorWindowCard: React.FC<SaferOutdoorWindowCardProps> = ({
       </div>
 
       {/* Hourly Thermal Trajectory Strip */}
-      {windowResult.hourlyTimeline && windowResult.hourlyTimeline.length > 0 && (
+      {variant !== 'compact' && windowResult.hourlyTimeline && windowResult.hourlyTimeline.length > 0 && (
         <div className="px-5 py-4 border-b ts-border bg-slate-500/5">
           <div className="flex items-center justify-between mb-2.5">
             <span className="text-xs font-bold uppercase tracking-wider ts-text-muted flex items-center space-x-1.5">
@@ -310,31 +310,33 @@ export const SaferOutdoorWindowCard: React.FC<SaferOutdoorWindowCardProps> = ({
         </div>
       )}
 
-      {/* Expandable "Why This Window?" Factor Breakdown */}
-      <div className="px-5 py-3 border-b ts-border flex items-center justify-between bg-white/20 dark:bg-slate-900/20">
-        <button
-          type="button"
-          onClick={() => setShowExplanation(!showExplanation)}
-          className="flex items-center space-x-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-          <span>{t('outdoorWindow.whyThisWindow', 'Why This Window?')}</span>
-          <span className="text-[10px] ts-text-muted font-normal hidden sm:inline">
-            — {t('outdoorWindow.whyThisWindowSubtitle', 'Relative improvement over peak afternoon conditions')}
+      {/* Expandable "Why This Window?" Factor Breakdown (Only in full forecast mode) */}
+      {variant !== 'compact' && (
+        <div className="px-5 py-3 border-b ts-border flex items-center justify-between bg-white/20 dark:bg-slate-900/20">
+          <button
+            type="button"
+            onClick={() => setShowExplanation(!showExplanation)}
+            className="flex items-center space-x-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+            <span>{t('outdoorWindow.whyThisWindow', 'Why This Window?')}</span>
+            <span className="text-[10px] ts-text-muted font-normal hidden sm:inline">
+              — {t('outdoorWindow.whyThisWindowSubtitle', 'Relative improvement over peak afternoon conditions')}
+            </span>
+            {showExplanation ? (
+              <ChevronUp className="w-3.5 h-3.5 ml-1" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5 ml-1" />
+            )}
+          </button>
+
+          <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+            {t(windowResult.suitableActivitiesKey, 'Permissible: Essential outdoor transit')}
           </span>
-          {showExplanation ? (
-            <ChevronUp className="w-3.5 h-3.5 ml-1" />
-          ) : (
-            <ChevronDown className="w-3.5 h-3.5 ml-1" />
-          )}
-        </button>
+        </div>
+      )}
 
-        <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-          {t(windowResult.suitableActivitiesKey, 'Permissible: Essential outdoor transit')}
-        </span>
-      </div>
-
-      {showExplanation && (
+      {variant !== 'compact' && showExplanation && (
         <div className="p-5 bg-white/30 dark:bg-slate-900/40 border-b ts-border space-y-4 animate-in fade-in duration-200">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {windowResult.reliefFactors.map((factor) => {
@@ -413,7 +415,11 @@ export const SaferOutdoorWindowCard: React.FC<SaferOutdoorWindowCardProps> = ({
           to="/forecast"
           className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center space-x-2"
         >
-          <span>{t('outdoorWindow.ctaForecast', 'View 5-Day Synoptic Outlook')}</span>
+          <span>
+            {variant === 'compact'
+              ? t('outdoorWindow.ctaForecastPlanning', 'View Full Forecast & Planning')
+              : t('outdoorWindow.ctaForecast', 'View 5-Day Synoptic Outlook')}
+          </span>
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
