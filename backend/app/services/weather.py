@@ -193,6 +193,9 @@ def _init_regional_seed_cache():
                     "weather_icon": meta["icon"],
                     "precipitation": 0.0,
                     "wind_direction": 180.0,
+                    "source_status": "OFFLINE_FALLBACK",
+                    "source_name": "Regional Baseline Cache",
+                    "is_fallback": True,
                 },
                 "forecast": {
                     "dates": dynamic_dates,
@@ -202,7 +205,10 @@ def _init_regional_seed_cache():
                     "apparent_temperature_min": [27.0, 27.5, 27.0, 26.5, 27.0],
                     "uv_index_max": [8.5, 8.8, 8.6, 8.2, 8.4],
                     "hourly": _generate_synthetic_hourly(34.0, 26.0),
-                }
+                },
+                "source_status": "OFFLINE_FALLBACK",
+                "source_name": "Regional Baseline Cache",
+                "is_fallback": True,
             },
             "timestamp": now
         }
@@ -344,8 +350,14 @@ async def _fetch_from_open_meteo(latitude: float, longitude: float) -> Dict[str,
                         "weather_icon": meta["icon"],
                         "precipitation": round(precip, 1),
                         "wind_direction": round(wind_dir, 0),
+                        "source_status": "LIVE",
+                        "source_name": "Open-Meteo Global API",
+                        "is_fallback": False,
                     },
-                    "forecast": forecast_dict
+                    "forecast": forecast_dict,
+                    "source_status": "LIVE",
+                    "source_name": "Open-Meteo Global API",
+                    "is_fallback": False,
                 }
 
             if response.status_code == 429:
@@ -429,10 +441,16 @@ def _get_nearest_cached_or_regional_weather(latitude: float, longitude: float) -
         if is_night:
             w["solar_radiation"] = 0.0
             w["is_day"] = 0
+        w["source_status"] = "OFFLINE_FALLBACK"
+        w["source_name"] = "Regional Baseline Fallback"
+        w["is_fallback"] = True
         return {
             "location": {"latitude": latitude, "longitude": longitude},
             "weather": w,
-            "forecast": dict(best_data.get("forecast", {}))
+            "forecast": dict(best_data.get("forecast", {})),
+            "source_status": "OFFLINE_FALLBACK",
+            "source_name": "Regional Baseline Fallback",
+            "is_fallback": True,
         }
 
     # Universal regional baseline with dynamic dates & accurate telemetry
@@ -455,6 +473,9 @@ def _get_nearest_cached_or_regional_weather(latitude: float, longitude: float) -
             "weather_icon": meta["icon"],
             "precipitation": 0.0,
             "wind_direction": 180.0,
+            "source_status": "OFFLINE_FALLBACK",
+            "source_name": "Regional Baseline Fallback",
+            "is_fallback": True,
         },
         "forecast": {
             "dates": _get_dynamic_forecast_dates(5),
@@ -464,7 +485,10 @@ def _get_nearest_cached_or_regional_weather(latitude: float, longitude: float) -
             "apparent_temperature_min": [27.0, 27.5, 27.0, 26.5, 27.0],
             "uv_index_max": [8.5, 8.8, 8.6, 8.2, 8.4],
             "hourly": _generate_synthetic_hourly(34.0, 26.0),
-        }
+        },
+        "source_status": "OFFLINE_FALLBACK",
+        "source_name": "Regional Baseline Fallback",
+        "is_fallback": True,
     }
 
 
@@ -493,11 +517,17 @@ async def _execute_fetch_and_resolve(
             fallback_data = {
                 "location": dict(stale_data.get("location", {})),
                 "weather": dict(stale_data.get("weather", {})),
-                "forecast": dict(stale_data.get("forecast", {}))
+                "forecast": dict(stale_data.get("forecast", {})),
+                "source_status": "OFFLINE_FALLBACK",
+                "source_name": "Cached Data Fallback",
+                "is_fallback": True,
             }
             if _is_nighttime_at_location(latitude, longitude):
                 fallback_data["weather"]["solar_radiation"] = 0.0
                 fallback_data["weather"]["is_day"] = 0
+            fallback_data["weather"]["source_status"] = "OFFLINE_FALLBACK"
+            fallback_data["weather"]["source_name"] = "Cached Data Fallback"
+            fallback_data["weather"]["is_fallback"] = True
             if not future.done():
                 future.set_result(fallback_data)
         else:
@@ -528,5 +558,8 @@ async def get_forecast(
     weather_data = await get_weather(effective_lat, effective_lon)
     return {
         "location": weather_data["location"],
-        "forecast": weather_data["forecast"]
+        "forecast": weather_data["forecast"],
+        "source_status": weather_data.get("source_status", "LIVE"),
+        "source_name": weather_data.get("source_name", "Open-Meteo Global API"),
+        "is_fallback": weather_data.get("is_fallback", False)
     }
