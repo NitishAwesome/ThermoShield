@@ -4,13 +4,19 @@ import { WeatherCondition } from '../types';
 import { formatTemperature, formatPercent, formatSpeed } from '../utils/risk';
 import { Card, CardHeader, CardContent, Badge, EmptyState } from './ui';
 import { useTranslation } from '../context/LanguageContext';
+import { DataRealityBadge } from './provenance';
 
 interface WeatherCardProps {
   weather?: WeatherCondition;
   className?: string;
+  variant?: 'citizen' | 'full';
 }
 
-export const WeatherCard: React.FC<WeatherCardProps> = ({ weather, className = '' }) => {
+export const WeatherCard: React.FC<WeatherCardProps> = ({
+  weather,
+  className = '',
+  variant = 'citizen',
+}) => {
   const { t } = useTranslation();
 
   if (!weather) {
@@ -18,16 +24,18 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ weather, className = '
       <Card className={className}>
         <EmptyState
           icon={<Thermometer className="w-6 h-6 text-slate-400" />}
-          title={t('weatherCard.telemetryInactive')}
-          description={t('weatherCard.telemetryWaiting')}
+          title={t('weatherCard.telemetryInactive', 'Weather data loading...')}
+          description={t('weatherCard.telemetryWaiting', 'Fetching current meteorological observations.')}
         />
       </Card>
     );
   }
 
+  const isFallback = Boolean(weather.is_fallback || weather.source_status === 'OFFLINE_FALLBACK');
+
   const formattedTime = weather.time
     ? new Date(weather.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : t('riskCard.liveTelemetry');
+    : t('riskCard.liveTelemetry', 'Live telemetry');
 
   const feelsLike = weather.apparent_temperature ?? weather.temperature;
   const uvIndex = weather.uv_index ?? (weather.solar_radiation && weather.solar_radiation > 400 ? 7.5 : 2.0);
@@ -43,14 +51,16 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ weather, className = '
   const uvBadge = getUvBadge(uvIndex);
 
   return (
-    <Card variant="elevated" className={`flex flex-col justify-between ${className}`}>
+    <Card variant="elevated" className={`flex flex-col justify-between shadow-md ${className}`}>
       <CardHeader
-        title={t('weatherCard.title')}
-        subtitle={t('weatherCard.subtitle')}
+        title={t('weatherCard.title', 'Current Local Conditions')}
+        subtitle={variant === 'citizen' ? (isFallback ? 'Offline Regional Baseline • Continuous fallback' : 'Live Open-Meteo observations • Regional coordinate') : t('weatherCard.subtitle')}
         badge={
-          <Badge variant="brand" size="sm" showDot>
-            {t('riskCard.liveTelemetry')}
-          </Badge>
+          <DataRealityBadge
+            tier={isFallback ? 'OFFLINE_FALLBACK' : 'LIVE'}
+            size="xs"
+            customLabel={isFallback ? 'Demonstration Baseline' : 'Live Telemetry'}
+          />
         }
         action={
           <div className="flex items-center space-x-1.5 text-xs ts-text-muted px-2.5 py-1 rounded-lg ts-card-subtle border ts-border">
@@ -65,7 +75,7 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ weather, className = '
           <div className="space-y-1">
             <div className="flex items-center space-x-2">
               <span className="text-xs font-bold uppercase tracking-wider ts-text-muted">
-                {t('weatherCard.dryBulb')}
+                {variant === 'citizen' ? t('weather.temperature', 'Current Temperature') : t('weatherCard.dryBulb')}
               </span>
               {weather.weather_description && (
                 <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-orange-500/10 text-orange-400 border border-orange-500/20">
@@ -83,7 +93,9 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ weather, className = '
               </div>
             </div>
             <p className="text-[11px] ts-text-subtle">
-              {t('weatherCard.synopticNote')}
+              {variant === 'citizen'
+                ? `Feels like ${formatTemperature(feelsLike)} based on relative humidity and air temperature.`
+                : t('weatherCard.synopticNote')}
             </p>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 flex-shrink-0 ml-3">
@@ -97,7 +109,7 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ weather, className = '
           <div className="p-2.5 rounded-xl ts-card-subtle border ts-border text-center flex flex-col items-center justify-center">
             <div className="flex items-center space-x-1 text-sky-400 mb-1">
               <Droplets className="w-3.5 h-3.5" />
-              <span className="text-[10px] uppercase font-bold ts-text-muted">{t('weather.humidity')}</span>
+              <span className="text-[10px] uppercase font-bold ts-text-muted">{t('weather.humidity', 'Humidity')}</span>
             </div>
             <span className="text-base sm:text-lg font-bold font-mono ts-text-primary">
               {formatPercent(weather.humidity)}
@@ -108,7 +120,7 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ weather, className = '
           <div className="p-2.5 rounded-xl ts-card-subtle border ts-border text-center flex flex-col items-center justify-center">
             <div className="flex items-center space-x-1 text-teal-400 mb-1">
               <Wind className="w-3.5 h-3.5" />
-              <span className="text-[10px] uppercase font-bold ts-text-muted">{t('weather.windSpeed')}</span>
+              <span className="text-[10px] uppercase font-bold ts-text-muted">{t('weather.windSpeed', 'Wind Speed')}</span>
             </div>
             <span className="text-base sm:text-lg font-bold font-mono ts-text-primary">
               {formatSpeed(weather.wind_speed)}
@@ -119,27 +131,26 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ weather, className = '
           <div className="p-2.5 rounded-xl ts-card-subtle border ts-border text-center flex flex-col items-center justify-center">
             <div className="flex items-center space-x-1 text-amber-400 mb-1">
               <Sun className="w-3.5 h-3.5" />
-              <span className="text-[10px] uppercase font-bold ts-text-muted">{t('weatherCard.solarFlux')}</span>
+              <span className="text-[10px] uppercase font-bold ts-text-muted">Solar Sun</span>
             </div>
             <span className="text-base sm:text-lg font-bold font-mono ts-text-primary">
               {weather.solar_radiation !== null && weather.solar_radiation !== undefined
-                ? `${Math.round(weather.solar_radiation)}`
-                : '0'}
-              <span className="text-[10px] font-normal ts-text-muted ml-0.5">W/m²</span>
+                ? `${Math.round(weather.solar_radiation)} W/m²`
+                : 'Daylight'}
             </span>
           </div>
 
           {/* UV Radiation Index */}
           <div className="p-2.5 rounded-xl ts-card-subtle border ts-border text-center flex flex-col items-center justify-center">
-            <div className="flex items-center space-x-1 text-orange-400 mb-1">
+            <div className="flex items-center space-x-1 text-purple-400 mb-1">
               <SunMedium className="w-3.5 h-3.5" />
-              <span className="text-[10px] uppercase font-bold ts-text-muted">{t('dashboard.uvIndex')}</span>
+              <span className="text-[10px] uppercase font-bold ts-text-muted">UV Index</span>
             </div>
             <div className="flex items-center space-x-1">
               <span className="text-base sm:text-lg font-bold font-mono ts-text-primary">
                 {uvIndex.toFixed(1)}
               </span>
-              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${uvBadge.color}`}>
+              <span className={`px-1 py-0.2 rounded text-[9px] font-bold border ${uvBadge.color}`}>
                 {uvBadge.label}
               </span>
             </div>
@@ -149,3 +160,5 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ weather, className = '
     </Card>
   );
 };
+
+export default WeatherCard;
