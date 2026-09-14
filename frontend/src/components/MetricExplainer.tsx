@@ -25,7 +25,7 @@ export const MetricExplainer: React.FC<MetricExplainerProps> = ({
           meaning: t(
             'explainer.wbgtMeaning',
             undefined,
-            'Wet-Bulb Globe Temperature (WBGT) estimates how air heat, humidity, sunlight, and wind combine to affect thermal stress.'
+            'Estimated Wet-Bulb Globe Temperature (WBGT) is an analytical biometeorological calculation derived from ambient air temperature, relative humidity, solar radiation, and wind. It is an analytical meteorological estimate, not a physical black-globe sensor measurement.'
           ),
           why: t(
             'explainer.wbgtWhy',
@@ -35,7 +35,7 @@ export const MetricExplainer: React.FC<MetricExplainerProps> = ({
           action: t(
             'explainer.wbgtAction',
             undefined,
-            'When WBGT exceeds 30°C, take 15-minute shaded rest breaks every hour and drink water or electrolytes frequently.'
+            'When estimated WBGT exceeds 30°C, take 15-minute shaded rest breaks every hour and drink water or electrolytes frequently.'
           ),
         };
       case 'riskScore':
@@ -43,12 +43,12 @@ export const MetricExplainer: React.FC<MetricExplainerProps> = ({
           meaning: t(
             'explainer.riskScoreMeaning',
             undefined,
-            'A 0 to 100 score estimating physical heat burden from weather conditions, sun exposure, and personal sensitivity.'
+            'ThermoShield Composite Thermal Strain Index: A 0 to 100 planning and guidance score combining biometeorological calculations, local vulnerability weighting, and predictive models.'
           ),
           why: t(
             'explainer.riskScoreWhy',
             undefined,
-            'Scores above 50 indicate high physical strain. Scores above 75 warn of extreme heat danger where heat exhaustion can occur rapidly.'
+            'Scores above 50 indicate elevated physiological strain. Scores above 75 warn of critical heat risk where heat exhaustion can occur rapidly.'
           ),
           action: t(
             'explainer.riskScoreAction',

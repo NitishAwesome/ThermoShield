@@ -224,7 +224,7 @@ export const en: TranslationDictionary = {
   'roleBanner.showFullDetails': 'Show Full Details',
   'roleBanner.showLessDetails': 'Show Less',
   'roleBanner.officialTitle': 'Municipal Health & Civic Command View',
-  'roleBanner.officialDesc': 'Monitor area-level heat risk across municipal wards, evaluate vulnerable populations, and simulate proactive response actions.',
+  'roleBanner.officialDesc': 'Monitor regional heat risk across urban reference locations, evaluate vulnerable populations, and simulate proactive response actions.',
   'roleBanner.responderTitle': 'Emergency Field Response Command',
   'roleBanner.responderDesc': 'Active alerts, areas needing urgent attention, and vulnerable people needing extra protection during peak heat windows.',
   'roleBanner.analystTitle': 'Climate Intelligence & Risk Modeling',
@@ -276,7 +276,7 @@ export const en: TranslationDictionary = {
   'weatherCard.feelsLike': 'Feels {temp}',
   'weatherCard.solarFlux': 'Solar Sunshine Intensity',
   'weatherCard.telemetryInactive': 'Telemetry Inactive',
-  'weatherCard.telemetryWaiting': 'Waiting for live weather telemetry feed from local sensor or station.',
+  'weatherCard.telemetryWaiting': 'Waiting for live meteorological data feed from reference station.',
 
   // Risk Drivers
   'riskDrivers.title': 'Why This Rating? — Environmental Risk Drivers',
@@ -480,9 +480,9 @@ export const en: TranslationDictionary = {
   'roleBanner.featureCitizen1': 'Personal heat risk calculator tuned to your health profile and routine',
   'roleBanner.featureCitizen2': 'Real-time city-specific temperature & WBGT physiological strain',
   'roleBanner.featureCitizen3': 'Clear, jargon-free protective advice for you and your family',
-  'roleBanner.featureOfficial1': 'Multi-zone surveillance across all monitored municipal wards',
+  'roleBanner.featureOfficial1': 'Multi-zone monitoring across evaluated regional reference locations',
   'roleBanner.featureOfficial2': 'Intervention simulator to model cooling centers & work-pause impact',
-  'roleBanner.featureOfficial3': 'ML-driven civic health impact scoring for hospital preparedness',
+  'roleBanner.featureOfficial3': 'ML-driven civic health impact scoring for facility preparedness planning',
   'roleBanner.featureResponder1': 'Live heatwave warnings with actionable public protection directives',
   'roleBanner.featureResponder2': 'Intervention planning for hydration and cooling station deployments',
   'roleBanner.featureResponder3': 'Personal heat risk calculator for occupational and field worker safety',
@@ -496,7 +496,7 @@ export const en: TranslationDictionary = {
   'matrix.tryClearingFilters': 'Try clearing your search query or selecting All Zones.',
   'matrix.zoneLabel': 'Zone:',
   'matrix.guestExplorer': 'Guest Public Explorer',
-  'matrix.nationalSurveillance': 'Live National Surveillance',
+  'matrix.nationalSurveillance': 'National Reference Monitoring',
   'matrix.guestExplorerDesc': 'Viewing regional municipal heat risks. To calculate your Personalized Heat Stress Index based on your age, health conditions, and work hours, sign in to your profile.',
   'matrix.zoneSuffix': '{zone} Zone',
   'matrix.explanationExtreme': 'Dangerous thermal burden; acute risk of heat exhaustion and clinical emergency.',
@@ -603,7 +603,7 @@ export const en: TranslationDictionary = {
   'profile.adultBracket': 'Adult (18–64)',
   'profile.seniorBracket': 'Senior (65+)',
   'profile.emailLabel': 'Email Address (Account):',
-  'profile.civicRoleSubtitle': 'Configures your administrative node for city surveillance and command directives.',
+  'profile.civicRoleSubtitle': 'Configures your administrative node for regional heat monitoring and command directives.',
   'profile.exposureSubtitle': 'Heat risk depends greatly on where you spend your day and when you are outside.',
   'profile.condHeart': 'Heart or circulation condition',
   'profile.condHeartDesc': 'High heat puts extra strain on blood pumping and heart rate.',
@@ -774,12 +774,12 @@ export const en: TranslationDictionary = {
   'common.risk': 'Risk',
 
   // Dashboard Role Headers
-  'dashboard.roleOfficialTitle': 'Municipal Command Center: Heat Surveillance & Action Planning',
-  'dashboard.roleOfficialSubtitle': 'Monitor area-level heat risk across municipal wards, understand civic health demand, and evaluate intervention responses.',
+  'dashboard.roleOfficialTitle': 'Municipal Command Center: Regional Heat Monitoring & Action Planning',
+  'dashboard.roleOfficialSubtitle': 'Monitor regional heat risk across urban reference locations, understand civic health demand, and evaluate intervention responses.',
   'dashboard.roleResponderTitle': 'Field Response Command: Heat Hazard & Alert Operations',
-  'dashboard.roleResponderSubtitle': 'Operational surveillance: active alerts, areas needing attention, heat conditions, people needing extra protection, and response measures.',
+  'dashboard.roleResponderSubtitle': 'Operational monitoring: active alerts, areas needing attention, heat conditions, people needing extra protection, and response measures.',
   'dashboard.roleAnalystTitle': 'Climate Intelligence & Multi-Index Risk Analytics',
-  'dashboard.roleAnalystSubtitle': 'Biometeorological modeling: analyze WBGT, multi-index heat stress, predictive ML risk factors, and cross-zone surveillance.',
+  'dashboard.roleAnalystSubtitle': 'Biometeorological modeling: analyze WBGT, multi-index heat stress, predictive ML risk factors, and cross-zone monitoring.',
 
   // Risk Drivers Detailed
   'riskDrivers.elevated': 'Elevated',
@@ -937,7 +937,7 @@ export const en: TranslationDictionary = {
   'notif.autoLocationTitle': 'Auto-Update Location Monitoring',
   'notif.autoLocationDesc': 'Update heat risk baselines automatically when moving between districts or cities.',
   'notif.currentLocAlertsTitle': 'Current Location Personalized Alerts',
-  'notif.currentLocAlertsDesc': 'Use precise ward coordinates to deliver localized microclimate warnings.',
+  'notif.currentLocAlertsDesc': 'Use precise location coordinates to deliver localized microclimate warnings.',
   'notif.severeCheckInTitle': 'Severe Heat Safety Check-In',
   'notif.severeCheckInDesc': 'Ask for a quick wellness confirmation during prolonged extreme heatwave events.',
   'notif.privacyNotice': 'Your location is evaluated locally on your device for heat stress assessment. Continuous background tracking is never enabled without your consent.',
@@ -954,7 +954,7 @@ export const en: TranslationDictionary = {
 
   // Role notes & badges
   'notif.roleResponderNotice': 'Field Responder Notice: Operational heat safety alerts, dispatch warnings, and crew hydration pacing protocols are prioritized for your role.',
-  'notif.roleOfficialNotice': 'Municipal Official Notice: Ward-level heat action thresholds, vulnerability hot-spot triggers, and cooling center capacity alerts remain active.',
+  'notif.roleOfficialNotice': 'Municipal Official Notice: Regional heat action thresholds, vulnerability hot-spot triggers, and cooling center capacity alerts remain active.',
   'notif.roleAnalystNotice': 'Meteorological Analyst Notice: Synoptic anomaly alerts, WBGT divergence warnings, and model delta notifications remain active.',
   'notif.recommendedBadge': 'Recommended',
   'notif.essentialBadge': 'Essential',

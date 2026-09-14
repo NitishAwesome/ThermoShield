@@ -24,6 +24,9 @@ export interface WeatherCondition {
   weather_icon?: string;
   precipitation?: number;
   wind_direction?: number;
+  source_status?: 'LIVE' | 'OFFLINE_FALLBACK';
+  source_name?: string;
+  is_fallback?: boolean;
 }
 
 export interface HourlyForecast {
@@ -53,6 +56,9 @@ export interface WeatherResponse {
   };
   weather: WeatherCondition;
   forecast?: DailyForecast;
+  source_status?: 'LIVE' | 'OFFLINE_FALLBACK';
+  source_name?: string;
+  is_fallback?: boolean;
 }
 
 export interface ThermalIndices {
@@ -160,6 +166,9 @@ export interface ForecastResponse {
     longitude: number;
   };
   forecast: DailyForecast;
+  source_status?: 'LIVE' | 'OFFLINE_FALLBACK';
+  source_name?: string;
+  is_fallback?: boolean;
 }
 
 export interface MapLocationRisk {
@@ -258,11 +267,28 @@ export interface AreaRiskItem {
   longitude: number;
   temperature_c: number;
   humidity_pct: number;
+  wind_speed_mps?: number;
   wbgt_c: number;
   risk_score: number;
   risk_level: RiskLevel;
   vulnerability_tag: string;
   summary_advisory: string;
+  area_type?: 'prototype_zone' | 'regional_centroid';
+}
+
+export interface ThermalZone {
+  id: string;
+  name: string;
+  shortName: string;
+  district: string;
+  zone: string;
+  representativeCoords: [number, number]; // [lat, lon]
+  polygon: [number, number][]; // [[lat, lon], ...]
+  baselineTempOffsetC: number;
+  vulnerabilityIndex: number;
+  vulnerabilityFactors: string[];
+  demographicsNote: string;
+  areaType: 'prototype_zone';
 }
 
 export interface AreasRiskOverviewResponse {
@@ -403,3 +429,4 @@ export interface FamilyVulnerableMember {
 }
 
 export * from './notifications';
+export * from './provenance';
