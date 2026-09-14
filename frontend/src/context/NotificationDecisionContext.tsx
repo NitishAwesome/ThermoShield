@@ -15,6 +15,13 @@ import { useProfile } from './ProfileContext';
 import { useAuth } from './AuthContext';
 import { api } from '../services/api';
 import { getCachedData } from '../services/cache';
+import {
+  getNotificationPermission,
+  requestDeviceNotificationPermission,
+  sendNativeDeviceNotification,
+  sendTestDeviceNotification,
+  DeviceNotificationPermission,
+} from '../services/browserNotification';
 
 export type SimulationScenario = 'spike' | 'moderate' | 'normal' | null;
 
@@ -25,6 +32,9 @@ interface NotificationDecisionContextType {
   evaluatedAt: number;
   history: NotificationHistoryState;
   simulationScenario: SimulationScenario;
+  devicePermission: DeviceNotificationPermission;
+  requestDevicePermission: () => Promise<DeviceNotificationPermission>;
+  sendTestNotification: () => boolean;
   setSimulationScenario: (scenario: SimulationScenario) => void;
   acknowledgeEvent: (id: string, type?: NotificationEventType) => void;
   clearHistory: () => void;
@@ -255,6 +265,48 @@ export const NotificationDecisionProvider: React.FC<{ children: React.ReactNode 
     setEvaluationTick(Date.now());
   }, []);
 
+  // Native device notification permission state
+  const [devicePermission, setDevicePermission] = useState<DeviceNotificationPermission>(() =>
+    getNotificationPermission()
+  );
+
+  // Delivered native notification tracking (ensures no duplicate popups per session)
+  const deliveredNativeIdsRef = React.useRef<Set<string>>(new Set());
+
+  // Automatically sync permission if user modifies browser settings
+  useEffect(() => {
+    const syncPerm = () => {
+      setDevicePermission(getNotificationPermission());
+    };
+    window.addEventListener('focus', syncPerm);
+    return () => window.removeEventListener('focus', syncPerm);
+  }, []);
+
+  // Deliver approved decision engine alerts to native browser notifications
+  useEffect(() => {
+    if (devicePermission !== 'granted') return;
+
+    for (const event of result.eligibleEvents) {
+      if (!deliveredNativeIdsRef.current.has(event.id)) {
+        sendNativeDeviceNotification(event.titleFallback, {
+          body: event.messageFallback,
+          tag: event.id,
+        });
+        deliveredNativeIdsRef.current.add(event.id);
+      }
+    }
+  }, [result.eligibleEvents, devicePermission]);
+
+  const requestDevicePermission = useCallback(async () => {
+    const perm = await requestDeviceNotificationPermission();
+    setDevicePermission(perm);
+    return perm;
+  }, []);
+
+  const sendTestNotification = useCallback(() => {
+    return sendTestDeviceNotification();
+  }, []);
+
   const value = useMemo(
     () => ({
       eligibleEvents: result.eligibleEvents,
@@ -263,6 +315,9 @@ export const NotificationDecisionProvider: React.FC<{ children: React.ReactNode 
       evaluatedAt: result.evaluatedAt,
       history,
       simulationScenario,
+      devicePermission,
+      requestDevicePermission,
+      sendTestNotification,
       setSimulationScenario,
       acknowledgeEvent,
       clearHistory,
@@ -275,6 +330,9 @@ export const NotificationDecisionProvider: React.FC<{ children: React.ReactNode 
       result.evaluatedAt,
       history,
       simulationScenario,
+      devicePermission,
+      requestDevicePermission,
+      sendTestNotification,
       acknowledgeEvent,
       clearHistory,
       refreshEvaluation,

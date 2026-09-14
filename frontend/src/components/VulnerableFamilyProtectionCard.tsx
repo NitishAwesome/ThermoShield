@@ -177,14 +177,14 @@ export const VulnerableFamilyProtectionCard: React.FC<VulnerableFamilyProtection
           <div>
             <div className="flex items-center space-x-2">
               <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                {t('familyProtection.badge', 'Family & Dependent Care')}
+                Household Safety Profile
               </span>
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
-                {t('familyProtection.voluntaryNotice', 'Voluntary Reminders')}
+                Family Vulnerability Checklist
               </span>
             </div>
             <h2 className="text-base sm:text-lg font-black ts-text-primary mt-0.5">
-              {t('familyProtection.headline', 'Check on family members who may need extra heat protection')}
+              Check on family members who may need extra heat protection
             </h2>
           </div>
         </div>
@@ -358,10 +358,7 @@ export const VulnerableFamilyProtectionCard: React.FC<VulnerableFamilyProtection
           <div className="flex items-center space-x-1.5">
             <Shield className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
             <span>
-              {t(
-                'familyProtection.privacyFootnote',
-                'Privacy Assurance: ThermoShield does not store names or sensitive health records for your family. Categories are voluntary guidance tags on your local device.'
-              )}
+              Manually maintained household checklist: ThermoShield uses the information you provide to personalize safety reminders. It does not remotely track family members, access GPS locations, or collect biometric data.
             </span>
           </div>
         </div>
