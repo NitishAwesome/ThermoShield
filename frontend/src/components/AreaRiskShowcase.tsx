@@ -33,6 +33,7 @@ interface AreaRiskShowcaseProps {
   title?: string;
   subtitle?: string;
   isGuestView?: boolean;
+  variant?: 'default' | 'command-summary';
 }
 
 export const AreaRiskShowcase: React.FC<AreaRiskShowcaseProps> = ({
@@ -40,6 +41,7 @@ export const AreaRiskShowcase: React.FC<AreaRiskShowcaseProps> = ({
   title,
   subtitle,
   isGuestView = false,
+  variant = 'default',
 }) => {
   const { locationName, setLocation } = useLocation();
   const { isAuthenticated } = useAuth();
@@ -224,6 +226,93 @@ export const AreaRiskShowcase: React.FC<AreaRiskShowcaseProps> = ({
   const toggleHighExtreme = () => {
     setSelectedSeverity((prev) => (prev === 'CRITICAL_HIGH' ? 'ALL' : 'CRITICAL_HIGH'));
   };
+
+  if (variant === 'command-summary') {
+    const topAreas = prioritizedFilteredAreas.slice(0, 3);
+    const getTrendLabel = (level: string, index: number) => {
+      const norm = (level || '').toUpperCase().trim();
+      if (norm === 'EXTREME' || norm === 'CRITICAL' || norm === 'HIGH') {
+        return index === 0 ? 'Conditions rising' : 'Afternoon peak expected';
+      }
+      if (norm === 'MODERATE') return 'Continue monitoring';
+      return 'Stable baseline';
+    };
+
+    return (
+      <div className="rounded-3xl ts-card p-5 sm:p-6 border ts-border shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b ts-border">
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+              <h2 className="text-xs font-black uppercase tracking-wider text-orange-500">
+                Areas Needing Attention
+              </h2>
+            </div>
+            <h3 className="text-lg font-black ts-text-primary mt-0.5">
+              Priority Ranking
+            </h3>
+          </div>
+          <Link
+            to="/gov/matrix"
+            className="self-start sm:self-auto inline-flex items-center space-x-1.5 text-xs font-extrabold text-orange-600 dark:text-orange-400 hover:underline cursor-pointer"
+          >
+            <span>View Full Municipal Matrix</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {isLoading ? (
+          <div className="py-8 text-center ts-text-muted text-xs flex items-center justify-center space-x-2">
+            <RefreshCw className="w-4 h-4 animate-spin text-orange-500" />
+            <span>Loading priority sectors...</span>
+          </div>
+        ) : topAreas.length === 0 ? (
+          <div className="py-6 text-center text-xs ts-text-muted">
+            No priority areas currently flagging elevated concern.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+            {topAreas.map((area, idx) => {
+              const trendNote = getTrendLabel(area.risk_level, idx);
+              return (
+                <div
+                  key={area.name}
+                  onClick={() => handleSelect(area)}
+                  className="p-4 rounded-2xl ts-card-subtle border ts-border hover:border-orange-500/50 transition-all cursor-pointer flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-400 font-mono">
+                        #{idx + 1}
+                      </span>
+                      <Badge riskLevel={area.risk_level} size="sm">
+                        {translateRiskLevel(area.risk_level, t)}
+                      </Badge>
+                    </div>
+                    <h4 className="text-base font-black ts-text-primary mt-2 group-hover:text-orange-400">
+                      {area.name}
+                    </h4>
+                    <p className="text-[11px] ts-text-muted mt-0.5">
+                      {area.state} • {translateZone(area.zone, t)}
+                    </p>
+                    <div className="mt-3 text-xs font-semibold text-orange-600 dark:text-orange-400 flex items-center space-x-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                      <span>{trendNote}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t ts-border flex items-center justify-between text-[11px] ts-text-subtle font-mono">
+                    <span>Temp: {area.temperature_c.toFixed(1)}°C</span>
+                    <span>WBGT: {area.wbgt_c.toFixed(1)}°C</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div ref={containerRef} className="rounded-3xl ts-card p-5 sm:p-7 shadow-2xl relative overflow-hidden">
