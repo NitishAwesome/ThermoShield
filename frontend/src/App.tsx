@@ -9,6 +9,15 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ProfileProvider } from './context/ProfileContext';
 import { LanguageProvider } from './context/LanguageContext';
+import { NotificationDecisionProvider } from './context/NotificationDecisionContext';
+
+// Layout Wrappers
+const CitizenLayout = lazy(() =>
+  import('./layouts/CitizenLayout').then((m) => ({ default: m.CitizenLayout }))
+);
+const GovernmentLayout = lazy(() =>
+  import('./layouts/GovernmentLayout').then((m) => ({ default: m.GovernmentLayout }))
+);
 
 // Code-split route components for instant initial bundle loading
 const Forecast = lazy(() =>
@@ -22,6 +31,11 @@ const RiskDetails = lazy(() =>
 const Alerts = lazy(() =>
   import('./pages/Alerts').then((m) => ({ default: m.Alerts }))
 );
+
+const CitizenHeatMap = lazy(() =>
+  import('./pages/CitizenHeatMap').then((m) => ({ default: m.CitizenHeatMap }))
+);
+
 
 const Intervention = lazy(() =>
   import('./pages/Intervention').then((m) => ({ default: m.Intervention }))
@@ -51,7 +65,36 @@ const NotificationSettings = lazy(() =>
   }))
 );
 
-import { NotificationDecisionProvider } from './context/NotificationDecisionContext';
+// Government Portal Pages
+const GovernmentDashboard = lazy(() =>
+  import('./pages/government/GovernmentDashboard').then((m) => ({
+    default: m.GovernmentDashboard,
+  }))
+);
+
+const GovernmentMap = lazy(() =>
+  import('./pages/government/GovernmentMap').then((m) => ({
+    default: m.GovernmentMap,
+  }))
+);
+
+const GovernmentHealthImpact = lazy(() =>
+  import('./pages/government/GovernmentHealthImpact').then((m) => ({
+    default: m.GovernmentHealthImpact,
+  }))
+);
+
+const GovernmentDispatch = lazy(() =>
+  import('./pages/government/GovernmentDispatch').then((m) => ({
+    default: m.GovernmentDispatch,
+  }))
+);
+
+const GovernmentReports = lazy(() =>
+  import('./pages/government/GovernmentReports').then((m) => ({
+    default: m.GovernmentReports,
+  }))
+);
 
 export const App: React.FC = () => {
   return (
@@ -67,107 +110,157 @@ export const App: React.FC = () => {
                     v7_relativeSplatPath: true,
                   }}
                 >
-                <div className="min-h-screen flex flex-col font-sans selection:bg-orange-500 selection:text-white transition-colors duration-200">
+                  <div className="min-h-screen flex flex-col font-sans selection:bg-orange-500 selection:text-white transition-colors duration-200">
+                    {/* Top Navigation: Portal & Role Aware */}
+                    <Navbar />
 
-                  {/* Top Navigation */}
-                  <Navbar />
+                    {/* Main Content Viewport */}
+                    <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+                      <Suspense
+                        fallback={<LoadingState message="Loading module..." />}
+                      >
+                        <Routes>
+                          {/* ========================================================= */}
+                          {/* 1. CITIZEN PORTAL ROUTES (Clean citizen experience)       */}
+                          {/* ========================================================= */}
+                          <Route element={<CitizenLayout />}>
+                            {/* Citizen Home */}
+                            <Route path="/" element={<Dashboard />} />
 
-                  {/* Main Content Viewport */}
-                  <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
-                    <Suspense
-                      fallback={<LoadingState message="Loading module..." />}
-                    >
-                      <Routes>
-                        <Route path="/" element={<Dashboard />} />
+                            {/* Personal Heat Stress */}
+                            <Route
+                              path="/personal-risk"
+                              element={<PersonalRisk />}
+                            />
+                            <Route
+                              path="/individual-risk"
+                              element={<PersonalRisk />}
+                            />
 
-                        <Route path="/profile" element={<Profile />} />
-                        <Route path="/my-profile" element={<Profile />} />
+                            {/* Alerts & Safety Directives */}
+                            <Route path="/alerts" element={<Alerts />} />
 
-                        <Route
-                          path="/notification-settings"
-                          element={<NotificationSettings />}
-                        />
-                        <Route
-                          path="/notifications"
-                          element={<NotificationSettings />}
-                        />
+                            {/* Forecast & Planning */}
+                            <Route path="/forecast" element={<Forecast />} />
 
-                        <Route
-                          path="/personal-risk"
-                          element={<PersonalRisk />}
-                        />
-                        <Route
-                          path="/individual-risk"
-                          element={<PersonalRisk />}
-                        />
+                            {/* Citizen Local Heat Map */}
+                            <Route path="/heat-map" element={<CitizenHeatMap />} />
+                            <Route path="/map" element={<CitizenHeatMap />} />
 
-                        <Route path="/forecast" element={<Forecast />} />
-                        <Route
-                          path="/risk-details"
-                          element={<RiskDetails />}
-                        />
 
-                        <Route
-                          path="/matrix"
-                          element={<MunicipalMatrix />}
-                        />
-                        <Route
-                          path="/municipal-matrix"
-                          element={<MunicipalMatrix />}
-                        />
+                            {/* Personal Profile & Settings */}
+                            <Route path="/profile" element={<Profile />} />
+                            <Route path="/my-profile" element={<Profile />} />
+                            <Route
+                              path="/notification-settings"
+                              element={<NotificationSettings />}
+                            />
+                            <Route
+                              path="/notifications"
+                              element={<NotificationSettings />}
+                            />
 
-                        <Route path="/alerts" element={<Alerts />} />
-                        <Route
-                          path="/interventions"
-                          element={<Intervention />}
-                        />
+                            {/* Legacy Aliases kept backward compatible */}
+                            <Route
+                              path="/risk-details"
+                              element={<RiskDetails />}
+                            />
+                            <Route
+                              path="/matrix"
+                              element={<MunicipalMatrix />}
+                            />
+                            <Route
+                              path="/municipal-matrix"
+                              element={<MunicipalMatrix />}
+                            />
+                            <Route
+                              path="/interventions"
+                              element={<Intervention />}
+                            />
+                          </Route>
 
-                        <Route
-                          path="/login"
-                          element={<Auth initialMode="login" />}
-                        />
-                        <Route
-                          path="/register"
-                          element={<Auth initialMode="register" />}
-                        />
-                        <Route
-                          path="/signup"
-                          element={<Auth initialMode="register" />}
-                        />
+                          {/* ========================================================= */}
+                          {/* 2. GOVERNMENT / AUTHORITY PORTAL ROUTES                   */}
+                          {/* ========================================================= */}
+                          <Route path="/gov" element={<GovernmentLayout />}>
+                            <Route index element={<GovernmentDashboard />} />
+                            <Route
+                              path="dashboard"
+                              element={<GovernmentDashboard />}
+                            />
+                            <Route path="map" element={<GovernmentMap />} />
+                            <Route
+                              path="health-impact"
+                              element={<GovernmentHealthImpact />}
+                            />
+                            <Route
+                              path="dispatch"
+                              element={<GovernmentDispatch />}
+                            />
+                            <Route
+                              path="interventions"
+                              element={<Intervention />}
+                            />
+                            <Route
+                              path="matrix"
+                              element={<MunicipalMatrix />}
+                            />
+                            <Route
+                              path="reports"
+                              element={<GovernmentReports />}
+                            />
+                          </Route>
 
-                        <Route
-                          path="*"
-                          element={<Navigate to="/" replace />}
-                        />
-                      </Routes>
-                    </Suspense>
-                  </main>
+                          {/* ========================================================= */}
+                          {/* 3. AUTHENTICATION & ACCESS ROUTES                         */}
+                          {/* ========================================================= */}
+                          <Route
+                            path="/login"
+                            element={<Auth initialMode="login" />}
+                          />
+                          <Route
+                            path="/register"
+                            element={<Auth initialMode="register" />}
+                          />
+                          <Route
+                            path="/signup"
+                            element={<Auth initialMode="register" />}
+                          />
 
-                  {/* Footer */}
-                  <footer className="ts-card-elevated border-t ts-border py-6 text-center text-xs ts-text-muted">
-                    <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-bold ts-text-primary">
-                          ThermoShield
-                        </span>
-                        <span>
-                          — Smart India Hackathon 2026 Prototype (SIH26083)
-                        </span>
+                          {/* Fallback Catch-All */}
+                          <Route
+                            path="*"
+                            element={<Navigate to="/" replace />}
+                          />
+                        </Routes>
+                      </Suspense>
+                    </main>
+
+                    {/* Global Footer */}
+                    <footer className="ts-card-elevated border-t ts-border py-6 text-center text-xs ts-text-muted">
+                      <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-bold ts-text-primary">
+                            ThermoShield
+                          </span>
+                          <span>
+                            — Smart India Hackathon 2026 Prototype (SIH26083)
+                          </span>
+                        </div>
+
+                        <p className="text-[11px] ts-text-subtle">
+                          Extreme Heatwave Early Warning & Biometeorological
+                          Thermal Stress Engine
+                        </p>
                       </div>
+                    </footer>
 
-                      <p className="text-[11px] ts-text-subtle">
-                        Extreme Heatwave Early Warning & Biometeorological
-                        Thermal Stress Engine
-                      </p>
-                    </div>
-                  </footer>
-
-                  {/* Global AI Heatwave Copilot Drawer */}
-                  <HeatCopilot />
-                </div>
-              </Router>
-            </NotificationDecisionProvider>
-          </LocationProvider>
+                    {/* Shared Global Heat Copilot Assistant */}
+                    <HeatCopilot />
+                  </div>
+                </Router>
+              </NotificationDecisionProvider>
+            </LocationProvider>
           </ProfileProvider>
         </AuthProvider>
       </LanguageProvider>

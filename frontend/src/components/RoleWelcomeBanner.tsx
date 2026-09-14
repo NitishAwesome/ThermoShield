@@ -72,11 +72,11 @@ const getRoleConfig = (role?: string, t?: (key: any, fallback?: any) => string):
         compactTitle: tr('role.healthOfficial', 'Municipal Health View'),
         description: tr(
           'roleBanner.officialDesc',
-          'Monitor area-level heat risk across municipal wards, evaluate vulnerable populations, and simulate proactive response actions.'
+          'Monitor regional heat risk across urban reference locations, evaluate vulnerable populations, and simulate proactive response actions.'
         ),
         compactDescription: tr(
           'roleBanner.officialDesc',
-          'Monitor area-level heat risk and evaluate municipal response actions.'
+          'Monitor regional heat risk and evaluate municipal response actions.'
         ),
         quickActions: [
           { to: '/matrix', label: tr('nav.municipalMatrix', 'Open Municipal Matrix'), icon: Building2, primary: true },
@@ -84,9 +84,9 @@ const getRoleConfig = (role?: string, t?: (key: any, fallback?: any) => string):
           { to: '/interventions', label: tr('nav.interventions', 'Simulate Actions'), icon: Sliders },
         ],
         features: [
-          tr('roleBanner.featureOfficial1', 'Multi-zone surveillance across all monitored municipal wards'),
+          tr('roleBanner.featureOfficial1', 'Multi-zone monitoring across evaluated regional reference locations'),
           tr('roleBanner.featureOfficial2', 'Intervention simulator to model cooling centers & work-pause impact'),
-          tr('roleBanner.featureOfficial3', 'ML-driven civic health impact scoring for hospital preparedness'),
+          tr('roleBanner.featureOfficial3', 'ML-driven civic health impact scoring for facility preparedness planning'),
         ],
       };
 
