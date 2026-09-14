@@ -269,7 +269,7 @@ export const RiskDetails: React.FC = () => {
                     <span className="text-xs ts-text-subtle block font-semibold">{t('riskCard.healthcareDemand')}</span>
                     <span className="text-sm font-bold text-purple-700 dark:text-purple-300 font-mono">
                       {riskData?.risk?.predicted_health_impact_proxy !== undefined
-                        ? `~${riskData.risk.predicted_health_impact_proxy.toFixed(1)} cases/ward`
+                        ? `~${riskData.risk.predicted_health_impact_proxy.toFixed(1)} cases/zone (modelled proxy)`
                         : 'Calibrating...'}
                     </span>
                   </div>
