@@ -26,11 +26,13 @@ import {
   Terminal,
   Settings,
   Info,
+  Smartphone,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, Badge, Button } from '../../components/ui';
 import { DataRealityBadge } from '../../components/provenance';
 import { NotificationDecisionFeed } from '../../components/NotificationDecisionFeed';
 import { translateRiskLevel } from '../../utils/translationHelpers';
+import { AlertDeliveryStatusResponse } from '../../types';
 
 export const GovernmentDispatch: React.FC = () => {
   const { coords, locationName } = useLocation();
@@ -38,6 +40,7 @@ export const GovernmentDispatch: React.FC = () => {
   const { t } = useTranslation();
 
   const [engineTelemetry, setEngineTelemetry] = useState<any>(null);
+  const [deliveryStatus, setDeliveryStatus] = useState<AlertDeliveryStatusResponse | null>(null);
   const [isTriggeringCycle, setIsTriggeringCycle] = useState<boolean>(false);
   const [isSendingEmail, setIsSendingEmail] = useState<boolean>(false);
   const [recipientEmail, setRecipientEmail] = useState<string>(user?.email || '');
@@ -45,14 +48,27 @@ export const GovernmentDispatch: React.FC = () => {
   const [emailErrorMsg, setEmailErrorMsg] = useState<string | null>(null);
   const [showEmailPreview, setShowEmailPreview] = useState<boolean>(false);
 
+  // SMS Test Dispatch State
+  const [isSendingSMS, setIsSendingSMS] = useState<boolean>(false);
+  const [recipientPhone, setRecipientPhone] = useState<string>(user?.phone_number || '+91 9811223344');
+  const [smsSuccessMsg, setSmsSuccessMsg] = useState<string | null>(null);
+  const [smsErrorMsg, setSmsErrorMsg] = useState<string | null>(null);
+  const [showSmsPreview, setShowSmsPreview] = useState<boolean>(false);
+
   // Progressive Disclosure Toggles
   const [showTechDetails, setShowTechDetails] = useState<boolean>(false);
   const [showTestingTools, setShowTestingTools] = useState<boolean>(false);
 
   const fetchTelemetry = async () => {
     try {
-      const data = await api.getAlertEngineStatus();
+      const [data, delivery] = await Promise.all([
+        api.getAlertEngineStatus(),
+        api.getAlertDeliveryStatus().catch(() => null),
+      ]);
       setEngineTelemetry(data);
+      if (delivery) {
+        setDeliveryStatus(delivery);
+      }
     } catch (e) {
       console.debug('Failed to fetch engine telemetry:', e);
     }
@@ -118,6 +134,39 @@ export const GovernmentDispatch: React.FC = () => {
       }
     } finally {
       setIsSendingEmail(false);
+    }
+  };
+
+  const handleSendTestSMS = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const phone = recipientPhone.trim();
+    if (!phone || phone.length < 7) {
+      setSmsErrorMsg('Please provide a valid phone number (at least 7 digits).');
+      return;
+    }
+    setIsSendingSMS(true);
+    setSmsErrorMsg(null);
+    setSmsSuccessMsg(null);
+
+    try {
+      const res = await api.sendTestSMS({
+        phone_number: phone,
+        location_name: locationName,
+        message: `[ThermoShield TEST ALERT] Heatwave early warning test for ${locationName}. Stage 2 HAP protocol active. Seek shade and hydrate.`,
+      });
+
+      if (res.status === 'ACCEPTED') {
+        setSmsSuccessMsg(`Live SMS queued via Twilio to ${res.recipient}! (Message SID: ${res.message_id})`);
+      } else if (res.status === 'SIMULATED') {
+        setSmsSuccessMsg(`Simulated SMS dispatched (Demo Mode) to ${res.recipient}. Provider: ${res.provider} • ID: ${res.message_id}. Logged to server stdout.`);
+      } else {
+        setSmsErrorMsg(res.error || 'Failed to dispatch SMS alert.');
+      }
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || err?.message || 'Failed to dispatch test SMS.';
+      setSmsErrorMsg(detail);
+    } finally {
+      setIsSendingSMS(false);
     }
   };
 
@@ -390,15 +439,15 @@ export const GovernmentDispatch: React.FC = () => {
           <div className="p-4 rounded-2xl ts-card-subtle border ts-border">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold ts-text-primary">Email Dispatch</span>
-              {Boolean(engineTelemetry?.email_dispatch_configured) ? (
-                <DataRealityBadge tier="LIVE" size="xs" customLabel="Emergency Email Dispatch: Operational" />
+              {deliveryStatus?.email?.configured || Boolean(engineTelemetry?.email_dispatch_configured) ? (
+                <DataRealityBadge tier="LIVE" size="xs" customLabel="Emergency Email: Operational" />
               ) : (
-                <DataRealityBadge tier="SIMULATED" size="xs" customLabel="Emergency Email Dispatch: Not Configured" />
+                <DataRealityBadge tier="SIMULATED" size="xs" customLabel="Emergency Email: Not Configured" />
               )}
             </div>
             <p className="text-xs ts-text-muted mt-2 leading-relaxed">
-              {Boolean(engineTelemetry?.email_dispatch_configured)
-                ? 'Automated situation reports and advisory emails dispatched to registered authorities via configured SMTP server.'
+              {deliveryStatus?.email?.configured || Boolean(engineTelemetry?.email_dispatch_configured)
+                ? `Automated situation reports and advisory emails dispatched via configured SMTP server (${deliveryStatus?.email?.sender || 'Live SMTP'}).`
                 : 'SMTP credentials are not configured in environment. Test and automatic dispatches are safely simulated.'}
             </p>
           </div>
@@ -406,10 +455,16 @@ export const GovernmentDispatch: React.FC = () => {
           <div className="p-4 rounded-2xl ts-card-subtle border ts-border">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold ts-text-primary">SMS Broadcast Gateway</span>
-              <DataRealityBadge tier="SIMULATED" size="xs" customLabel="Candidate Channel (Demo)" />
+              {deliveryStatus?.sms?.mode === 'LIVE' ? (
+                <DataRealityBadge tier="LIVE" size="xs" customLabel="Operational (Twilio Live)" />
+              ) : (
+                <DataRealityBadge tier="SIMULATED" size="xs" customLabel="Demo Simulation Mode" />
+              )}
             </div>
             <p className="text-xs ts-text-muted mt-2 leading-relaxed">
-              State disaster management SMS gateway integration candidate. Operates in console demonstration simulation mode.
+              {deliveryStatus?.sms?.mode === 'LIVE'
+                ? `Active Twilio cellular gateway. Dispatches real regional SMS alerts to phone recipients (From: ${deliveryStatus?.sms?.from_number}).`
+                : 'State disaster management SMS gateway integration candidate. Operates in console demonstration simulation mode with honest IDs.'}
             </p>
           </div>
 
@@ -419,7 +474,7 @@ export const GovernmentDispatch: React.FC = () => {
               <DataRealityBadge tier="PLANNED" size="xs" customLabel="Planned Integration" />
             </div>
             <p className="text-xs ts-text-muted mt-2 leading-relaxed">
-              Citizen notification bot connector planned for regional civic messaging deployment once WhatsApp Business API is connected.
+              Citizen notification bot connector planned for regional civic messaging deployment under SIH26083 once WhatsApp Business API is connected.
             </p>
           </div>
         </div>
@@ -659,6 +714,97 @@ export const GovernmentDispatch: React.FC = () => {
                     <li>Deploy mobile drinking water tankers to congested transit hubs.</li>
                     <li>Open designated air-cooled municipal shelters.</li>
                   </ul>
+                </div>
+              )}
+            </Card>
+
+            {/* Cellular SMS Test Dispatch */}
+            <Card variant="elevated" className="p-4 sm:p-5 border ts-border">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b ts-border pb-3">
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-500">
+                      Cellular SMS Test Dispatch & Truthfulness Inspector
+                    </h4>
+                    {deliveryStatus?.sms?.mode === 'LIVE' ? (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                        Live Twilio Gateway
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                        Demo Simulation Mode
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs ts-text-muted mt-0.5">
+                    Verify cellular SMS deliverability. Dispatches live via Twilio if configured, or outputs truthful simulation logs to the console.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSmsPreview(!showSmsPreview)}
+                  leftIcon={<Smartphone className="w-3.5 h-3.5 text-emerald-500" />}
+                  className="text-xs cursor-pointer"
+                >
+                  {showSmsPreview ? 'Hide SMS Format' : 'Inspect SMS Format'}
+                </Button>
+              </div>
+
+              <form onSubmit={handleSendTestSMS} className="mt-4 flex flex-col sm:flex-row gap-2.5 max-w-xl">
+                <input
+                  type="tel"
+                  required
+                  placeholder="Enter recipient phone (+91 9811223344)..."
+                  value={recipientPhone}
+                  onChange={(e) => setRecipientPhone(e.target.value)}
+                  className="flex-1 px-3 py-2 text-xs rounded-xl ts-input ts-text-primary focus:outline-none"
+                />
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  disabled={isSendingSMS || !recipientPhone.trim()}
+                  leftIcon={
+                    isSendingSMS ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5" />
+                    )
+                  }
+                  className="text-xs font-bold whitespace-nowrap cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white"
+                >
+                  {isSendingSMS ? 'Dispatching SMS...' : 'Dispatch Test SMS'}
+                </Button>
+              </form>
+
+              {smsSuccessMsg && (
+                <div className="mt-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                  <span>{smsSuccessMsg}</span>
+                </div>
+              )}
+
+              {smsErrorMsg && (
+                <div className="mt-3 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-xs flex items-center space-x-2">
+                  <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                  <span>{smsErrorMsg}</span>
+                </div>
+              )}
+
+              {showSmsPreview && (
+                <div className="mt-4 p-4 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs space-y-2">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="font-bold text-emerald-400">📱 Mobile SMS Preview (160 GSM Character Format)</span>
+                    <span className="text-[10px] text-slate-400">To: {recipientPhone}</span>
+                  </div>
+                  <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-[11px] text-slate-200">
+                    [ThermoShield TEST ALERT] Heatwave early warning test for {locationName}. Stage 2 HAP protocol active. Seek shade and hydrate.
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    Provider Mode: {deliveryStatus?.sms?.display_status || 'Demo Simulation Mode'} • Gateway Status: {deliveryStatus?.sms?.status || 'DEMO_SIMULATION'}
+                  </div>
                 </div>
               )}
             </Card>

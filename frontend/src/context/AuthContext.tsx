@@ -14,6 +14,7 @@ export interface AuthContextType {
   logout: () => void;
   clearError: () => void;
   switchRole: (role: string) => void;
+  updateUser: (fields: Partial<User>) => void;
 }
 
 const TOKEN_STORAGE_KEY = 'thermoshield_token';
@@ -200,6 +201,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
+  const updateUser = useCallback((fields: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const updated: User = { ...prev, ...fields };
+      try {
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to save updated user to localStorage', e);
+      }
+      return updated;
+    });
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -214,6 +228,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         clearError,
         switchRole,
+        updateUser,
       }}
     >
       {children}

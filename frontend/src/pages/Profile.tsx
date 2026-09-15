@@ -204,13 +204,24 @@ export const Profile: React.FC<ProfileProps> = ({ initialTab }) => {
     );
   };
 
-  const handleUseMyLocation = () => {
-    detectMyLocation();
-    if (locationName) {
-      const parts = locationName.split(',').map((p) => p.trim());
-      if (parts[0]) setCity(parts[0]);
-      if (parts[1]) setState(parts[1]);
+  const handleSetHomeFromMonitored = () => {
+    if (!locationName) return;
+    const parts = locationName.split(',').map((p) => p.trim());
+    if (parts[0]) setCity(parts[0]);
+    if (parts[1]) setState(parts[1]);
+    setSaveSuccessMsg(`Home location set to "${locationName}". Click "Save Changes" to persist to your profile.`);
+    setTimeout(() => setSaveSuccessMsg(null), 4000);
+  };
+
+  const handleSyncSessionToHome = () => {
+    if (!city) {
+      alert('Please enter your home city and state first.');
+      return;
     }
+    const targetName = state ? `${city}, ${state}` : city;
+    setCoordsAndName(coords, targetName);
+    setSaveSuccessMsg(`Switched active session monitored area to your home: ${targetName}.`);
+    setTimeout(() => setSaveSuccessMsg(null), 4000);
   };
 
   const handleSaveAll = async (e?: React.FormEvent) => {
@@ -261,11 +272,7 @@ export const Profile: React.FC<ProfileProps> = ({ initialTab }) => {
       },
     });
 
-    if (city && state && coords) {
-      setCoordsAndName(coords, `${city}, ${state}`);
-    }
-
-    setSaveSuccessMsg('Your changes were saved.');
+    setSaveSuccessMsg('Profile updated successfully! Changes are active across ThermoShield.');
     setTimeout(() => setSaveSuccessMsg(null), 3500);
   };
 
@@ -652,32 +659,78 @@ export const Profile: React.FC<ProfileProps> = ({ initialTab }) => {
               subtitle="Who you are and where ThermoShield should monitor local heat conditions for you."
             />
             <CardContent className="space-y-5">
-              {/* Location Handling: Distinguishing Current Monitored vs Profile Home Location */}
-              <div className="p-3.5 rounded-2xl ts-card-subtle border ts-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                  <div className="text-xs text-orange-600 dark:text-orange-400 font-bold flex items-center gap-1.5">
-                    <MapPin className="w-4 h-4" />
-                    <span>Current Monitored Location:</span>
-                    <span className="ts-text-primary font-semibold">{locationName || 'GPS Location Not Detected'}</span>
+              {/* Location Architecture: Clear separation between Active Session Monitored Area & Permanent Home Location */}
+              <div className="p-4 rounded-2xl ts-card-subtle border ts-border space-y-3">
+                <div className="flex items-center justify-between gap-2 pb-2 border-b ts-border">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-orange-500" />
+                    <span className="text-xs font-bold ts-text-primary">
+                      Location Strategy: Monitored vs. Permanent Home
+                    </span>
                   </div>
-                  <div className="text-[11px] ts-text-muted mt-1">
-                    Profile Home Location: {city ? `${city}${state ? `, ${state}` : ''}` : 'Not set'}
-                  </div>
-                  <p className="text-[10.5px] ts-text-subtle mt-0.5">
-                    Your location is used to show local heat conditions and alerts for your area. Profile home location can differ from your current travel location.
-                  </p>
+                  <Badge variant="brand" size="sm">Separated</Badge>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleUseMyLocation}
-                  disabled={isLocating}
-                  leftIcon={<Compass className={`w-3.5 h-3.5 text-orange-400 ${isLocating ? 'animate-spin' : ''}`} />}
-                  className="text-xs shrink-0"
-                >
-                  {isLocating ? 'Detecting...' : 'Use Current Monitored Location'}
-                </Button>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+                  {/* Active Monitored Area */}
+                  <div className="p-3 rounded-xl ts-card border ts-border flex flex-col justify-between">
+                    <div>
+                      <div className="text-[11px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider">
+                        Active Monitored Area (Current Session)
+                      </div>
+                      <div className="text-sm font-bold ts-text-primary mt-1">
+                        {locationName || 'GPS Location Not Detected'}
+                      </div>
+                      <p className="text-[10.5px] ts-text-subtle mt-1 leading-relaxed">
+                        The area currently powering your heat map, weather widgets, and live thermal strain calculations.
+                      </p>
+                    </div>
+                    <div className="pt-3 mt-2 border-t ts-border flex items-center justify-between gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSetHomeFromMonitored}
+                        leftIcon={<Home className="w-3.5 h-3.5 text-orange-500" />}
+                        className="text-[11px] w-full"
+                      >
+                        Copy this Area to Home
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Permanent Home Location */}
+                  <div className="p-3 rounded-xl ts-card border ts-border flex flex-col justify-between">
+                    <div>
+                      <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                        Permanent Home Location (Saved in Profile)
+                      </div>
+                      <div className="text-sm font-bold ts-text-primary mt-1">
+                        {city ? `${city}${state ? `, ${state}` : ''}` : 'Not configured yet'}
+                      </div>
+                      <p className="text-[10.5px] ts-text-subtle mt-1 leading-relaxed">
+                        Used for baseline vulnerability, morning alerts, and personalized civic protection.
+                      </p>
+                    </div>
+                    <div className="pt-3 mt-2 border-t ts-border flex items-center justify-between gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!city}
+                        onClick={handleSyncSessionToHome}
+                        leftIcon={<Compass className="w-3.5 h-3.5 text-emerald-500" />}
+                        className="text-[11px] w-full"
+                      >
+                        Sync Active Session to Home
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-[11px] ts-text-muted leading-relaxed pt-1">
+                  💡 <strong>Privacy & Exploration Rule:</strong> Searching or exploring other cities (e.g. Delhi, Mumbai, Jaipur) on the heat map or forecast updates your temporary session only — your permanent home profile is never overwritten silently.
+                </p>
               </div>
 
               {/* Personal Details Grid */}
@@ -1079,10 +1132,10 @@ export const Profile: React.FC<ProfileProps> = ({ initialTab }) => {
               <div className="p-4 rounded-xl ts-card-subtle border ts-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <span className="text-xs font-bold ts-text-primary block">
-                    Are you accustomed to local summer heat? (Acclimatization)
+                    Used to hot weather? (Heat Adaptation)
                   </span>
                   <span className="text-[11px] ts-text-muted mt-0.5 block leading-relaxed">
-                    Used to understand how your body may respond to repeated heat exposure. Living here 2+ weeks allows sweating mechanisms to adapt.
+                    Helps calculate how your body responds to thermal stress. Living in hot weather for 2+ weeks allows sweat mechanisms to adapt.
                   </span>
                 </div>
                 <div className="flex items-center space-x-2 shrink-0">
@@ -1095,7 +1148,7 @@ export const Profile: React.FC<ProfileProps> = ({ initialTab }) => {
                         : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary'
                     }`}
                   >
-                    ✓ Acclimatized
+                    ✓ Used to Hot Weather
                   </button>
                   <button
                     type="button"
@@ -1106,7 +1159,7 @@ export const Profile: React.FC<ProfileProps> = ({ initialTab }) => {
                         : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary'
                     }`}
                   >
-                    ⚠️ Not Yet Adapted
+                    ⚠️ New to Hot Climate
                   </button>
                 </div>
               </div>

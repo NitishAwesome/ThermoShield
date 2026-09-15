@@ -22,6 +22,9 @@ import {
   ExternalLink,
   ChevronRight,
   Globe,
+  Thermometer,
+  HeartPulse,
+  Radio,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
@@ -368,434 +371,565 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
   ];
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center py-4 sm:py-6 px-3 sm:px-4">
-      <div className="w-full max-w-xl">
-        {/* Top Google-style Header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl ts-card shadow-xl shadow-blue-500/5 mb-3">
-            {/* Google 4-Color 'G' Logo + ThermoShield Co-branding */}
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-md p-2">
-                <svg className="w-full h-full" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                  />
-                </svg>
-              </div>
-              <div className="text-left">
-                <span className="text-xs font-semibold uppercase tracking-widest text-blue-600 dark:text-[#8ab4f8] block">
-                  Google Identity
-                </span>
-                <span className="text-sm font-bold ts-text-primary tracking-tight">ThermoShield Gateway</span>
-              </div>
-            </div>
-          </div>
-
-          <h1 className="text-2xl sm:text-3xl font-bold ts-text-primary tracking-tight">
-            {mode === 'login' ? t('auth.loginTitle') : t('auth.registerTitle')}
-          </h1>
-          <p className="text-sm text-slate-600 dark:text-slate-300 mt-1 max-w-md mx-auto">
-            {mode === 'login'
-              ? t('auth.loginSubtitle')
-              : t('auth.registerSubtitle')}
-          </p>
-
-          {/* Security Assurance Badge */}
-          <div className="mt-2.5 inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 text-blue-700 dark:text-[#8ab4f8] text-xs font-medium">
-            <ShieldCheck className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
-            <span>256-Bit Encrypted &amp; OAuth 2.0 Verified</span>
-            <button
-              type="button"
-              onClick={() => setIsSecurityModalOpen(true)}
-              className="ml-1 underline hover:text-blue-900 dark:hover:text-white transition-colors cursor-pointer"
-            >
-              Details
-            </button>
-          </div>
-        </div>
-
-        {/* Main Google-styled Card */}
-        <div className="ts-card rounded-3xl shadow-2xl p-4 sm:p-8 relative overflow-hidden backdrop-blur-xl">
-          {/* Subtle Ambient Glow */}
-          <div className="absolute -top-24 -right-24 w-52 h-52 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 -left-24 w-52 h-52 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
-
-          {/* Mode Switcher Tabs */}
-          <div className="grid grid-cols-2 p-1 ts-card-subtle rounded-2xl mb-6">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('login');
-                setLocalError(null);
-                clearError();
-              }}
-              className={`py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 cursor-pointer ${
-                mode === 'login'
-                  ? 'bg-white dark:bg-slate-800 ts-text-primary shadow-sm border border-slate-200 dark:border-slate-700/60'
-                  : 'text-slate-600 dark:text-slate-400 hover:ts-text-primary'
-              }`}
-            >
-              <span>{t('auth.signIn')}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('register');
-                setLocalError(null);
-                clearError();
-              }}
-              className={`py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 cursor-pointer ${
-                mode === 'register'
-                  ? 'bg-white dark:bg-slate-800 ts-text-primary shadow-sm border border-slate-200 dark:border-slate-700/60'
-                  : 'text-slate-600 dark:text-slate-400 hover:ts-text-primary'
-              }`}
-            >
-              <span>{t('auth.register')}</span>
-            </button>
-          </div>
-
-          {/* Error Banner */}
-          {(localError || authError) && (
-            <div className="mb-5 p-3.5 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-start space-x-3 text-red-400 text-sm animate-in fade-in duration-200">
-              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="font-semibold text-red-300">Security / Auth Notice</p>
-                <p className="text-xs text-red-400/90 mt-0.5">{localError || authError}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Success Banner */}
-          {successMsg && (
-            <div className="mb-5 p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-start space-x-3 text-emerald-400 text-sm animate-in fade-in duration-200">
-              <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="font-semibold text-emerald-300">Authenticated</p>
-                <p className="text-xs text-emerald-400/90 mt-0.5">{successMsg}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Google Sign-In Hero Button */}
-          <div className="mb-6">
-            <button
-              type="button"
-              disabled={isGoogleLoading || isSubmitting}
-              onClick={handleGoogleClick}
-              className="w-full py-3.5 px-5 bg-white hover:bg-slate-100 text-slate-800 font-semibold text-sm rounded-2xl border border-[#dadce0] shadow-sm hover:shadow flex items-center justify-center space-x-3 transition-all duration-200 hover:scale-[1.005] active:scale-[0.995] disabled:opacity-60 disabled:cursor-not-allowed group relative overflow-hidden"
-            >
-              {isGoogleLoading ? (
-                <span className="w-5 h-5 border-2 border-slate-400 border-t-[#4285F4] rounded-full animate-spin" />
-              ) : (
-                <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center">
-                  <svg className="w-full h-full" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                    />
-                  </svg>
-                </div>
-              )}
-              <span className="text-slate-800 font-medium">
-                {mode === 'login' ? t('auth.continueWithGoogle') : t('auth.signUpWithGoogle')}
-              </span>
-              <span className="hidden sm:inline-block ml-auto text-[11px] font-semibold text-slate-500 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200">
-                SSO
-              </span>
-            </button>
-
-            {/* Google Divider */}
-            <div className="relative my-5">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t ts-border" />
-              </div>
-              <div className="relative flex justify-center text-[11px] uppercase tracking-wider">
-                <span className="bg-white dark:bg-slate-900 px-3 text-slate-500 dark:text-slate-400 font-semibold tracking-wider">
-                  {mode === 'login' ? t('auth.orUseCredentials') : t('auth.orUseEmail')}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Form with Google Material Outline Inputs */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Full Name (Register Mode only) */}
-            {mode === 'register' && (
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
-                  {t('auth.fullName')}
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                    <UserIcon className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Dr. Ronit Sharma"
-                    className="w-full ts-input pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#1a73e8] focus:ring-2 focus:ring-[#1a73e8]/20 transition-all"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Email Address */}
+    <div className="min-h-[88vh] flex items-center justify-center py-6 sm:py-10 px-3 sm:px-6">
+      <div className="w-full max-w-5xl mx-auto">
+        <div className="lg:grid lg:grid-cols-12 gap-8 items-start">
+          {/* Left Column: Mission, Biometeorological Science, and Trust (Visible on lg screens) */}
+          <div className="hidden lg:flex lg:col-span-5 flex-col justify-between space-y-6 pt-2">
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                  {mode === 'login' ? `${t('auth.email')} / Phone` : t('auth.email')}
-                </label>
-                {mode === 'login' && (
-                  <span
-                    onClick={() => {
-                      setEmail('aarav.sharma@health.gov.in');
-                    }}
-                    className="text-[11px] text-blue-600 dark:text-[#8ab4f8] font-medium hover:underline cursor-pointer"
-                  >
-                    {t('auth.forgotEmail')}
-                  </span>
-                )}
+              {/* Civic Tag & Problem Statement */}
+              <div className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-semibold mb-4">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>SIH26083 Civic Early Warning Network</span>
               </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <Mail className="w-4 h-4" />
+
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-cyan-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white flex-shrink-0">
+                  <ShieldCheck className="w-6 h-6" />
                 </div>
-                <input
-                  type={mode === 'login' ? 'text' : 'email'}
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder={mode === 'login' ? 'name@example.com or +91...' : 'name@example.com'}
-                  className="w-full ts-input pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#1a73e8] focus:ring-2 focus:ring-[#1a73e8]/20 transition-all"
-                />
+                <div>
+                  <h2 className="text-xl font-black tracking-tight ts-text-primary">ThermoShield</h2>
+                  <p className="text-xs ts-text-muted font-medium">Extreme Heatwave Defense Platform</p>
+                </div>
+              </div>
+
+              <h1 className="text-2xl xl:text-3xl font-extrabold ts-text-primary tracking-tight leading-tight mb-3">
+                Hyper-Local Thermal Defense For Every Citizen &amp; Household
+              </h1>
+              <p className="text-sm ts-text-muted leading-relaxed mb-6">
+                Calibrated biometeorological intelligence providing neighborhood Wet Bulb Globe Temperature (WBGT),
+                personalized vulnerability modeling, and early warning directives to protect public health.
+              </p>
+
+              {/* 3 Core Scientific Highlights */}
+              <div className="space-y-3.5">
+                <div className="p-3.5 rounded-2xl ts-card-subtle border ts-border flex items-start space-x-3 transition-all hover:border-emerald-500/40">
+                  <div className="p-2 rounded-xl bg-orange-500/10 border border-orange-500/25 text-orange-600 dark:text-orange-400 flex-shrink-0">
+                    <Thermometer className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold ts-text-primary">ISO 7243 &amp; WBGT Precision</h3>
+                    <p className="text-[11px] ts-text-muted mt-0.5 leading-relaxed">
+                      Real-time wet-bulb globe thermal strain modeling accounting for ambient temperature, humidity, wind, and direct solar radiation.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl ts-card-subtle border ts-border flex items-start space-x-3 transition-all hover:border-emerald-500/40">
+                  <div className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-400 flex-shrink-0">
+                    <HeartPulse className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold ts-text-primary">Personalized Risk Calibration</h3>
+                    <p className="text-[11px] ts-text-muted mt-0.5 leading-relaxed">
+                      Custom risk calculations adjusted for age, medical conditions, outdoor work exposure, hydration, and clothing habits.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl ts-card-subtle border ts-border flex items-start space-x-3 transition-all hover:border-emerald-500/40">
+                  <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 flex-shrink-0">
+                    <Radio className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold ts-text-primary">Actionable Directives &amp; Cooling Grids</h3>
+                    <p className="text-[11px] ts-text-muted mt-0.5 leading-relaxed">
+                      Hourly safe outdoor windows, hydration alerts, and direct routing to municipal cooling shelters and ORS hubs.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Phone Number (Register Mode only) */}
-            {mode === 'register' && (
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
-                  {t('auth.phone')}
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                    <Phone className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="tel"
-                    required
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    placeholder="+91 98765 43210"
-                    className="w-full ts-input pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#1a73e8] focus:ring-2 focus:ring-[#1a73e8]/20 transition-all"
-                  />
+            {/* Zero-Trust Security Callout */}
+            <div className="p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20 text-xs text-blue-700 dark:text-blue-300">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center space-x-2 font-bold">
+                  <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span>256-Bit Cryptographic Security</span>
                 </div>
-              </div>
-            )}
-
-            {/* Password */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                  {t('auth.password')}
-                </label>
-                {mode === 'login' && (
-                  <span
-                    onClick={() => setPassword('demo12345')}
-                    className="text-[11px] text-blue-600 dark:text-[#8ab4f8] font-medium hover:underline cursor-pointer"
-                  >
-                    {t('auth.useDemoPassword')}
-                  </span>
-                )}
-              </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={mode === 'login' ? '••••••••' : 'Minimum 8 characters'}
-                  className="w-full ts-input pl-10 pr-11 py-2.5 text-sm focus:outline-none focus:border-[#1a73e8] focus:ring-2 focus:ring-[#1a73e8]/20 transition-all"
-                />
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                  onClick={() => setIsSecurityModalOpen(true)}
+                  className="text-[11px] font-semibold underline hover:text-blue-900 dark:hover:text-white cursor-pointer"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  Architecture
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                OAuth 2.0 PKCE verification with Google public keys, salted Bcrypt-12, and zero-trust session safeguards.
+              </p>
+            </div>
+          </div>
+
+          {/* Right Column: Auth Card + Mobile Header */}
+          <div className="lg:col-span-7 w-full">
+            {/* Mobile Header (Shown on < lg screens) */}
+            <div className="text-center mb-6 lg:hidden">
+              <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-semibold mb-3">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>SIH26083 Civic Heat Defense</span>
+              </div>
+              <h1 className="text-2xl font-bold ts-text-primary tracking-tight">
+                {mode === 'login' ? t('auth.loginTitle') : t('auth.registerTitle')}
+              </h1>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-sm mx-auto">
+                {mode === 'login'
+                  ? t('auth.loginSubtitle')
+                  : t('auth.registerSubtitle')}
+              </p>
+            </div>
+
+            {/* Main Auth Card */}
+            <div className="ts-card rounded-3xl shadow-2xl p-5 sm:p-8 relative overflow-hidden backdrop-blur-xl border ts-border">
+              {/* Subtle Ambient Glows */}
+              <div className="absolute -top-24 -right-24 w-52 h-52 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-24 -left-24 w-52 h-52 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+              {/* Card Header (Desktop) */}
+              <div className="hidden lg:block mb-5">
+                <h2 className="text-xl font-bold ts-text-primary">
+                  {mode === 'login' ? t('auth.loginTitle') : t('auth.registerTitle')}
+                </h2>
+                <p className="text-xs ts-text-muted mt-0.5">
+                  {mode === 'login'
+                    ? t('auth.loginSubtitle')
+                    : t('auth.registerSubtitle')}
+                </p>
+              </div>
+
+              {/* Mode Switcher Tabs */}
+              <div className="grid grid-cols-2 p-1 ts-card-subtle rounded-2xl mb-5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('login');
+                    setLocalError(null);
+                    clearError();
+                  }}
+                  className={`py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 cursor-pointer ${
+                    mode === 'login'
+                      ? 'bg-white dark:bg-slate-800 ts-text-primary shadow-sm border border-slate-200 dark:border-slate-700/60'
+                      : 'text-slate-600 dark:text-slate-400 hover:ts-text-primary'
+                  }`}
+                >
+                  <span>{t('auth.signIn')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('register');
+                    setLocalError(null);
+                    clearError();
+                  }}
+                  className={`py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 cursor-pointer ${
+                    mode === 'register'
+                      ? 'bg-white dark:bg-slate-800 ts-text-primary shadow-sm border border-slate-200 dark:border-slate-700/60'
+                      : 'text-slate-600 dark:text-slate-400 hover:ts-text-primary'
+                  }`}
+                >
+                  <span>{t('auth.register')}</span>
                 </button>
               </div>
 
-              {/* Password strength meter in registration mode */}
-              {mode === 'register' && password && (
-                <div className="mt-2">
-                  <div className="flex items-center justify-between text-[11px] mb-1">
-                    <span className="ts-text-subtle">{t('auth.passwordStrength')}:</span>
-                    <span className="font-semibold ts-text-primary">{passStrength.label}</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full ${passStrength.color} transition-all duration-300`}
-                      style={{ width: `${passStrength.score}%` }}
-                    />
+              {/* Error Banner */}
+              {(localError || authError) && (
+                <div className="mb-4 p-3.5 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-start space-x-3 text-red-400 text-xs animate-in fade-in duration-200">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-red-300">Security / Auth Notice</p>
+                    <p className="text-red-400/90 mt-0.5">{localError || authError}</p>
                   </div>
                 </div>
               )}
-            </div>
 
-            {/* Role Selection (Register Mode only) */}
-            {mode === 'register' && (
-              <div className="pt-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
-                  {t('auth.role')}
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {roleOptions.map((opt) => {
-                    const Icon = opt.icon;
-                    const isSelected = role === opt.id;
-                    return (
-                      <div
-                        key={opt.id}
-                        onClick={() => setRole(opt.id as any)}
-                        className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                          isSelected
-                            ? 'bg-blue-50 dark:bg-slate-800 border-[#1a73e8] ring-1 ring-[#1a73e8]/50'
-                            : 'ts-card-subtle hover:border-slate-400 dark:hover:border-slate-700'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-2.5">
-                          <div className={`p-1.5 rounded-lg border ${opt.badgeColor} flex items-center justify-center`}>
-                            <Icon className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <div className="text-xs font-bold ts-text-primary">{opt.label}</div>
-                            <div className="text-[10px] ts-text-muted leading-tight">{opt.desc}</div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+              {/* Success Banner */}
+              {successMsg && (
+                <div className="mb-4 p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-start space-x-3 text-emerald-400 text-xs animate-in fade-in duration-200">
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-emerald-300">Authenticated</p>
+                    <p className="text-emerald-400/90 mt-0.5">{successMsg}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Google Sign-In One-Click Button */}
+              <div className="mb-5">
+                <button
+                  type="button"
+                  disabled={isGoogleLoading || isSubmitting}
+                  onClick={handleGoogleClick}
+                  className="w-full py-3 px-4 bg-white hover:bg-slate-50 text-slate-800 font-medium text-xs sm:text-sm rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow flex items-center justify-center space-x-3 transition-all duration-200 hover:scale-[1.005] active:scale-[0.995] disabled:opacity-60 disabled:cursor-not-allowed group relative overflow-hidden cursor-pointer"
+                >
+                  {isGoogleLoading ? (
+                    <span className="w-4 h-4 border-2 border-slate-400 border-t-[#4285F4] rounded-full animate-spin" />
+                  ) : (
+                    <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center">
+                      <svg className="w-full h-full" viewBox="0 0 24 24">
+                        <path
+                          fill="#4285F4"
+                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                        />
+                        <path
+                          fill="#EA4335"
+                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                        />
+                      </svg>
+                    </div>
+                  )}
+                  <span>
+                    {mode === 'login' ? t('auth.continueWithGoogle') : t('auth.signUpWithGoogle')}
+                  </span>
+                  <span className="hidden sm:inline-block ml-auto text-[10px] font-bold text-slate-500 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                    SSO
+                  </span>
+                </button>
+
+                {/* Divider */}
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t ts-border" />
+                  </div>
+                  <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
+                    <span className="bg-white dark:bg-slate-900 px-3 text-slate-500 dark:text-slate-400 font-semibold tracking-wider">
+                      {mode === 'login' ? t('auth.orUseCredentials') : t('auth.orUseEmail')}
+                    </span>
+                  </div>
                 </div>
               </div>
-            )}
 
-            {/* Submit Button */}
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 text-white font-semibold text-sm rounded-xl shadow-lg shadow-blue-600/25 flex items-center justify-center space-x-2 transition-all duration-200 hover:scale-[1.005] active:scale-[0.995] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
-              >
-                {isSubmitting ? (
-                  <span className="inline-flex items-center space-x-2">
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>{t('auth.verifying')}</span>
-                  </span>
-                ) : (
-                  <>
-                    <span>{mode === 'login' ? t('auth.signIn') : t('auth.register')}</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
+              {/* Form */}
+              <form onSubmit={handleSubmit} className="space-y-3.5">
+                {/* Full Name (Register Mode only) */}
+                {mode === 'register' && (
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                      {t('auth.fullName')}
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <UserIcon className="w-4 h-4" />
+                      </div>
+                      <input
+                        type="text"
+                        required
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="e.g. Siddharth Patel"
+                        className="w-full ts-input pl-10 pr-4 py-2.5 text-xs sm:text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all rounded-xl"
+                      />
+                    </div>
+                  </div>
                 )}
-              </button>
-            </div>
-          </form>
 
-          {/* Quick Demo Credentials */}
-          <div className="mt-6 pt-4 border-t ts-border">
-            <div className="flex items-center justify-between mb-2.5">
-              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center space-x-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
-                <span>{t('auth.demoPersonasTitle')}</span>
-              </span>
+                {/* Email Address */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                      {mode === 'login' ? `${t('auth.email')} / Phone` : t('auth.email')}
+                    </label>
+                    {mode === 'login' && (
+                      <span
+                        onClick={() => {
+                          setEmail('siddharth.patel@gmail.com');
+                        }}
+                        className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium hover:underline cursor-pointer"
+                      >
+                        Sample Citizen Email
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Mail className="w-4 h-4" />
+                    </div>
+                    <input
+                      type={mode === 'login' ? 'text' : 'email'}
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder={mode === 'login' ? 'name@example.com or +91...' : 'name@example.com'}
+                      className="w-full ts-input pl-10 pr-4 py-2.5 text-xs sm:text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all rounded-xl"
+                    />
+                  </div>
+                </div>
+
+                {/* Phone Number (Register Mode only) */}
+                {mode === 'register' && (
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                      {t('auth.phone')}
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <Phone className="w-4 h-4" />
+                      </div>
+                      <input
+                        type="tel"
+                        required
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        placeholder="+91 98765 43210"
+                        className="w-full ts-input pl-10 pr-4 py-2.5 text-xs sm:text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all rounded-xl"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Password */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                      {t('auth.password')}
+                    </label>
+                    {mode === 'login' && (
+                      <span
+                        onClick={() => setPassword('demo12345')}
+                        className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium hover:underline cursor-pointer"
+                      >
+                        {t('auth.useDemoPassword')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder={mode === 'login' ? '••••••••' : 'Minimum 8 characters'}
+                      className="w-full ts-input pl-10 pr-11 py-2.5 text-xs sm:text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all rounded-xl"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {/* Password strength meter in registration mode */}
+                  {mode === 'register' && password && (
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between text-[10px] mb-1">
+                        <span className="ts-text-subtle">{t('auth.passwordStrength')}:</span>
+                        <span className="font-semibold ts-text-primary">{passStrength.label}</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${passStrength.color} transition-all duration-300`}
+                          style={{ width: `${passStrength.score}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Role Selection (Register Mode only) */}
+                {mode === 'register' && (
+                  <div className="pt-1">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                      {t('auth.role')}
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {roleOptions.map((opt) => {
+                        const Icon = opt.icon;
+                        const isSelected = role === opt.id;
+                        return (
+                          <div
+                            key={opt.id}
+                            onClick={() => setRole(opt.id as any)}
+                            className={`p-2.5 rounded-xl border cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-500 ring-1 ring-emerald-500/40'
+                                : 'ts-card-subtle hover:border-slate-400 dark:hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-2.5">
+                              <div className={`p-1.5 rounded-lg border ${opt.badgeColor} flex items-center justify-center flex-shrink-0`}>
+                                <Icon className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-xs font-bold ts-text-primary truncate">{opt.label}</div>
+                                <div className="text-[10px] ts-text-muted leading-tight line-clamp-1">{opt.desc}</div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Submit Button */}
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 hover:from-emerald-500 hover:to-teal-600 text-white font-bold text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-600/20 flex items-center justify-center space-x-2 transition-all duration-200 hover:scale-[1.005] active:scale-[0.995] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    {isSubmitting ? (
+                      <span className="inline-flex items-center space-x-2">
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>{t('auth.verifying')}</span>
+                      </span>
+                    ) : (
+                      <>
+                        <span>{mode === 'login' ? t('auth.signIn') : t('auth.register')}</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+
+              {/* Organized & Intentional Evaluation / Demo Access */}
+              <div className="mt-6 pt-4 border-t ts-border">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                      Evaluation &amp; Demo Roles
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                    1-Click Test Sign-In
+                  </span>
+                </div>
+                <p className="text-[11px] ts-text-muted mb-3 leading-relaxed">
+                  Select a verified test persona to evaluate personalized thermal stress, authority command, or field responder views:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {/* Citizen */}
+                  <button
+                    type="button"
+                    onClick={() => handleDemoFill('user')}
+                    className="p-2.5 rounded-xl ts-card-subtle border ts-border hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all text-left flex items-start space-x-2.5 cursor-pointer group"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                      SP
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold ts-text-primary group-hover:text-emerald-600 dark:group-hover:text-emerald-400 truncate">
+                          Siddharth Patel
+                        </span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                          Citizen
+                        </span>
+                      </div>
+                      <div className="text-[10px] ts-text-muted truncate">siddharth.patel@gmail.com</div>
+                    </div>
+                  </button>
+
+                  {/* Municipal Authority */}
+                  <button
+                    type="button"
+                    onClick={() => handleDemoFill('official')}
+                    className="p-2.5 rounded-xl ts-card-subtle border ts-border hover:border-cyan-500/50 hover:bg-cyan-500/5 transition-all text-left flex items-start space-x-2.5 cursor-pointer group"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                      AS
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold ts-text-primary group-hover:text-cyan-600 dark:group-hover:text-cyan-400 truncate">
+                          Dr. Aarav Sharma
+                        </span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30">
+                          Authority
+                        </span>
+                      </div>
+                      <div className="text-[10px] ts-text-muted truncate">aarav.sharma@health.gov.in</div>
+                    </div>
+                  </button>
+
+                  {/* Responder */}
+                  <button
+                    type="button"
+                    onClick={() => handleDemoFill('responder')}
+                    className="p-2.5 rounded-xl ts-card-subtle border ts-border hover:border-orange-500/50 hover:bg-orange-500/5 transition-all text-left flex items-start space-x-2.5 cursor-pointer group"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                      RV
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold ts-text-primary group-hover:text-orange-600 dark:group-hover:text-orange-400 truncate">
+                          Rajesh Verma (NDRF)
+                        </span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30">
+                          Responder
+                        </span>
+                      </div>
+                      <div className="text-[10px] ts-text-muted truncate">rajesh.verma@disastermgmt.gov.in</div>
+                    </div>
+                  </button>
+
+                  {/* Climate Analyst */}
+                  <button
+                    type="button"
+                    onClick={() => handleDemoFill('analyst')}
+                    className="p-2.5 rounded-xl ts-card-subtle border ts-border hover:border-purple-500/50 hover:bg-purple-500/5 transition-all text-left flex items-start space-x-2.5 cursor-pointer group"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                      PI
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold ts-text-primary group-hover:text-purple-600 dark:group-hover:text-purple-400 truncate">
+                          Pooja Iyer (IMD)
+                        </span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30">
+                          Analyst
+                        </span>
+                      </div>
+                      <div className="text-[10px] ts-text-muted truncate">pooja.iyer@imd.gov.in</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Security & Compliance Footer */}
+              <div className="mt-5 pt-3.5 border-t ts-border flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 gap-2">
+                <div className="flex items-center space-x-2">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
+                  <span>TLS 1.3 • OAuth 2.0 PKCE • Bcrypt-12</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSecurityModalOpen(true)}
+                  className="text-emerald-600 dark:text-emerald-400 font-medium hover:underline flex items-center space-x-1 cursor-pointer"
+                >
+                  <span>Security Architecture</span>
+                  <ExternalLink className="w-3 h-3" />
+                </button>
+              </div>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <button
-                type="button"
-                onClick={() => handleDemoFill('user')}
-                className="px-2.5 py-1.5 ts-card-subtle border ts-border hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium hover:text-emerald-600 dark:hover:text-emerald-400 text-xs rounded-lg text-center transition-colors cursor-pointer"
+
+            {/* Back Link */}
+            <div className="text-center mt-4">
+              <Link
+                to="/"
+                className="text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium transition-colors inline-flex items-center space-x-1"
               >
-                👤 {t('role.citizen')}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoFill('official')}
-                className="px-2.5 py-1.5 ts-card-subtle border ts-border hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium hover:text-cyan-600 dark:hover:text-cyan-400 text-xs rounded-lg text-center transition-colors cursor-pointer"
-              >
-                🏥 {t('role.healthOfficial')}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoFill('responder')}
-                className="px-2.5 py-1.5 ts-card-subtle border ts-border hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium hover:text-orange-600 dark:hover:text-orange-400 text-xs rounded-lg text-center transition-colors cursor-pointer"
-              >
-                🚒 {t('role.responder')}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoFill('analyst')}
-                className="px-2.5 py-1.5 ts-card-subtle border ts-border hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium hover:text-purple-600 dark:hover:text-purple-400 text-xs rounded-lg text-center transition-colors cursor-pointer"
-              >
-                📊 {t('role.analyst')}
-              </button>
+                <span>← {t('auth.returnToDashboard')}</span>
+              </Link>
             </div>
           </div>
-
-          {/* Security & Compliance Footer */}
-          <div className="mt-5 pt-3.5 border-t ts-border flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 gap-2">
-            <div className="flex items-center space-x-2">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
-              <span>TLS 1.3 • OAuth 2.0 PKCE • Bcrypt-12</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsSecurityModalOpen(true)}
-              className="text-blue-600 dark:text-[#8ab4f8] font-medium hover:underline flex items-center space-x-1 cursor-pointer"
-            >
-              <span>Security Architecture</span>
-              <ExternalLink className="w-3 h-3" />
-            </button>
-          </div>
-        </div>
-
-        {/* Back Link */}
-        <div className="text-center mt-4">
-          <Link
-            to="/"
-            className="text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium transition-colors inline-flex items-center space-x-1"
-          >
-            <span>← {t('auth.returnToDashboard')}</span>
-          </Link>
         </div>
       </div>
 

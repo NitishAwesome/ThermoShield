@@ -31,12 +31,14 @@ import {
   Info,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useProfile } from '../context/ProfileContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLocation } from '../context/LocationContext';
 import { useTranslation } from '../context/LanguageContext';
 import { LanguageSelector } from './LanguageSelector';
 import { useNotificationDecision } from '../context/NotificationDecisionContext';
 import { MethodologyDisclosureModal } from './provenance';
+import { getEffectiveIdentity } from '../utils/identity';
 
 const AUTHORIZED_GOV_ROLES = ['official', 'responder', 'analyst', 'admin'];
 
@@ -52,6 +54,8 @@ export const Navbar: React.FC = () => {
   const moreDropdownRef = useRef<HTMLDivElement>(null);
 
   const { user, isAuthenticated, logout } = useAuth();
+  const { profile } = useProfile();
+  const effectiveIdentity = getEffectiveIdentity(profile, user);
   const { theme, setTheme } = useTheme();
   const { locationName } = useLocation();
   const { t } = useTranslation();
@@ -82,7 +86,7 @@ export const Navbar: React.FC = () => {
     setMoreDropdownOpen(false);
   }, [routerLocation.pathname]);
 
-  const userRole = (user?.role || '').toLowerCase();
+  const userRole = effectiveIdentity.role;
   const isGovRole = isAuthenticated && AUTHORIZED_GOV_ROLES.includes(userRole);
   const isGovPortal = routerLocation.pathname.startsWith('/gov');
 
@@ -138,6 +142,12 @@ export const Navbar: React.FC = () => {
           label: 'Health Impact',
           shortLabel: 'Health',
           icon: HeartPulse,
+        },
+        {
+          to: '/gov/action-plan',
+          label: 'Heat Action Plan',
+          shortLabel: 'Action Plan',
+          icon: ShieldAlert,
         },
         {
           to: '/gov/dispatch',
@@ -240,7 +250,7 @@ export const Navbar: React.FC = () => {
       {
         to: '/risk-details',
         label: 'Detailed Metrics',
-        description: 'Biometeorological thermal index & meteorological breakdown',
+        description: 'How weather affects your body & thermal breakdown',
         icon: Layers,
       },
     ];
@@ -263,7 +273,7 @@ export const Navbar: React.FC = () => {
     (item) => item.to === routerLocation.pathname || (item.to !== '/' && routerLocation.pathname.startsWith(item.to))
   );
 
-  const roleInfo = getRoleBadge(user?.role);
+  const roleInfo = getRoleBadge(effectiveIdentity.role);
   const RoleIcon = roleInfo.icon;
 
   const renderThemeIcon = () => {
@@ -273,8 +283,9 @@ export const Navbar: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-50 ts-card-elevated border-b ts-border backdrop-blur-md overflow-x-clip">
-      <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-2">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16 gap-2 sm:gap-4">
+
           {/* Brand Logo & Current Portal Indicator */}
           <NavLink
             to={isGovPortal ? '/gov/dashboard' : '/'}
@@ -408,10 +419,10 @@ export const Navbar: React.FC = () => {
                       <Info className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
                       <div>
                         <div className="font-semibold text-xs flex items-center gap-1">
-                          <span>Data Reality & Methodology</span>
+                          <span>How This Works & Data Reality</span>
                         </div>
                         <div className="text-[10.5px] ts-text-subtle leading-tight">
-                          Inspect live, calculated, modelled & fallback tiers
+                          Inspect calculations, data sources & fallback tiers
                         </div>
                       </div>
                     </button>
@@ -468,12 +479,10 @@ export const Navbar: React.FC = () => {
                 type="button"
                 aria-label={t('theme.displayTheme', 'Display Theme')}
                 onClick={() => setThemeDropdownOpen(!themeDropdownOpen)}
-                className="flex items-center space-x-1.5 p-2 rounded-lg ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary transition-all focus:outline-none"
+                className="flex items-center justify-center w-8 h-8 rounded-lg ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary transition-all focus:outline-none"
                 title={`${t('theme.displayTheme', 'Display Theme')}: ${theme.toUpperCase()}`}
               >
                 {renderThemeIcon()}
-                <span className="text-xs font-semibold capitalize hidden xl:inline">{theme}</span>
-                <ChevronDown className="w-3 h-3 text-slate-400 hidden xl:inline" />
               </button>
 
               {themeDropdownOpen && (
@@ -516,19 +525,20 @@ export const Navbar: React.FC = () => {
             </div>
 
             {/* Auth Profile Button */}
-            {isAuthenticated && user ? (
+            {isAuthenticated && (user || profile) ? (
               <div className="relative flex-shrink-0" ref={dropdownRef}>
                 <button
                   type="button"
                   onClick={() => setDropdownOpen(!dropdownOpen)}
-                  className="flex items-center space-x-2 p-1.5 pl-2 pr-2 rounded-xl ts-card-subtle hover:bg-slate-800/60 border ts-border ts-text-primary transition-all flex-shrink-0"
+                  className="flex items-center space-x-2 p-1.5 pl-2 pr-2 rounded-xl ts-card-subtle hover:bg-slate-800/60 border ts-border ts-text-primary transition-all flex-shrink-0 cursor-pointer"
+                  title={`${effectiveIdentity.displayName} (${roleInfo.label})`}
                 >
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-sky-600 to-blue-600 flex items-center justify-center text-xs font-bold text-white shadow-sm flex-shrink-0">
-                    {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-sky-600 to-blue-600 flex items-center justify-center text-xs font-bold text-white shadow-sm flex-shrink-0 tracking-tight">
+                    {effectiveIdentity.initials}
                   </div>
                   <div className="text-left hidden xl:block">
-                    <div className="text-xs font-bold leading-tight max-w-[85px] lg:max-w-[110px] truncate ts-text-primary">
-                      {user.name}
+                    <div className="text-xs font-bold leading-tight max-w-[85px] lg:max-w-[125px] truncate ts-text-primary">
+                      {effectiveIdentity.displayName}
                     </div>
                     <div className="text-[10px] text-orange-700 dark:text-orange-300 font-medium leading-none mt-0.5">
                       {roleInfo.label}
@@ -539,13 +549,33 @@ export const Navbar: React.FC = () => {
 
                 {/* User Dropdown Menu */}
                 {dropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-64 ts-card-elevated border ts-border rounded-2xl shadow-2xl py-2 z-50">
+                  <div className="absolute right-0 mt-2 w-64 ts-card-elevated border ts-border rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                     <div className="px-4 py-3 border-b ts-border">
-                      <div className="text-sm font-bold ts-text-primary">{user.name}</div>
-                      <div className="text-xs ts-text-muted truncate">{user.email}</div>
-                      <div className={`mt-2 inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] border font-semibold ${roleInfo.classes}`}>
-                        <RoleIcon className="w-3 h-3" />
-                        <span>{roleInfo.label}</span>
+                      <div className="flex items-center space-x-2.5 mb-1.5">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-sky-600 to-blue-600 flex items-center justify-center text-xs font-bold text-white shadow-sm flex-shrink-0">
+                          {effectiveIdentity.initials}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-bold ts-text-primary truncate" title={effectiveIdentity.displayName}>
+                            {effectiveIdentity.displayName}
+                          </div>
+                          <div className="text-xs ts-text-muted truncate" title={effectiveIdentity.email}>
+                            {effectiveIdentity.email}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-1 mt-2">
+                        <div className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] border font-semibold ${roleInfo.classes}`}>
+                          <RoleIcon className="w-3 h-3" />
+                          <span>{roleInfo.label}</span>
+                        </div>
+                        {effectiveIdentity.homeLocation && (
+                          <div className="text-[10.5px] ts-text-subtle truncate max-w-[110px] flex items-center gap-0.5" title={`Home: ${effectiveIdentity.homeLocation}`}>
+                            <MapPin className="w-2.5 h-2.5 text-orange-400 shrink-0" />
+                            <span className="truncate">{effectiveIdentity.homeLocation.split(',')[0]}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -747,10 +777,10 @@ export const Navbar: React.FC = () => {
               <Info className="w-4 h-4 text-orange-500 flex-shrink-0" />
               <div>
                 <div className="font-semibold text-xs flex items-center gap-1">
-                  <span>Data Reality & Methodology</span>
+                  <span>How This Works & Data Reality</span>
                 </div>
                 <div className="text-[10px] ts-text-subtle">
-                  Inspect live, calculated, modelled & fallback tiers
+                  Inspect calculations, data sources & fallback tiers
                 </div>
               </div>
             </button>

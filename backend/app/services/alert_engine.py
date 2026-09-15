@@ -55,14 +55,17 @@ def get_alert_priority(risk_level: str) -> str:
 
 def get_engine_status_summary() -> Dict[str, Any]:
     """Returns engine telemetry for diagnostics and frontend inspection."""
+    from app.services.sms import get_sms_delivery_status
     return {
         "engine_active": True,
         "email_dispatch_configured": is_smtp_configured(),
+        "sms_dispatch": get_sms_delivery_status(),
         "monitored_locations_tracked": len(_LOCATION_STATE_REGISTRY),
         "cooldown_records_active": len(_CITIZEN_COOLDOWN_REGISTRY),
         "recent_dispatches_count": len(_RECENT_DISPATCH_LOG),
         "recent_dispatches": _RECENT_DISPATCH_LOG[-10:] if _RECENT_DISPATCH_LOG else []
     }
+
 
 
 def evaluate_risk_transition(

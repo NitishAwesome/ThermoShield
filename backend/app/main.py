@@ -35,7 +35,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 
-from app.services.location import search_location
+from app.services.location import search_location, reverse_location
 from app.services.weather import get_weather, get_forecast
 
 from app.services.thermal import (
@@ -61,11 +61,22 @@ from app.services.map_services import (
 )
 from app.services.intervention import generate_interventions
 from app.services.simulator import simulate_intervention
-from app.services.sms import send_sms
-from app.services.email import send_notification_email
+from app.services.sms import send_sms, get_sms_delivery_status
+from app.services.email import send_notification_email, is_smtp_configured
 from app.services.email_templates import generate_action_first_alert_html
 from app.services.alert_engine import dispatch_automatic_early_warning, get_engine_status_summary
 from app.services.monitor import monitor_daemon
+
+
+from app.services.heat_action_plan import (
+    evaluate_heat_action_plan,
+    get_all_wards_heat_action_overview,
+    MUNICIPAL_WARD_REGISTRY,
+)
+from app.services.health_forecast import (
+    generate_health_impact_forecast,
+    get_all_wards_forecast_summary,
+)
 
 
 from app.schemas import (
@@ -83,7 +94,13 @@ from app.schemas import (
     SendAlertEmailResponse,
     AlertSubscriptionRequest,
     AlertSubscriptionResponse,
+    SendTestSMSRequest,
+    SendTestSMSResponse,
+    HeatActionEvaluateRequest,
+    HeatActionDecisionUpdateRequest,
 )
+
+
 
 
 
@@ -556,6 +573,76 @@ async def trigger_alert_engine_cycle_api():
     }
 
 
+@app.get("/alerts/delivery-status")
+def get_alerts_delivery_status():
+    """
+    Returns multi-channel alert delivery gateway health and operational readiness.
+    Preserves truthfulness across SMS, Email, and WhatsApp channels.
+    """
+    sms_status = get_sms_delivery_status()
+    smtp_ok = is_smtp_configured()
+    sender_email = (os.getenv("MAIL_USERNAME") or "").strip()
+
+    return {
+        "sms": sms_status,
+        "email": {
+            "status": "OPERATIONAL" if smtp_ok else "NOT_CONFIGURED",
+            "display_status": "Operational (SMTP Direct)" if smtp_ok else "Not Configured (Simulation Mode)",
+            "configured": smtp_ok,
+            "sender": sender_email if smtp_ok else "Not Configured",
+            "can_deliver": smtp_ok,
+            "channel": "Email Dispatch (SMTP)"
+        },
+        "whatsapp": {
+            "status": "PLANNED",
+            "display_status": "Planned Integration",
+            "configured": False,
+            "can_deliver": False,
+            "channel": "WhatsApp Business API",
+            "note": "Planned for subsequent regional deployment under SIH26083."
+        }
+    }
+
+
+@app.post(
+    "/alerts/send-test-sms",
+    response_model=SendTestSMSResponse
+)
+async def send_test_sms_api(
+    payload: SendTestSMSRequest,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """
+    Dispatches a test SMS alert to verify cellular gateway deliverability.
+    If Twilio credentials are configured, sends real SMS; otherwise runs truthful demo simulation.
+    """
+    clean_phone = (payload.phone_number or "").strip()
+    if not clean_phone or len(clean_phone) < 7:
+        raise HTTPException(
+            status_code=400,
+            detail="A valid phone number with at least 7 digits is required."
+        )
+
+    loc = payload.location_name or "Monitored Region"
+    test_msg = payload.message or (
+        f"[ThermoShield TEST ALERT] Heatwave early warning system test for {loc}. "
+        f"Automated regional dispatch pipeline operational."
+    )
+
+    result = await send_sms(clean_phone, test_msg)
+
+    return SendTestSMSResponse(
+        success=result.get("success", False),
+        status=result.get("status", "SIMULATED"),
+        mode=result.get("mode", "DEMO"),
+        provider=result.get("provider", "demo"),
+        recipient=clean_phone,
+        message=test_msg,
+        message_id=result.get("message_id"),
+        error=result.get("error")
+    )
+
+
 @app.get(
     "/alerts/{alert_id}",
     response_model=AlertResponse
@@ -848,6 +935,9 @@ def subscribe_citizen_alerts(
 
 
 
+
+
+
 # ==================================================
 # INTERVENTION CRUD (PROTECTED)
 # ==================================================
@@ -1000,6 +1090,20 @@ async def location_search(
         "count": len(locations),
         "locations": locations
     }
+
+
+@app.get("/location/reverse")
+async def location_reverse(
+    lat: float = Query(..., ge=-90, le=90),
+    lon: float = Query(..., ge=-180, le=180),
+):
+    """
+    Reverse geocodes a lat/lon coordinate to a human-friendly place name.
+    Used by the Citizen Heat Map for tap-to-place interaction.
+    Returns: { name, latitude, longitude }
+    """
+    result = await reverse_location(lat, lon)
+    return result
 
 
 # ==================================================
@@ -1646,3 +1750,223 @@ async def intervention_simulation(
         "active_interventions": active_list,
         "policy_count": len(active_list),
     }
+
+
+# ==================================================
+# HEAT ACTION PLAN (HAP) DECISION ENGINE (PROMPT 21)
+# ==================================================
+
+# In-memory store for municipal manual decision states
+HEAT_ACTION_DECISIONS: Dict[str, Dict[str, Any]] = {}
+
+
+def _apply_decisions_to_actions(area_id: str, actions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Enriches recommended actions with saved manual municipal decisions."""
+    clean_area = area_id.strip().lower()
+    for act in actions:
+        key = f"{clean_area}:{act.get('action')}"
+        if key in HEAT_ACTION_DECISIONS:
+            dec = HEAT_ACTION_DECISIONS[key]
+            act["decision_status"] = dec.get("decision_status", act.get("status"))
+            act["decision_officer"] = dec.get("officer_name")
+            act["decision_notes"] = dec.get("officer_notes")
+            act["decision_timestamp"] = dec.get("updated_at")
+        else:
+            act["decision_status"] = act.get("status", "RECOMMENDED_FOR_REVIEW")
+    return actions
+
+
+@app.get("/api/action-plan/all")
+def get_all_heat_action_plans_api():
+    """
+    Returns localized Heat Action Plan evaluations across all registered administrative wards.
+    Enriched with any active municipal authority review decisions.
+    """
+    plans = get_all_wards_heat_action_overview()
+    for plan in plans:
+        plan["recommended_actions"] = _apply_decisions_to_actions(
+            plan["area_id"], plan.get("recommended_actions", [])
+        )
+    return {
+        "count": len(plans),
+        "plans": plans
+    }
+
+
+@app.get("/api/action-plan/decisions")
+def get_action_decisions_api():
+    """
+    Returns all manual authority decision overrides recorded by city disaster managers.
+    """
+    return {
+        "count": len(HEAT_ACTION_DECISIONS),
+        "decisions": list(HEAT_ACTION_DECISIONS.values())
+    }
+
+
+@app.post("/api/action-plan/decision")
+def update_action_decision_api(
+    payload: HeatActionDecisionUpdateRequest,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """
+    Records an authority decision on a Heat Action recommendation:
+    Allowed states: 'Reviewed', 'Acknowledged', 'Deferred', 'Action Initiated Externally'
+    """
+    status_val = payload.decision_status or payload.decision or "Reviewed"
+    valid_states = ["Reviewed", "Acknowledged", "Deferred", "Action Initiated Externally", "RECOMMENDED_FOR_REVIEW"]
+    if status_val not in valid_states:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid decision_status '{status_val}'. Must be one of: {', '.join(valid_states)}"
+        )
+
+    clean_area = (payload.area_id or "general").strip().lower()
+    clean_action = payload.action_key.strip()
+    key = f"{clean_area}:{clean_action}"
+
+    officer_name = payload.officer_name
+    if not officer_name and current_user:
+        officer_name = getattr(current_user, "name", None) or getattr(current_user, "email", "Civic Administrator")
+
+    record = {
+        "key": key,
+        "area_id": clean_area,
+        "action_key": clean_action,
+        "decision_status": status_val,
+        "officer_name": officer_name or "Disaster Management Officer",
+        "officer_notes": payload.officer_notes or payload.notes or "",
+        "updated_at": datetime.utcnow().isoformat() + "Z"
+    }
+    HEAT_ACTION_DECISIONS[key] = record
+
+    return {
+        "status": "success",
+        "message": f"Action '{clean_action}' for area '{clean_area}' marked as '{payload.decision_status}'",
+        "decision": record
+    }
+
+
+@app.get("/api/action-plan/{area_id}")
+async def get_heat_action_plan_api(
+    area_id: str,
+    temp_override: Optional[float] = None,
+    risk_override: Optional[str] = None
+):
+    """
+    Evaluates and returns the localized Heat Action Plan trigger package for a specific ward/area.
+    Uses real meteorological forecast data if available, or registered municipal baseline.
+    """
+    clean_area = area_id.strip().lower()
+    profile = MUNICIPAL_WARD_REGISTRY.get(clean_area)
+
+    lat = profile["latitude"] if profile else 19.0760
+    lon = profile["longitude"] if profile else 72.8777
+    vuln = profile.get("vulnerability_score", 55.0) if profile else 50.0
+    name = profile.get("name") if profile else clean_area.replace("_", " ").title()
+
+    temp = temp_override or (profile.get("baseline_temp", 34.5) if profile else 34.0)
+    try:
+        w = await get_weather(lat, lon)
+        weather = w.get("weather", {})
+        if "temperature" in weather and temp_override is None:
+            temp = weather["temperature"]
+        hum = weather.get("humidity", 65.0)
+    except Exception as exc:
+        logger.warning(f"Weather lookup fallback for HAP area {area_id}: {exc}")
+        hum = 65.0
+
+    plan = evaluate_heat_action_plan(
+        area_id=clean_area,
+        area_name=name,
+        temperature_c=temp,
+        humidity_pct=hum,
+        vulnerability_score=vuln,
+        risk_level=risk_override,
+    )
+
+    plan_dict = plan.to_dict()
+    plan_dict["recommended_actions"] = _apply_decisions_to_actions(
+        clean_area, plan_dict.get("recommended_actions", [])
+    )
+    return plan_dict
+
+
+@app.post("/api/action-plan/evaluate")
+def evaluate_heat_action_plan_api(payload: HeatActionEvaluateRequest):
+    """
+    Evaluates arbitrary or custom microclimate telemetry against the city administration decision engine.
+    """
+    plan = evaluate_heat_action_plan(
+        area_id=payload.area_id,
+        area_name=payload.area_name,
+        temperature_c=payload.temperature_c or 34.0,
+        humidity_pct=payload.humidity_pct or 65.0,
+        wbgt_c=payload.wbgt_c,
+        heat_index_c=payload.heat_index_c,
+        solar_radiation=payload.solar_radiation,
+        wind_speed=payload.wind_speed,
+        vulnerability_score=payload.vulnerability_score,
+        risk_level=payload.risk_level,
+        risk_score=payload.risk_score,
+        forecast_max_risk=payload.forecast_max_risk,
+        forecast_trend=payload.forecast_trend,
+        forecast_lead_time_hours=payload.forecast_lead_time_hours,
+        alert_state=payload.alert_state
+    )
+
+    plan_dict = plan.to_dict()
+    plan_dict["recommended_actions"] = _apply_decisions_to_actions(
+        payload.area_id, plan_dict.get("recommended_actions", [])
+    )
+    return plan_dict
+
+
+# =========================================================================
+# 3–5 DAY HUMAN HEALTH IMPACT FORECAST & PREDICTIVE EARLY WARNING (PROMPT 22)
+# =========================================================================
+
+@app.get("/api/forecast/health-impact")
+async def get_health_impact_forecast_api(
+    lat: float = Query(19.0760, description="Latitude"),
+    lon: float = Query(72.8777, description="Longitude"),
+    area_id: Optional[str] = Query(None, description="Optional municipal ward identifier"),
+    area_name: Optional[str] = Query(None, description="Optional area label"),
+    vulnerability_score: Optional[float] = Query(None, description="Local vulnerability score (0-100)")
+):
+    """
+    Generates a 3-5 day human health impact outlook.
+    Translates weather forecast, biometeorological WBGT, and socio-demographic vulnerability
+    into Projected Civic Health Concern and alert lead time intelligence.
+    STRICT SCIENTIFIC HONESTY: Does not fabricate death or hospital admission counts.
+    """
+    clean_id = (area_id or "").strip().lower()
+    if clean_id in MUNICIPAL_WARD_REGISTRY and lat == 19.0760 and lon == 72.8777:
+        reg = MUNICIPAL_WARD_REGISTRY[clean_id]
+        lat = reg["latitude"]
+        lon = reg["longitude"]
+        if not area_name:
+            area_name = reg["name"]
+        if vulnerability_score is None:
+            vulnerability_score = reg.get("vulnerability_score")
+
+    return await generate_health_impact_forecast(
+        latitude=lat,
+        longitude=lon,
+        area_name=area_name,
+        area_id=clean_id or None,
+        vulnerability_score=vulnerability_score
+    )
+
+
+@app.get("/api/forecast/wards-summary")
+def get_wards_forecast_summary_api():
+    """
+    Returns 5-day risk level projections across all official administrative wards for dynamic GIS recoloring.
+    """
+    summaries = get_all_wards_forecast_summary()
+    return {
+        "count": len(summaries),
+        "wards": summaries
+    }
+

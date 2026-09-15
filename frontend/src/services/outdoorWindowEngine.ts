@@ -19,6 +19,7 @@ export interface ReliefFactor {
 
 export interface HourlyEvaluationPoint {
   timeIso: string;
+  hourNum: number;
   displayHour: string;
   temp: number;
   apparentTemp: number;
@@ -62,6 +63,18 @@ export interface SaferOutdoorWindowResult {
 
   // 12-to-24 hour trajectory for visual trend strip
   hourlyTimeline: HourlyEvaluationPoint[];
+
+  // Citizen-friendly daytime & active window enhancements (Prompt 15)
+  activeNowUntil?: string | null;           // e.g. "3:30 AM" if status === 'ACTIVE_NOW'
+  isNightOnlyWindow?: boolean;              // true if primary window is during night hours (e.g. 21:00 - 05:00)
+  bestDaytimeWindow?: {
+    label: string;                          // e.g. "6:00 AM – 8:30 AM"
+    startHour: string;
+    endHour: string;
+    avgApparentTemp: number;
+    reliefDeg: number;
+  } | null;
+  practicalDaytimeAdvice?: string;          // e.g. "Night hours are cooler, but for most daytime errands the safer practical window is before 9:30 AM / after 5:30 PM."
 }
 
 /**
@@ -262,6 +275,7 @@ export function evaluateSaferOutdoorWindow(
 
     return {
       timeIso: pt.timeIso,
+      hourNum: new Date(pt.timeIso).getHours(),
       displayHour: formatHourDisplay(pt.timeIso),
       temp: pt.temp,
       apparentTemp: pt.apparentTemp,
@@ -462,6 +476,83 @@ export function evaluateSaferOutdoorWindow(
     suitableActivitiesKey = 'outdoorWindow.activitiesElevated';
   }
 
+  // 11. Citizen-friendly daytime & active window intelligence (Prompt 15)
+  const isNightOnlyWindow = bestCandidate.points.every(
+    (p) => !p.isDay || p.hourNum < 6 || p.hourNum >= 21
+  );
+
+  const activeNowUntil = status === 'ACTIVE_NOW' ? endDisplay : null;
+
+  // Search for the best daytime outdoor window (06:00 to 19:00)
+  const daytimePoints = evaluatedPoints.filter(
+    (p) => p.hourNum >= 6 && p.hourNum <= 19
+  );
+
+  let bestDaytimeWindow: {
+    label: string;
+    startHour: string;
+    endHour: string;
+    avgApparentTemp: number;
+    reliefDeg: number;
+  } | null = null;
+
+  if (daytimePoints.length > 0) {
+    // Look for safer daytime candidate block first
+    const daytimeSaferCandidate = candidates.find(
+      (c) => c.points.some((p) => p.hourNum >= 6 && p.hourNum <= 19)
+    );
+
+    if (daytimeSaferCandidate) {
+      const dStartPt = daytimeSaferCandidate.points[0];
+      const dEndPt = daytimeSaferCandidate.points[daytimeSaferCandidate.points.length - 1];
+      const dStartDisplay = formatHourDisplay(dStartPt.timeIso);
+      const dEndDisplay = formatHourDisplay(
+        new Date(new Date(dEndPt.timeIso).getTime() + 3600 * 1000).toISOString().slice(0, 16)
+      );
+      const isTm = daytimeSaferCandidate.isTomorrow ? 'Tomorrow ' : '';
+      bestDaytimeWindow = {
+        label: `${isTm}${dStartDisplay} – ${dEndDisplay}`,
+        startHour: dStartDisplay,
+        endHour: dEndDisplay,
+        avgApparentTemp: daytimeSaferCandidate.avgApparentTemp,
+        reliefDeg: daytimeSaferCandidate.apparentTempDrop,
+      };
+    } else {
+      // Find the coolest 2-hour morning or evening daytime span
+      let minDaySpanAvg = 999;
+      let minSpanIdx = 0;
+      for (let i = 0; i < daytimePoints.length - 1; i++) {
+        const spanAvg = (daytimePoints[i].apparentTemp + daytimePoints[i + 1].apparentTemp) / 2.0;
+        if (spanAvg < minDaySpanAvg) {
+          minDaySpanAvg = spanAvg;
+          minSpanIdx = i;
+        }
+      }
+      const dStartPt = daytimePoints[minSpanIdx];
+      const dEndPt = daytimePoints[Math.min(daytimePoints.length - 1, minSpanIdx + 1)];
+      const dStartDisplay = formatHourDisplay(dStartPt.timeIso);
+      const dEndDisplay = formatHourDisplay(
+        new Date(new Date(dEndPt.timeIso).getTime() + 3600 * 1000).toISOString().slice(0, 16)
+      );
+      bestDaytimeWindow = {
+        label: `${dStartDisplay} – ${dEndDisplay}`,
+        startHour: dStartDisplay,
+        endHour: dEndDisplay,
+        avgApparentTemp: Math.round(minDaySpanAvg * 10) / 10,
+        reliefDeg: Math.max(0.5, Math.round((peakApparentTemp - minDaySpanAvg) * 10) / 10),
+      };
+    }
+  }
+
+  // Meaningful practical advice for real citizens
+  let practicalDaytimeAdvice = 'Plan necessary daytime errands during this window when solar radiant load is minimized.';
+  if (isNightOnlyWindow) {
+    practicalDaytimeAdvice =
+      'Night hours are cooler, but for most daytime errands the safer practical window is before 9:30 AM / after 5:30 PM.';
+  } else if (bestDaytimeWindow) {
+    practicalDaytimeAdvice = `For normal daytime activities, the coolest practical window is ${bestDaytimeWindow.label} (~${bestDaytimeWindow.reliefDeg.toFixed(1)}°C below peak heat).`;
+  }
+
   return {
     status,
     hasWindow: true,
@@ -483,5 +574,9 @@ export function evaluateSaferOutdoorWindow(
     suitableActivitiesKey,
     reliefFactors,
     hourlyTimeline: evaluatedPoints,
+    activeNowUntil,
+    isNightOnlyWindow,
+    bestDaytimeWindow,
+    practicalDaytimeAdvice,
   };
 }

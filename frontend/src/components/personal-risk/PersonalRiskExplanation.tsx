@@ -111,15 +111,45 @@ export const PersonalRiskExplanation: React.FC<PersonalRiskExplanationProps> = (
   }
 
   if (isAcclimatized) {
-    positiveProtective.push(t('risk.protAcclimatized', 'Acclimatized to local climate over 1-2 weeks'));
+    positiveProtective.push(t('risk.protAcclimatized', 'Body has adjusted to hot weather — reduces strain by ~10–15%'));
   } else {
-    negativeProtective.push(t('risk.protUnacclimatized', 'Not yet acclimatized to sudden intense heatwaves'));
+    negativeProtective.push(t('risk.protUnacclimatized', 'Not yet used to this heat level — higher strain expected'));
   }
 
   if (clothingLevel === 'light' || clothingLevel === 'breathable') {
     positiveProtective.push(t('risk.protLightClothing', 'Light, loose, breathable clothing'));
   } else if (clothingLevel === 'heavy' || clothingLevel === 'protective') {
     negativeProtective.push(t('risk.protHeavyClothing', 'Heavy or restrictive work clothing traps body heat'));
+  }
+
+  // 4. Derive the single highest-priority action and biggest potential improvement
+  const riskTier = result.risk_level?.toLowerCase() ?? 'moderate';
+  const isHighRisk = riskTier === 'high' || riskTier === 'extreme' || riskTier === 'critical';
+
+  let topPriorityAction = '';
+  if (isHighRisk && selectedConditions.length > 0) {
+    topPriorityAction = 'Your health conditions combined with today\'s heat make immediate cooling and close symptom monitoring the most critical action.';
+  } else if (isHighRisk && outdoorHours >= 4) {
+    topPriorityAction = 'Extended outdoor exposure is the most dangerous factor right now. Reduce time in direct sun and increase shade breaks immediately.';
+  } else if (hydrationStatus === 'dehydrated' || hydrationStatus === 'poor') {
+    topPriorityAction = 'Your hydration status is the factor most within your control. Drinking 250 mL every 20 minutes will have the fastest positive effect on your thermal safety.';
+  } else if (isHighRisk) {
+    topPriorityAction = 'Today\'s heat level is the primary driver. Stay indoors during 11 AM–3 PM peak hours and prioritise shaded, ventilated rest.';
+  } else {
+    topPriorityAction = 'Conditions are manageable. Staying hydrated and limiting peak-hour outdoor exposure will keep your risk level stable.';
+  }
+
+  let biggestImprovement = '';
+  if (hydrationStatus === 'dehydrated' || hydrationStatus === 'moderate') {
+    biggestImprovement = 'Improving your hydration to "Well Hydrated" could reduce your estimated heat burden by 10–20% and significantly lower fatigue risk.';
+  } else if (!isAcclimatized && outdoorHours >= 2) {
+    biggestImprovement = 'As your body adjusts to this heat over 1–2 weeks, your sweat efficiency improves and you\'ll feel ~10–15% less strain at the same temperature.';
+  } else if (clothingLevel === 'heavy' || clothingLevel === 'heavy_protective') {
+    biggestImprovement = 'Switching to light, breathable clothing could reduce your effective heat load by 20–30%, especially during outdoor work.';
+  } else if (coolingAccess === 'limited') {
+    biggestImprovement = 'Access to air conditioning or a cool room for at least 1 hour during peak heat is one of the most effective interventions you can make today.';
+  } else {
+    biggestImprovement = 'Your profile is well-managed. Keeping consistent hydration and avoiding the 11 AM–3 PM sun window will maintain your current low-to-moderate risk.';
   }
 
   return (
@@ -134,9 +164,36 @@ export const PersonalRiskExplanation: React.FC<PersonalRiskExplanationProps> = (
         <p className="text-xs sm:text-sm ts-text-muted mt-0.5">
           {t(
             'risk.whySectionSubtitle',
-            'Your risk is the combination of atmospheric weather, your physical body, and your protective habits.'
+            'Your risk is the combination of atmospheric weather, your physical body, and your protective habits.',
           )}
         </p>
+      </div>
+
+      {/* What matters most right now */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="p-3.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-500/25 flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center shrink-0">
+            <AlertCircle className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-mono block mb-0.5">
+              What matters most right now
+            </span>
+            <p className="text-xs ts-text-primary leading-relaxed font-medium">{topPriorityAction}</p>
+          </div>
+        </div>
+
+        <div className="p-3.5 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-500/25 flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
+            <TrendingDown className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-mono block mb-0.5">
+              Biggest potential improvement
+            </span>
+            <p className="text-xs ts-text-primary leading-relaxed font-medium">{biggestImprovement}</p>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

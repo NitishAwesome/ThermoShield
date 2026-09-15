@@ -16,14 +16,16 @@ interface PersonalRiskResultProps {
   mode: 'saved_profile' | 'scenario';
   locationName: string;
   className?: string;
+  isHighlighted?: boolean;
 }
 
-export const PersonalRiskResultCard: React.FC<PersonalRiskResultProps> = ({
+export const PersonalRiskResultCard = React.forwardRef<HTMLDivElement, PersonalRiskResultProps>(({
   result,
   mode,
   locationName,
   className = '',
-}) => {
+  isHighlighted = false,
+}, ref) => {
   const { t } = useTranslation();
   const level = (result.risk_level || 'LOW').toUpperCase();
   const score = Math.min(100, Math.max(0, Math.round(result.risk_score)));
@@ -56,7 +58,24 @@ export const PersonalRiskResultCard: React.FC<PersonalRiskResultProps> = ({
   };
 
   return (
-    <Card variant="elevated" className={`p-5 sm:p-6 shadow-md overflow-hidden relative ${className}`}>
+    <div
+      ref={ref}
+      id="personal-risk-result"
+      tabIndex={-1}
+      className={`rounded-2xl transition-all duration-500 outline-none ${
+        isHighlighted
+          ? 'ring-4 ring-orange-500 shadow-2xl shadow-orange-500/30 scale-[1.008]'
+          : ''
+      }`}
+    >
+      {/* Screen reader announcement on recalculation */}
+      <div aria-live="polite" className="sr-only">
+        {isHighlighted
+          ? `Personal heat risk recalculated: Score ${score} of 100, ${level} risk.`
+          : ''}
+      </div>
+
+      <Card variant="elevated" className={`p-5 sm:p-6 shadow-md overflow-hidden relative ${className}`}>
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b ts-border pb-3">
         <div>
@@ -141,7 +160,10 @@ export const PersonalRiskResultCard: React.FC<PersonalRiskResultProps> = ({
         </span>
       </div>
     </Card>
-  );
-};
+  </div>
+);
+});
+
+PersonalRiskResultCard.displayName = 'PersonalRiskResultCard';
 
 export default PersonalRiskResultCard;

@@ -39,6 +39,7 @@ import { Button, Card } from '../components/ui';
 import { subscribeToLiveRisk, type LiveRisk } from '../services/liveRisk';
 import { useTranslation } from '../context/LanguageContext';
 import { DataRealityBadge, FallbackModeBanner, MethodologyDisclosureModal } from '../components/provenance';
+import { getEffectiveDisplayName } from '../utils/identity';
 
 export const Dashboard: React.FC = () => {
   const { t } = useTranslation();
@@ -212,8 +213,8 @@ export const Dashboard: React.FC = () => {
           </div>
 
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-black ts-text-primary tracking-tight font-sans mt-1">
-            {isAuthenticated && user?.name
-              ? `Welcome back, ${user.name}`
+            {isAuthenticated
+              ? `Welcome back, ${getEffectiveDisplayName(profile, user)}`
               : t('dashboard.title', "Today's Heat Conditions & Safety")}
           </h1>
 
@@ -237,9 +238,9 @@ export const Dashboard: React.FC = () => {
             type="button"
             onClick={() => setIsMethodologyOpen(true)}
             className="text-[11px] font-medium text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1 cursor-pointer"
-            title="Inspect Data Reality & Provenance Standards"
+            title="Understand how calculations and data sources work"
           >
-            <span>Methodology</span>
+            <span>How this works</span>
           </button>
         </div>
       </div>
@@ -252,7 +253,7 @@ export const Dashboard: React.FC = () => {
         />
       )}
 
-      {/* Role Welcome Banner: Compact Mode (Never overwhelming for the user) */}
+      {/* Citizen Home Introduction & Hero Context Banner */}
       <RoleWelcomeBanner user={user} initialMode="compact" />
 
       {/* Location Confirmation Banner (Appears only when automatic change is detected) */}

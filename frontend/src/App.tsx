@@ -96,6 +96,12 @@ const GovernmentReports = lazy(() =>
   }))
 );
 
+const GovernmentHeatActionPlan = lazy(() =>
+  import('./pages/government/GovernmentHeatActionPlan').then((m) => ({
+    default: m.GovernmentHeatActionPlan,
+  }))
+);
+
 export const App: React.FC = () => {
   return (
     <ThemeProvider>
@@ -196,6 +202,10 @@ export const App: React.FC = () => {
                             <Route
                               path="dispatch"
                               element={<GovernmentDispatch />}
+                            />
+                            <Route
+                              path="action-plan"
+                              element={<GovernmentHeatActionPlan />}
                             />
                             <Route
                               path="interventions"

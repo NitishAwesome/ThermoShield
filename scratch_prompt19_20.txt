@@ -1,0 +1,1006 @@
+<USER_REQUEST>
+And from this screenshot, one correction first: **the main GIS content panel itself is now centered reasonably well.** What still makes it *look* off is the **navbar/header balance**: the right-side controls are visually heavy, while the brand/nav cluster sits left. So the remaining UI problem is more about **header width consistency and visual balance**, not that the central GIS card is literally shifted off-center.
+
+The GIS issue is more serious: the current polygons are clearly **prototype coarse shapes**, and they all look nearly the same because the fill/stroke color system is not being driven strongly enough by each area's risk level. That is exactly what we should fix next.
+
+And yes: **SMS is still demo-only** right now. We should make it genuinely deliverable, or keep it explicitly demo. Since the PS specifically mentions SMS/WhatsApp *or localized triggers*, I recommend we make **SMS real** and also complete the **localized Heat Action Plan trigger API**. WhatsApp can remain planned for now.
+
+Below are the next **four full prompts**. Execute them one by one. I will give two laters
+
+---
+
+# ThermoShield — SIH26083 Completion Phase
+
+# PROMPT 19 — Authority Header Stabilization, Real Ward GIS & Risk Color Intelligence
+
+## Executive Objective
+
+The current Authority GIS implementation is structurally improved, but it still has three visible weaknesses:
+
+1. The top navigation/header remains visually unbalanced.
+2. The Greater Mumbai GIS polygons are coarse prototype geometries.
+3. The risk coloring does not visually communicate different heat-risk levels strongly enough.
+
+This prompt must address those three problems without disrupting the Citizen Portal, scientific engines, Intervention Simulator, or existing authority routing.
+
+The goal is:
+
+> **A clean, centered authority interface with precise administrative geography and immediately understandable color-coded heat risk.**
+
+---
+
+# PART 1 — HEADER / NAVBAR VISUAL STABILIZATION
+
+Inspect:
+
+```text
+frontend/src/components/Navbar.tsx
+frontend/src/layouts/GovernmentLayout.tsx
+frontend/src/layouts/CitizenLayout.tsx
+global CSS / Tailwind layout utilities
+```
+
+Do not assume the central page container is still mathematically off-center.
+
+From the current UI, the main page content is largely centered, but the header is visually right-heavy because of:
+
+- portal switcher,
+- current location,
+- language,
+- theme,
+- profile control,
+- long navigation labels,
+- "More" menu,
+- role information.
+
+The goal is therefore to create **visual alignment between navbar and page content**, not blindly shift the main page.
+
+---
+
+## Required Header Architecture
+
+Use a consistent inner container:
+
+```text
+Navbar outer shell
+    ↓
+Centered max-width inner container
+    ↓
+Left cluster
+    ↓
+Primary navigation
+    ↓
+Right utility cluster
+```
+
+Conceptually:
+
+```text
+┌────────────────────────────────────────────────────────────┐
+│ BRAND | MAIN NAVIGATION              UTILITIES | PROFILE   │
+└────────────────────────────────────────────────────────────┘
+```
+
+The inner navbar container should use the same maximum width family as the main authority content.
+
+For example:
+
+```text
+max-w-7xl
+mx-auto
+px-4
+sm:px-6
+lg:px-8
+```
+
+Do not use arbitrary absolute positioning or huge fixed margins.
+
+---
+
+## Desktop Behavior
+
+At 1440px–1920px:
+
+- Brand remains clearly visible.
+- Main authority destinations remain visible.
+- Utility actions do not push navigation sideways.
+- No horizontal scrollbar.
+- Header content aligns visually with main body content.
+- Profile control stays at far right inside the same centered container.
+
+---
+
+## Medium Laptop Width
+
+Around 1280–1440px:
+
+Collapse secondary authority navigation into:
+
+```text
+More
+```
+
+before compressing or breaking the header.
+
+Suggested always-visible authority navigation:
+
+```text
+Command Dashboard
+Heat Risk Map
+Health Impact
+Alerts & Dispatch
+Intervention Simulator
+```
+
+Secondary:
+
+```text
+Municipal Matrix
+Reports
+Authority Profile
+```
+
+may remain under:
+
+```text
+More
+```
+
+---
+
+## Tablet / Mobile
+
+Use a proper mobile menu.
+
+Do not create:
+
+- overlapping buttons,
+- clipped utility controls,
+- horizontal page scrolling.
+
+---
+
+# PART 2 — AUTHORITY CONTEXT STRIP CLEANUP
+
+The current strip:
+
+```text
+Authority Command Portal: ANALYST • City Administration & Disaster Management
+```
+
+should remain, but simplify visual weight.
+
+It should act as a context indicator, not a second navbar.
+
+Recommended structure:
+
+```text
+Authority Command Portal
+ANALYST
+City Administration & Disaster Management
+```
+
+Keep the Citizen Portal switch visible but compact.
+
+Do not use excessive borders or duplicated orange outlines.
+
+---
+
+# PART 3 — REPLACE COARSE PROTOTYPE POLYGONS WITH PRECISE GEOGRAPHIC BOUNDARIES
+
+Current prototype shapes are too broad and look manually drawn.
+
+They currently represent areas like:
+
+```text
+South Mumbai
+Central Mumbai
+Western Suburbs
+Eastern Suburbs
+Northern Suburbs
+Inland Belt
+```
+
+These are useful conceptually, but they do not satisfy the visual standard of a serious hyperlocal GIS system.
+
+The next step is to support **real administrative ward / zone boundaries**.
+
+---
+
+# GEOGRAPHIC DATA RULE
+
+First inspect whether verified Mumbai ward/administrative boundary GeoJSON already exists in the repository.
+
+If not, acquire a legitimate public GeoJSON dataset from a reliable civic/open-data source.
+
+Preferred geography:
+
+### Greater Mumbai administrative wards
+
+For example the established BMC administrative ward system.
+
+Do not manually draw arbitrary polygons and call them official wards.
+
+Every geographic source must have provenance metadata.
+
+Example:
+
+```ts
+{
+  sourceName: "...",
+  sourceType: "Official / Public GIS",
+  boundaryLevel: "Administrative Ward",
+  retrievedAt: "...",
+  license: "..."
+}
+```
+
+---
+
+# IF OFFICIAL WARD GEOJSON CANNOT BE OBTAINED
+
+Do not block development.
+
+Keep the existing prototype zones temporarily, but label them clearly:
+
+```text
+Prototype Thermal Zone
+```
+
+and do not represent them as official wards.
+
+However, structure the GIS layer so real GeoJSON can replace them without changing the thermal-risk engine.
+
+---
+
+# PART 4 — WARD-LEVEL DATA MODEL
+
+Create a reusable geography model.
+
+Conceptually:
+
+```ts
+interface HeatRiskArea {
+  id: string;
+  name: string;
+
+  geographyType:
+    | "official_ward"
+    | "municipal_zone"
+    | "prototype_zone"
+    | "regional_centroid";
+
+  geometry?: GeoJSON.Geometry;
+
+  centroid: {
+    latitude: number;
+    longitude: number;
+  };
+
+  weather: {
+    temperatureC: number;
+    humidityPercent: number;
+    windSpeedMps: number;
+    solarRadiationWm2: number;
+  };
+
+  thermal: {
+    wetBulbC: number;
+    estimatedWbgtC: number;
+    heatIndexC: number;
+  };
+
+  vulnerability: {
+    score: number;
+    source: "real" | "modelled" | "prototype";
+  };
+
+  risk: {
+    score: number;
+    level: "LOW" | "MODERATE" | "HIGH" | "EXTREME";
+  };
+
+  trend: "RISING" | "STABLE" | "IMPROVING";
+}
+```
+
+Do not duplicate thermal formulas in the frontend.
+
+Reuse existing backend calculations.
+
+---
+
+# PART 5 — REAL RISK COLOR SYSTEM
+
+The current map visually looks almost all orange.
+
+Fix this.
+
+Every polygon or monitored location must derive its style from **actual current calculated risk**.
+
+Use a single central risk style mapping.
+
+Example conceptual mapping:
+
+```text
+LOW
+Green
+
+MODERATE
+Yellow / Amber
+
+HIGH
+Orange
+
+EXTREME
+Red
+```
+
+Do not scatter different color logic across components.
+
+Create one reusable function:
+
+```ts
+getRiskStyle(level)
+```
+
+returning:
+
+```text
+fill
+stroke
+badge
+text label
+```
+
+---
+
+## Polygon Styling
+
+Risk polygons should use:
+
+### LOW
+Green fill with readable border.
+
+### MODERATE
+Yellow/amber fill.
+
+### HIGH
+Orange fill.
+
+### EXTREME
+Red fill.
+
+Selected polygon should use:
+
+- stronger border,
+- higher opacity,
+- subtle glow if appropriate.
+
+Do not make every level visually similar.
+
+---
+
+# PART 6 — COLOR INDICATOR FOR EVERY AREA
+
+The user must be able to understand every city's/ward's risk without clicking first.
+
+Implement visible risk markers for each geographic area.
+
+Options include:
+
+- compact label anchored to polygon centroid,
+- colored dot/pill beside ward name,
+- marker with risk-level color,
+- polygon fill plus textual tooltip.
+
+Recommended:
+
+```text
+Ward F/South
+● HIGH
+```
+
+or:
+
+```text
+Ward A
+🔴 EXTREME
+```
+
+Do not rely on color alone.
+
+Always include text:
+
+```text
+LOW
+MODERATE
+HIGH
+EXTREME
+```
+
+for accessibility.
+
+---
+
+# PART 7 — MAP LEGEND
+
+Improve the legend to show both color and meaning.
+
+Example:
+
+```text
+HEAT RISK
+
+🟢 LOW
+Conditions currently within lower-risk range
+
+🟡 MODERATE
+Increased caution recommended
+
+🟠 HIGH
+Significant heat stress
+
+🔴 EXTREME
+Severe thermal conditions
+```
+
+The legend must always match polygon colors exactly.
+
+---
+
+# PART 8 — SELECTED AREA PANEL
+
+When the user selects a ward/zone:
+
+Display:
+
+```text
+SELECTED AREA
+
+Ward:
+F/South
+
+Geography:
+Official Administrative Ward
+
+Current Risk:
+HIGH
+
+Temperature:
+34.8°C
+
+Humidity:
+71%
+
+Wind:
+2.1 m/s
+
+Solar Radiation:
+...
+
+Estimated WBGT:
+31.2°C
+
+Heat Index:
+...
+```
+
+Then:
+
+```text
+WHY THIS AREA NEEDS ATTENTION
+```
+
+Generate explanation from actual factors.
+
+Example:
+
+> High humidity combined with weak wind and strong solar radiation is increasing estimated thermal stress.
+
+---
+
+# PART 9 — CITIZEN MAP RELATIONSHIP
+
+Do not copy the full ward-management interface into the Citizen Portal.
+
+Citizen `/heat-map` should show:
+
+- current location,
+- nearby ward/zone risk,
+- simple colors,
+- plain-language guidance.
+
+Authority `/gov/map` should show:
+
+- all ward/zone polygons,
+- ranking,
+- vulnerability,
+- action triggers,
+- analytics.
+
+Reuse the same geographic layer where possible.
+
+---
+
+# PART 10 — KEEP EXISTING PROTOTYPE ZONES AS FALLBACK
+
+Do not delete the six prototype zones immediately.
+
+They may remain as:
+
+```text
+Prototype Layer
+```
+
+for development/demo comparison.
+
+GIS layer selector can become:
+
+```text
+Official Ward Boundaries
+Prototype Thermal Zones
+National Reference Locations
+```
+
+Only show "Official Ward Boundaries" when real verified GeoJSON is loaded.
+
+---
+
+# PART 11 — VERIFICATION
+
+Test:
+
+```text
+1366
+1440
+1920
+1024
+768
+390
+375
+```
+
+Verify:
+
+- Header does not overflow.
+- Main content remains visually centered.
+- GIS polygons load.
+- Risk colors differ visibly.
+- Every area has a risk indicator.
+- Selected area details update.
+- Citizen map remains functional.
+- Municipal Matrix still works.
+
+Run:
+
+```bash
+npx tsc --noEmit
+npm run build
+python -m pytest tests/
+```
+
+---
+
+# ACCEPTANCE CRITERIA
+
+Prompt 19 is complete when:
+
+- Header/nav is visually balanced.
+- No horizontal scroll.
+- Main GIS content is centered.
+- Risk levels produce distinct colors.
+- Every ward/location displays a risk indicator.
+- Geography provenance is visible.
+- Coarse prototype geometry is no longer presented as official ward coverage.
+- Existing thermal algorithms remain unchanged.
+- `Intervention.tsx` remains untouched internally.
+
+---
+
+# PROMPT 20 — Real SMS Delivery, Native Notifications & Multi-Channel Alert Truthfulness
+
+## Executive Objective
+
+ThermoShield currently has:
+
+- real in-app notifications,
+- real notification decision logic,
+- real email capability,
+- demo-only SMS,
+- planned WhatsApp.
+
+The SIH26083 requirement specifically mentions automated regional SMS/WhatsApp alerts.
+
+The goal of Prompt 20 is to make **SMS genuinely operational** while preserving truthfulness and keeping WhatsApp optional/planned.
+
+---
+
+# PART 1 — PRESERVE EXISTING ALERT ENGINE
+
+Do not rewrite:
+
+```text
+alert_engine.py
+monitor.py
+notificationEngine.ts
+anti-spam logic
+cooldown logic
+risk thresholds
+```
+
+Architecture must remain:
+
+```text
+Risk Evaluation
+↓
+Alert Decision
+↓
+Cooldown Check
+↓
+Approved Alert
+↓
+Dispatch Layer
+```
+
+Only improve the dispatch layer.
+
+---
+
+# PART 2 — CREATE PROVIDER-AGNOSTIC SMS ADAPTER
+
+Refactor:
+
+```text
+backend/app/services/sms.py
+```
+
+into a provider-based implementation.
+
+Conceptual interface:
+
+```python
+class SMSProvider:
+    async def send(
+        self,
+        phone_number: str,
+        message: str
+    ) -> SMSResult:
+        ...
+```
+
+Support:
+
+```text
+DEMO
+TWILIO
+```
+
+as the first implementation.
+
+If another provider already fits the codebase better, such as:
+
+```text
+MSG91
+Fast2SMS
+```
+
+it may be used, but do not hardcode provider-specific behavior throughout the application.
+
+---
+
+# PART 3 — ENVIRONMENT CONFIGURATION
+
+Use environment variables.
+
+Example:
+
+```text
+SMS_PROVIDER=twilio
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_FROM_NUMBER=
+```
+
+Never commit credentials.
+
+Keep `.env` ignored.
+
+---
+
+# PART 4 — REAL DELIVERY STATE
+
+SMS dispatch must return truthful state.
+
+Example:
+
+```json
+{
+  "channel": "sms",
+  "provider": "twilio",
+  "mode": "LIVE",
+  "status": "ACCEPTED",
+  "provider_message_id": "..."
+}
+```
+
+If demo mode:
+
+```json
+{
+  "channel": "sms",
+  "provider": "demo",
+  "mode": "DEMO",
+  "status": "SIMULATED"
+}
+```
+
+Never return:
+
+```text
+SENT
+```
+
+from demo mode.
+
+---
+
+# PART 5 — AUTHORIZED SMS TEST
+
+Inside `/gov/dispatch`, provide:
+
+```text
+Send Test SMS
+```
+
+Only for authorized government/demo users.
+
+Require:
+
+- destination phone number,
+- explicit "test" label,
+- provider configuration check.
+
+Message:
+
+> ThermoShield Test Alert: SMS delivery is configured correctly.
+
+Do not trigger actual emergency messaging.
+
+---
+
+# PART 6 — SMS CONFIGURATION STATUS
+
+Government Dispatch should show:
+
+### Configured Live Provider
+
+```text
+SMS Delivery
+Operational
+Provider: Twilio
+```
+
+### Demo
+
+```text
+SMS Delivery
+Demo Simulation
+```
+
+### Not Configured
+
+```text
+SMS Delivery
+Not Configured
+```
+
+No ambiguity.
+
+---
+
+# PART 7 — CONNECT REAL SMS TO EXISTING ALERT PIPELINE
+
+When configured and enabled:
+
+```text
+Alert approved
+↓
+Recipient eligible
+↓
+User preferences checked
+↓
+Cooldown checked
+↓
+SMS dispatched
+```
+
+Do not bypass existing decision logic.
+
+Do not send messages repeatedly on weather refresh.
+
+---
+
+# PART 8 — NATIVE BROWSER NOTIFICATIONS
+
+Complete the previously held browser-notification gap.
+
+Use:
+
+```text
+Notification.requestPermission()
+new Notification(...)
+```
+
+but only after explicit user action.
+
+Add in Profile → Alert Preferences:
+
+```text
+Enable Device Notifications
+```
+
+States:
+
+```text
+Not enabled
+Enabled
+Blocked
+Unsupported
+```
+
+Do not ask permission automatically on page load.
+
+---
+
+# PART 9 — EMAIL CONFIGURATION TRUTHFULNESS
+
+Email already exists.
+
+Do not redesign it.
+
+Ensure `/gov/dispatch` shows:
+
+```text
+Operational
+```
+
+only when SMTP credentials are actually available.
+
+Otherwise:
+
+```text
+Not Configured
+```
+
+Provide safe test email functionality.
+
+---
+
+# PART 10 — WHATSAPP
+
+Keep:
+
+```text
+Planned Integration
+```
+
+unless an actual Meta/Twilio provider is implemented.
+
+Do not fake WhatsApp delivery.
+
+---
+
+# PART 11 — REGIONAL ALERT PAYLOAD
+
+Regional alerts should support area context.
+
+Example:
+
+```json
+{
+  "area_id": "ward_f_south",
+  "risk_level": "EXTREME",
+  "peak_period": "13:00-16:00",
+  "message": "...",
+  "channels": [
+    "email",
+    "sms",
+    "in_app"
+  ]
+}
+```
+
+---
+
+# PART 12 — CITIZEN ALERT SUBSCRIPTION
+
+Respect:
+
+- monitored location,
+- citizen preferences,
+- quiet hours,
+- essential alerts,
+- family protection settings.
+
+Do not send every regional alert to every citizen.
+
+---
+
+# PART 13 — VERIFICATION
+
+Test:
+
+### SMS demo mode
+
+Must show:
+
+```text
+SIMULATED
+```
+
+### SMS live mode
+
+Use configured provider.
+
+Verify returned message ID.
+
+### Bad credentials
+
+Must fail safely.
+
+### Missing credentials
+
+Must show not configured.
+
+### Browser notifications
+
+Test:
+
+```text
+granted
+denied
+default
+unsupported
+```
+
+### Email
+
+Test configured/unconfigured.
+
+Run:
+
+```bash
+npx tsc --noEmit
+npm run build
+python -m pytest tests/
+```
+
+---
+
+# ACCEPTANCE CRITERIA
+
+Prompt 20 is complete when:
+
+- SMS can actually send through a configured real provider.
+- Demo mode no longer pretends to be sent.
+- Browser notifications work.
+- Email status is truthful.
+- WhatsApp remains planned unless genuinely implemented.
+- Existing alert thresholds/cooldowns are untouched.
+
+Stop after Prompt 20.
+
+
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-15T00:03:44+05:30.
+
+The user's current state is as follows:
+No browser pages are currently open.
+Running terminal commands:
+- python -m uvicorn backend.app.main:app --reload --port 8000
+ (in d:\ThermoShield, running for 7h47m53s)
+- git status
+git log --oneline --graph --decorate --all -20 (in d:\ThermoShield, running for 7m51s)
+</ADDITIONAL_METADATA>

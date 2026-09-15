@@ -24,6 +24,7 @@ import {
   Sparkles,
   Shield,
   Info,
+  Calendar,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, Badge, Button } from '../../components/ui';
 import { AreaRiskShowcase } from '../../components/AreaRiskShowcase';
@@ -33,7 +34,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from '../../context/LanguageContext';
 import { api } from '../../services/api';
 import { translateRiskLevel } from '../../utils/translationHelpers';
-import { ThermalResponse, WeatherResponse, ForecastResponse, RiskLevel } from '../../types';
+import { ThermalResponse, WeatherResponse, ForecastResponse, RiskLevel, HealthImpactForecastResponse } from '../../types';
 import { DataRealityBadge, FallbackModeBanner } from '../../components/provenance';
 
 export const GovernmentDashboard: React.FC = () => {
@@ -44,6 +45,7 @@ export const GovernmentDashboard: React.FC = () => {
   const [thermalData, setThermalData] = useState<ThermalResponse | null>(null);
   const [weatherData, setWeatherData] = useState<WeatherResponse | null>(null);
   const [forecastData, setForecastData] = useState<ForecastResponse | null>(null);
+  const [healthForecast, setHealthForecast] = useState<HealthImpactForecastResponse | null>(null);
   const [engineTelemetry, setEngineTelemetry] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [lastUpdatedTime, setLastUpdatedTime] = useState<string>('Recently');
@@ -53,11 +55,12 @@ export const GovernmentDashboard: React.FC = () => {
     const fetchDashboardData = async () => {
       setIsLoading(true);
       try {
-        const [thermalRes, weatherRes, forecastRes, telemetryRes] = await Promise.allSettled([
+        const [thermalRes, weatherRes, forecastRes, telemetryRes, healthFcRes] = await Promise.allSettled([
           api.getThermal(coords.lat, coords.lon),
           api.getWeather(coords.lat, coords.lon),
           api.getForecast(coords.lat, coords.lon),
           api.getAlertEngineStatus(),
+          api.getHealthImpactForecast({ lat: coords.lat, lon: coords.lon }),
         ]);
 
         if (!isMounted) return;
@@ -66,6 +69,7 @@ export const GovernmentDashboard: React.FC = () => {
         if (weatherRes.status === 'fulfilled') setWeatherData(weatherRes.value);
         if (forecastRes.status === 'fulfilled') setForecastData(forecastRes.value);
         if (telemetryRes.status === 'fulfilled') setEngineTelemetry(telemetryRes.value);
+        if (healthFcRes.status === 'fulfilled') setHealthForecast(healthFcRes.value);
 
         setLastUpdatedTime(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
       } catch (e) {
@@ -334,6 +338,94 @@ export const GovernmentDashboard: React.FC = () => {
           <strong className="ts-text-primary font-bold">Trend Summary:</strong>{' '}
           {evolution.proactiveInsight}
         </p>
+      </div>
+
+      {/* SECTION 4.5 — COMPACT NEXT 5 DAYS OUTLOOK (PROMPT 22) */}
+      <div className="rounded-3xl ts-card p-6 sm:p-7 border ts-border shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b ts-border">
+          <div className="flex items-center space-x-2">
+            <Calendar className="w-4 h-4 text-orange-500" />
+            <h2 className="text-xs font-black uppercase tracking-wider text-orange-500">
+              Early Warning Trajectory (Prompt 22)
+            </h2>
+            <span className="text-sm font-black ts-text-primary font-sans">
+              NEXT 5 DAYS OUTLOOK
+            </span>
+          </div>
+
+          <Link
+            to="/gov/health-impact"
+            className="inline-flex items-center space-x-1.5 text-xs font-extrabold text-orange-600 dark:text-orange-400 hover:underline cursor-pointer"
+          >
+            <span>Detailed Health Impact Outlook</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {/* Compact Horizontal 5-Day Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+          {healthForecast?.forecast_days ? (
+            healthForecast.forecast_days.map((d) => (
+              <div
+                key={d.day_index}
+                className="p-3 rounded-2xl ts-card-subtle border ts-border flex flex-col justify-between space-y-1.5"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black ts-text-primary">{d.day_label.split('(')[0]}</span>
+                  <span
+                    className="px-1.5 py-0.2 rounded text-[9.5px] font-extrabold uppercase"
+                    style={{
+                      backgroundColor: `${d.civic_health_color}20`,
+                      color: d.civic_health_color,
+                    }}
+                  >
+                    {d.thermal_risk_level}
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between text-xs font-mono">
+                  <span className="text-xs font-black ts-text-primary">{d.temp_max_c}°C</span>
+                  <span className="text-[10px] text-red-500">WBGT {d.estimated_wbgt_c}°C</span>
+                </div>
+                <div className="text-[10px] ts-text-muted truncate">
+                  {d.civic_health_label}
+                </div>
+              </div>
+            ))
+          ) : (
+            // Fallback preview while loading
+            [
+              { label: 'Tomorrow', level: 'HIGH', temp: 35.0, wbgt: 30.5 },
+              { label: 'Day 2', level: 'EXTREME', temp: 36.5, wbgt: 32.8 },
+              { label: 'Day 3', level: 'HIGH', temp: 34.8, wbgt: 30.2 },
+              { label: 'Day 4', level: 'MODERATE', temp: 33.2, wbgt: 28.0 },
+              { label: 'Day 5', level: 'LOW', temp: 31.5, wbgt: 26.2 },
+            ].map((d, i) => (
+              <div key={i} className="p-3 rounded-2xl ts-card-subtle border ts-border space-y-1">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span>{d.label}</span>
+                  <span className="text-[10px] text-orange-500">{d.level}</span>
+                </div>
+                <div className="text-xs font-mono font-bold ts-text-primary">{d.temp}°C</div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Highlight Lead-Time Bar */}
+        {healthForecast?.lead_time_intelligence && (
+          <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-orange-500" />
+              <span className="font-bold ts-text-primary">
+                Peak Concern: {healthForecast.lead_time_intelligence.peak_concern_day} ({healthForecast.lead_time_intelligence.peak_concern_date})
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="ts-text-muted">Expected Relief:</span>
+              <span className="font-bold text-emerald-500">{healthForecast.lead_time_intelligence.relief_day}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* SECTION 5 — POPULATION & HEALTH CONCERN SNAPSHOT */}

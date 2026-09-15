@@ -6,7 +6,7 @@ import { useLocation } from '../../context/LocationContext';
 import { useTranslation } from '../../context/LanguageContext';
 import { api } from '../../services/api';
 import { translateRiskLevel } from '../../utils/translationHelpers';
-import { AreaRiskItem, RiskLevel } from '../../types';
+import { AreaRiskItem, RiskLevel, HealthImpactForecastResponse } from '../../types';
 import {
   Activity,
   HeartPulse,
@@ -28,6 +28,10 @@ import {
   Wind,
   Home,
   Shield,
+  Calendar,
+  ShieldAlert,
+  Clock,
+  Sparkles,
 } from 'lucide-react';
 
 export const GovernmentHealthImpact: React.FC = () => {
@@ -36,6 +40,7 @@ export const GovernmentHealthImpact: React.FC = () => {
 
   const [riskData, setRiskData] = useState<any>(null);
   const [priorityAreas, setPriorityAreas] = useState<AreaRiskItem[]>([]);
+  const [forecastData, setForecastData] = useState<HealthImpactForecastResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [lastUpdatedTime, setLastUpdatedTime] = useState<string>('Recently');
 
@@ -44,15 +49,17 @@ export const GovernmentHealthImpact: React.FC = () => {
     const fetchHealthImpactData = async () => {
       try {
         setLoading(true);
-        const [riskRes, areasRes] = await Promise.allSettled([
+        const [riskRes, areasRes, forecastRes] = await Promise.allSettled([
           api.getRisk(coords.lat, coords.lon),
           api.getAreasRiskOverview(),
+          api.getHealthImpactForecast({ lat: coords.lat, lon: coords.lon, area_name: locationName }),
         ]);
 
         if (!isMounted) return;
 
         if (riskRes.status === 'fulfilled') setRiskData(riskRes.value);
         if (areasRes.status === 'fulfilled') setPriorityAreas(areasRes.value.areas || []);
+        if (forecastRes.status === 'fulfilled') setForecastData(forecastRes.value);
 
         setLastUpdatedTime(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
       } catch (err) {
@@ -150,6 +157,184 @@ export const GovernmentHealthImpact: React.FC = () => {
               {translateRiskLevel(currentRiskLevel, t)}
             </Badge>
           </div>
+        </div>
+      </div>
+
+      {/* SECTION 2.5 — 5-DAY HUMAN HEALTH IMPACT OUTLOOK & PREDICTIVE EARLY WARNING (PROMPT 22) */}
+      <div className="rounded-3xl ts-card p-6 sm:p-8 border ts-border shadow-xl space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b ts-border">
+          <div>
+            <div className="flex items-center space-x-2">
+              <Calendar className="w-4 h-4 text-orange-500" />
+              <h2 className="text-xs font-black uppercase tracking-wider text-orange-500">
+                Predictive Early Warning Pipeline (Prompt 22)
+              </h2>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30 uppercase">
+                3–5 Day Trajectory
+              </span>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-black ts-text-primary mt-1 font-sans">
+              5-Day Human Health Impact Outlook
+            </h3>
+            <p className="text-xs sm:text-sm ts-text-muted mt-1 leading-relaxed max-w-3xl">
+              Scientifically grounded projection combining weather forecast, biometeorological wet-bulb globe temperature (WBGT), heat index, and local socio-demographic vulnerability.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Link
+              to="/gov/action-plan"
+              className="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs transition-colors flex items-center space-x-1.5 shadow-sm"
+            >
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <span>Review Action Plan Triggers</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Lead Time Intelligence Directive Banner */}
+        {forecastData?.lead_time_intelligence && (
+          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-orange-500/15 via-amber-500/10 to-transparent border border-orange-500/30 space-y-3">
+            <div className="flex items-center space-x-2">
+              <Clock className="w-4 h-4 text-orange-500" />
+              <span className="text-xs font-black uppercase tracking-wider text-orange-600 dark:text-orange-400">
+                Early Warning Lead Time Intelligence:
+              </span>
+            </div>
+            <p className="text-sm font-bold ts-text-primary leading-relaxed">
+              {forecastData.lead_time_intelligence.summary_directive}
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+              <div className="p-2 rounded-xl ts-card-subtle border ts-border">
+                <span className="text-[10px] ts-text-muted block">First High Risk Day</span>
+                <span className="font-bold text-amber-500">
+                  {forecastData.lead_time_intelligence.first_high_risk_day || 'None Projected'}
+                </span>
+              </div>
+              <div className="p-2 rounded-xl ts-card-subtle border ts-border">
+                <span className="text-[10px] ts-text-muted block">First Extreme Day</span>
+                <span className="font-bold text-red-500">
+                  {forecastData.lead_time_intelligence.first_extreme_risk_day || 'None Projected'}
+                </span>
+              </div>
+              <div className="p-2 rounded-xl ts-card-subtle border ts-border">
+                <span className="text-[10px] ts-text-muted block">Peak Concern Day</span>
+                <span className="font-bold text-orange-500">
+                  {forecastData.lead_time_intelligence.peak_concern_day} ({forecastData.lead_time_intelligence.peak_concern_score}/100)
+                </span>
+              </div>
+              <div className="p-2 rounded-xl ts-card-subtle border ts-border">
+                <span className="text-[10px] ts-text-muted block">Expected Relief Day</span>
+                <span className="font-bold text-emerald-500">
+                  {forecastData.lead_time_intelligence.relief_day}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 5-Day Sequence Cards */}
+        {forecastData?.forecast_days && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+            {forecastData.forecast_days.map((day) => {
+              const isToday = day.day_index === 0;
+              const isSevere = day.civic_health_concern === 'CRITICAL' || day.civic_health_concern === 'SEVERE';
+
+              return (
+                <div
+                  key={day.day_index}
+                  className={`p-4 rounded-2xl border transition-all flex flex-col justify-between space-y-3 ${
+                    isToday
+                      ? 'border-orange-500/50 bg-orange-500/5 shadow-md'
+                      : isSevere
+                      ? 'border-red-500/30 ts-card-subtle'
+                      : 'ts-card-subtle ts-border'
+                  }`}
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black ts-text-primary flex items-center gap-1">
+                        {day.day_label}
+                        {isToday && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-orange-500 text-white uppercase">
+                            Now
+                          </span>
+                        )}
+                      </span>
+                      <span
+                        className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase"
+                        style={{
+                          backgroundColor: `${day.civic_health_color}25`,
+                          color: day.civic_health_color,
+                          border: `1px solid ${day.civic_health_color}40`,
+                        }}
+                      >
+                        {day.civic_health_concern}
+                      </span>
+                    </div>
+                    <span className="text-[10px] ts-text-muted block font-mono">
+                      {new Date(day.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </span>
+
+                    {/* Biometeorological Telemetry */}
+                    <div className="pt-2 border-t ts-border space-y-1 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="ts-text-muted text-[11px]">Max Temp:</span>
+                        <span className="font-bold ts-text-primary font-mono">{day.temp_max_c}°C</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="ts-text-muted text-[11px]">Est. WBGT:</span>
+                        <span className="font-bold text-red-500 font-mono">{day.estimated_wbgt_c}°C</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="ts-text-muted text-[11px]">Heat Index:</span>
+                        <span className="font-bold text-amber-500 font-mono">{day.heat_index_c}°C</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Projected Health Impact Proxy Box */}
+                  <div className="pt-2 border-t ts-border space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="ts-text-muted">Health Impact Proxy:</span>
+                      <span className="font-extrabold font-mono ts-text-primary">
+                        {day.projected_health_impact_proxy}/100
+                      </span>
+                    </div>
+
+                    <div className="w-full bg-slate-500/20 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="h-1.5 rounded-full transition-all"
+                        style={{
+                          width: `${day.projected_health_impact_proxy}%`,
+                          backgroundColor: day.civic_health_color,
+                        }}
+                      />
+                    </div>
+
+                    <p className="text-[10.5px] ts-text-muted leading-tight pt-1">
+                      {day.civic_health_description}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Scientific Honesty & ML Disclaimer Box */}
+        <div className="p-4 rounded-2xl bg-slate-500/10 border ts-border text-xs ts-text-muted space-y-2">
+          <div className="flex items-center space-x-2 text-orange-600 dark:text-orange-400 font-bold">
+            <Info className="w-4 h-4 shrink-0" />
+            <span className="uppercase tracking-wider text-[11px]">Scientific Honesty & ML Model Transparency:</span>
+          </div>
+          <p className="leading-relaxed">
+            {forecastData?.ml_transparency_disclaimer ||
+              "Forecast health concern uses ThermoShield's prototype ML health-impact proxy trained on synthetic epidemiological data. It is intended for comparative planning and early-warning research, not clinical prediction."}
+          </p>
+          <p className="text-[11px] leading-relaxed text-slate-400 border-t ts-border pt-2">
+            <strong>Architecture Notice:</strong> The engine is architected to accept future empirical datasets (IDSP syndromic heat illness, 108 emergency ambulance dispatches, HMIS admissions) once municipal health sharing agreements are established. ThermoShield never outputs fabricated casualty or mortality counts.
+          </p>
         </div>
       </div>
 

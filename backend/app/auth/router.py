@@ -105,6 +105,11 @@ class GoogleAuthRequest(BaseModel):
     nonce: Optional[str] = Field(None, description="Optional CSRF state nonce for verification")
 
 
+class UserUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    phone_number: Optional[str] = Field(None, min_length=7, max_length=20)
+
+
 class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -343,6 +348,47 @@ def get_current_user_profile(current_user: User = Depends(get_current_user)):
     Returns safe user information only (never exposes password hashes or tokens).
     """
     return UserResponse.model_validate(current_user)
+
+
+@router.patch("/me", response_model=UserResponse)
+def update_current_user_profile(
+    update_data: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update profile fields (name, phone_number) for the currently authenticated user.
+    """
+    if update_data.name is not None:
+        cleaned_name = update_data.name.strip()
+        if cleaned_name:
+            current_user.name = cleaned_name
+
+    if update_data.phone_number is not None:
+        cleaned_phone = update_data.phone_number.strip()
+        if cleaned_phone:
+            conflict = db.query(User).filter(User.phone_number == cleaned_phone, User.id != current_user.id).first()
+            if conflict:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="This phone number is already registered to another account."
+                )
+            current_user.phone_number = cleaned_phone
+
+    try:
+        db.commit()
+        db.refresh(current_user)
+        logger.info(f"Updated user profile for ID {current_user.id}: {current_user.name}")
+        return UserResponse.model_validate(current_user)
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating user profile {current_user.id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to persist profile update to database."
+        )
 
 
 # ==================================================
