@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 import time
 from datetime import datetime, timedelta
 from typing import Dict, Tuple, Any, Optional, List
@@ -45,7 +46,7 @@ def get_weather_condition_meta(code: int, temp: float, is_day: int) -> Dict[str,
     elif temp >= 37.0 and is_day:
         return {"description": f"Extreme Heat • {base_desc}", "icon": "sun"}
     elif temp >= 33.0 and is_day:
-        return {"description": f"High Heat Load • {base_desc}", "icon": "sun"}
+        return {"description": f"Elevated Thermal Stress • {base_desc}", "icon": "sun"}
     elif code in [0, 1]:
         return {"description": base_desc if is_day else "Clear Night", "icon": "sun" if is_day else "moon"}
     elif code in [2, 3]:
@@ -61,6 +62,69 @@ def _get_dynamic_forecast_dates(count: int = 5) -> List[str]:
     """Generates dynamic upcoming ISO forecast dates starting from today."""
     base_date = datetime.utcnow().date()
     return [(base_date + timedelta(days=i)).isoformat() for i in range(count)]
+
+
+def _generate_synthetic_hourly(
+    temp_max: float = 34.0,
+    temp_min: float = 26.0,
+    start_time: Optional[datetime] = None
+) -> Dict[str, Any]:
+    """
+    Generates a 48-hour diurnal hourly curve for temperature, relative humidity,
+    apparent temperature, UV index, and day/night status. Used as fallback
+    when hourly telemetry is temporarily unavailable.
+    """
+    if start_time is None:
+        start_time = datetime.utcnow()
+    base = start_time.replace(minute=0, second=0, microsecond=0)
+    times = []
+    temps = []
+    humidities = []
+    app_temps = []
+    uvs = []
+    is_days = []
+
+    mid_temp = (temp_max + temp_min) / 2.0
+    amp_temp = max(1.5, (temp_max - temp_min) / 2.0)
+
+    for i in range(48):
+        dt = base + timedelta(hours=i)
+        times.append(dt.strftime("%Y-%m-%dT%H:00"))
+        hour = dt.hour
+
+        # Diurnal cosine factor: peak at 14:30 (hour 14.5), minimum at 05:30 (hour 5.5)
+        diurnal_factor = math.cos((hour - 14.5) * math.pi / 12.0)
+        t = round(mid_temp + amp_temp * diurnal_factor, 1)
+        temps.append(t)
+
+        # Relative humidity tends to vary inversely with temperature
+        rh = round(max(30.0, min(95.0, 67.5 - 22.0 * diurnal_factor)), 1)
+        humidities.append(rh)
+
+        # Apparent temperature approximation using Steadman model
+        e = (rh / 100.0) * 6.105 * math.exp((17.27 * t) / (237.7 + t))
+        at = round(t + 0.33 * e - 0.7 * 1.5 - 4.0, 1)
+        at = max(t - 1.0, at)
+        app_temps.append(at)
+
+        # UV Index and is_day determination
+        if 6 <= hour <= 18:
+            is_days.append(1)
+            sun_factor = max(0.0, math.cos((hour - 12.5) * math.pi / 7.0))
+            uv = round(8.5 * sun_factor, 1)
+            uvs.append(uv)
+        else:
+            is_days.append(0)
+            uvs.append(0.0)
+
+    return {
+        "time": times,
+        "temperature": temps,
+        "humidity": humidities,
+        "apparent_temperature": app_temps,
+        "uv_index": uvs,
+        "is_day": is_days,
+    }
 
 # In-memory weather cache: (lat, lon) -> { "data": dict, "timestamp": float }
 # Fresh TTL: 60 seconds. Stale TTL (fallback for 429/5xx): 3600 seconds (1 hour).
@@ -129,6 +193,9 @@ def _init_regional_seed_cache():
                     "weather_icon": meta["icon"],
                     "precipitation": 0.0,
                     "wind_direction": 180.0,
+                    "source_status": "OFFLINE_FALLBACK",
+                    "source_name": "Regional Baseline Cache",
+                    "is_fallback": True,
                 },
                 "forecast": {
                     "dates": dynamic_dates,
@@ -137,7 +204,11 @@ def _init_regional_seed_cache():
                     "apparent_temperature_max": [37.5, 38.0, 37.2, 36.8, 37.0],
                     "apparent_temperature_min": [27.0, 27.5, 27.0, 26.5, 27.0],
                     "uv_index_max": [8.5, 8.8, 8.6, 8.2, 8.4],
-                }
+                    "hourly": _generate_synthetic_hourly(34.0, 26.0),
+                },
+                "source_status": "OFFLINE_FALLBACK",
+                "source_name": "Regional Baseline Cache",
+                "is_fallback": True,
             },
             "timestamp": now
         }
@@ -175,6 +246,13 @@ async def _fetch_from_open_meteo(latitude: float, longitude: float) -> Dict[str,
             "uv_index,"
             "is_day"
         ),
+        "hourly": (
+            "temperature_2m,"
+            "relative_humidity_2m,"
+            "apparent_temperature,"
+            "uv_index,"
+            "is_day"
+        ),
         "daily": (
             "temperature_2m_max,"
             "temperature_2m_min,"
@@ -205,6 +283,7 @@ async def _fetch_from_open_meteo(latitude: float, longitude: float) -> Dict[str,
                 data = response.json()
                 current = data.get("current", {})
                 daily = data.get("daily", {})
+                hourly = data.get("hourly", {})
 
                 is_day = int(current.get("is_day", 1))
                 raw_solar = float(current.get("shortwave_radiation", 0.0) or 0.0)
@@ -237,6 +316,21 @@ async def _fetch_from_open_meteo(latitude: float, longitude: float) -> Dict[str,
                 if "weather_code" in daily and daily["weather_code"]:
                     forecast_dict["weather_code"] = [int(x) for x in daily.get("weather_code", [])]
 
+                # Extract 48-hour hourly sequence
+                if hourly and "time" in hourly and len(hourly["time"]) > 0:
+                    forecast_dict["hourly"] = {
+                        "time": list(hourly.get("time", []))[:48],
+                        "temperature": [float(x) for x in hourly.get("temperature_2m", [])][:48],
+                        "humidity": [float(x) for x in hourly.get("relative_humidity_2m", [])][:48],
+                        "apparent_temperature": [float(x) for x in hourly.get("apparent_temperature", [])][:48],
+                        "uv_index": [float(x) for x in hourly.get("uv_index", [])][:48],
+                        "is_day": [int(x) for x in hourly.get("is_day", [])][:48],
+                    }
+                else:
+                    max_t = forecast_dict["max_temperature"][0] if forecast_dict["max_temperature"] else 34.0
+                    min_t = forecast_dict["min_temperature"][0] if forecast_dict["min_temperature"] else 26.0
+                    forecast_dict["hourly"] = _generate_synthetic_hourly(max_t, min_t)
+
                 return {
                     "location": {
                         "latitude": latitude,
@@ -256,8 +350,14 @@ async def _fetch_from_open_meteo(latitude: float, longitude: float) -> Dict[str,
                         "weather_icon": meta["icon"],
                         "precipitation": round(precip, 1),
                         "wind_direction": round(wind_dir, 0),
+                        "source_status": "LIVE",
+                        "source_name": "Open-Meteo Global API",
+                        "is_fallback": False,
                     },
-                    "forecast": forecast_dict
+                    "forecast": forecast_dict,
+                    "source_status": "LIVE",
+                    "source_name": "Open-Meteo Global API",
+                    "is_fallback": False,
                 }
 
             if response.status_code == 429:
@@ -341,10 +441,16 @@ def _get_nearest_cached_or_regional_weather(latitude: float, longitude: float) -
         if is_night:
             w["solar_radiation"] = 0.0
             w["is_day"] = 0
+        w["source_status"] = "OFFLINE_FALLBACK"
+        w["source_name"] = "Regional Baseline Fallback"
+        w["is_fallback"] = True
         return {
             "location": {"latitude": latitude, "longitude": longitude},
             "weather": w,
-            "forecast": dict(best_data.get("forecast", {}))
+            "forecast": dict(best_data.get("forecast", {})),
+            "source_status": "OFFLINE_FALLBACK",
+            "source_name": "Regional Baseline Fallback",
+            "is_fallback": True,
         }
 
     # Universal regional baseline with dynamic dates & accurate telemetry
@@ -367,6 +473,9 @@ def _get_nearest_cached_or_regional_weather(latitude: float, longitude: float) -
             "weather_icon": meta["icon"],
             "precipitation": 0.0,
             "wind_direction": 180.0,
+            "source_status": "OFFLINE_FALLBACK",
+            "source_name": "Regional Baseline Fallback",
+            "is_fallback": True,
         },
         "forecast": {
             "dates": _get_dynamic_forecast_dates(5),
@@ -375,7 +484,11 @@ def _get_nearest_cached_or_regional_weather(latitude: float, longitude: float) -
             "apparent_temperature_max": [37.5, 38.0, 37.2, 36.8, 37.0],
             "apparent_temperature_min": [27.0, 27.5, 27.0, 26.5, 27.0],
             "uv_index_max": [8.5, 8.8, 8.6, 8.2, 8.4],
-        }
+            "hourly": _generate_synthetic_hourly(34.0, 26.0),
+        },
+        "source_status": "OFFLINE_FALLBACK",
+        "source_name": "Regional Baseline Fallback",
+        "is_fallback": True,
     }
 
 
@@ -404,11 +517,17 @@ async def _execute_fetch_and_resolve(
             fallback_data = {
                 "location": dict(stale_data.get("location", {})),
                 "weather": dict(stale_data.get("weather", {})),
-                "forecast": dict(stale_data.get("forecast", {}))
+                "forecast": dict(stale_data.get("forecast", {})),
+                "source_status": "OFFLINE_FALLBACK",
+                "source_name": "Cached Data Fallback",
+                "is_fallback": True,
             }
             if _is_nighttime_at_location(latitude, longitude):
                 fallback_data["weather"]["solar_radiation"] = 0.0
                 fallback_data["weather"]["is_day"] = 0
+            fallback_data["weather"]["source_status"] = "OFFLINE_FALLBACK"
+            fallback_data["weather"]["source_name"] = "Cached Data Fallback"
+            fallback_data["weather"]["is_fallback"] = True
             if not future.done():
                 future.set_result(fallback_data)
         else:
@@ -439,5 +558,8 @@ async def get_forecast(
     weather_data = await get_weather(effective_lat, effective_lon)
     return {
         "location": weather_data["location"],
-        "forecast": weather_data["forecast"]
+        "forecast": weather_data["forecast"],
+        "source_status": weather_data.get("source_status", "LIVE"),
+        "source_name": weather_data.get("source_name", "Open-Meteo Global API"),
+        "is_fallback": weather_data.get("is_fallback", False)
     }

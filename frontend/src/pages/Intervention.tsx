@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation as useRouterLocation } from 'react-router-dom';
 import { api } from '../services/api';
 import { InterventionResponse, SimulationResponse } from '../types';
 import { useLocation } from '../context/LocationContext';
@@ -21,8 +22,10 @@ import {
   ShieldAlert,
   Users,
   AlertCircle,
+  Printer,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, Badge, Button } from '../components/ui';
+import { DataRealityBadge } from '../components/provenance';
 
 // Intelligent grouping of backend recommendations to eliminate robotic repetition
 interface GroupedDirective {
@@ -125,6 +128,8 @@ const groupRecommendations = (
 export const Intervention: React.FC = () => {
   const { coords, locationName } = useLocation();
   const { t } = useTranslation();
+  const routerLocation = useRouterLocation();
+  const isGovPortal = routerLocation.pathname.startsWith('/gov');
 
   // Simulator inputs (All 5 interactive scenario sliders)
   const [baselineRiskScore, setBaselineRiskScore] = useState<number>(37.4);
@@ -283,17 +288,26 @@ export const Intervention: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2">
             <span className="text-xs font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400">
-              {t('intervention.decisionSupportEngine')}
+              {isGovPortal
+                ? t('intervention.decisionSupportEngine', undefined, 'Authority Decision Support')
+                : t('intervention.citizenSafetyActions', undefined, 'Personal Heat Safety')}
             </span>
+            <DataRealityBadge tier="SIMULATED" size="xs" customLabel="Hypothetical Simulation" />
             <Badge variant="brand" size="sm">
-              {t('intervention.policySimulatorBadge')}
+              {isGovPortal
+                ? t('intervention.policySimulatorBadge', undefined, 'Authority Policy Simulator')
+                : t('intervention.citizenBadge', undefined, 'Interactive Safety Experiments')}
             </Badge>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold ts-text-primary font-sans mt-0.5">
-            {t('intervention.title')}
+            {isGovPortal
+              ? t('intervention.title', undefined, 'Intervention Simulator')
+              : t('intervention.citizenTitle', undefined, 'Try Safety Actions')}
           </h1>
           <p className="text-sm ts-text-muted mt-1">
-            {t('intervention.subtitle')}
+            {isGovPortal
+              ? t('intervention.subtitle', undefined, 'Explore hypothetical intervention scenarios to support response planning.')
+              : t('intervention.citizenSubtitle', undefined, 'Explore how hypothetical changes in hydration, rest, activity, clothing or cooling conditions may influence heat stress.')}
           </p>
         </div>
 
@@ -306,16 +320,27 @@ export const Intervention: React.FC = () => {
               <span className="font-semibold ts-text-primary">{locationName.split(',')[0]}</span>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleSyncLive}
-            disabled={isSyncing}
-            leftIcon={<Zap className={`w-3.5 h-3.5 text-orange-600 dark:text-orange-400 ${isSyncing ? 'animate-bounce' : ''}`} />}
-            className="ml-auto sm:ml-1 text-xs cursor-pointer"
-          >
-            {isSyncing ? t('common.loading') : t('intervention.syncLiveBtn')}
-          </Button>
+          <div className="flex items-center gap-1.5 ml-auto sm:ml-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.print()}
+              leftIcon={<Printer className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />}
+              className="text-xs cursor-pointer print:hidden"
+            >
+              {t('intervention.exportBriefing', undefined, 'Export Briefing')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSyncLive}
+              disabled={isSyncing}
+              leftIcon={<Zap className={`w-3.5 h-3.5 text-orange-600 dark:text-orange-400 ${isSyncing ? 'animate-bounce' : ''}`} />}
+              className="text-xs cursor-pointer print:hidden"
+            >
+              {isSyncing ? t('common.loading') : t('intervention.syncLiveBtn')}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -588,11 +613,14 @@ export const Intervention: React.FC = () => {
           <Card variant="elevated">
             <CardHeader
               title={t('intervention.impactTitle')}
-              subtitle={t('intervention.impactSubtitle')}
+              subtitle={t('intervention.impactSubtitle', undefined, 'Hypothetical intervention outcome and projected risk shift')}
               badge={
-                <Badge variant="brand" size="sm">
-                  {t('intervention.scenarioEstimateBadge')}
-                </Badge>
+                <div className="flex items-center gap-1.5">
+                  <DataRealityBadge tier="SIMULATED" size="xs" customLabel="Hypothetical Outcome" />
+                  <Badge variant="brand" size="sm">
+                    {t('intervention.scenarioEstimateBadge', undefined, 'Scenario Estimate')}
+                  </Badge>
+                </div>
               }
             />
             <CardContent className="space-y-4">

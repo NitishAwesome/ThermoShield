@@ -88,7 +88,7 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
 
       if (params && typeof str === 'string') {
         Object.entries(params).forEach(([paramKey, val]) => {
-          str = str.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), String(val));
+          str = str.replace(new RegExp(`\\{{1,2}${paramKey}\\}{1,2}`, 'g'), String(val));
         });
       }
 

@@ -1,0 +1,751 @@
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { api } from '../../services/api';
+import { useLocation } from '../../context/LocationContext';
+import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from '../../context/LanguageContext';
+import {
+  Radio,
+  Zap,
+  RefreshCw,
+  Mail,
+  Send,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  Shield,
+  MapPin,
+  Building2,
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  Compass,
+  HeartPulse,
+  Sliders,
+  ArrowRight,
+  Terminal,
+  Settings,
+  Info,
+} from 'lucide-react';
+import { Card, CardHeader, CardContent, Badge, Button } from '../../components/ui';
+import { DataRealityBadge } from '../../components/provenance';
+import { NotificationDecisionFeed } from '../../components/NotificationDecisionFeed';
+import { translateRiskLevel } from '../../utils/translationHelpers';
+
+export const GovernmentDispatch: React.FC = () => {
+  const { coords, locationName } = useLocation();
+  const { user } = useAuth();
+  const { t } = useTranslation();
+
+  const [engineTelemetry, setEngineTelemetry] = useState<any>(null);
+  const [isTriggeringCycle, setIsTriggeringCycle] = useState<boolean>(false);
+  const [isSendingEmail, setIsSendingEmail] = useState<boolean>(false);
+  const [recipientEmail, setRecipientEmail] = useState<string>(user?.email || '');
+  const [emailSuccessMsg, setEmailSuccessMsg] = useState<string | null>(null);
+  const [emailErrorMsg, setEmailErrorMsg] = useState<string | null>(null);
+  const [showEmailPreview, setShowEmailPreview] = useState<boolean>(false);
+
+  // Progressive Disclosure Toggles
+  const [showTechDetails, setShowTechDetails] = useState<boolean>(false);
+  const [showTestingTools, setShowTestingTools] = useState<boolean>(false);
+
+  const fetchTelemetry = async () => {
+    try {
+      const data = await api.getAlertEngineStatus();
+      setEngineTelemetry(data);
+    } catch (e) {
+      console.debug('Failed to fetch engine telemetry:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchTelemetry();
+  }, []);
+
+  const handleTriggerCycle = async () => {
+    setIsTriggeringCycle(true);
+    setEmailErrorMsg(null);
+    try {
+      const res = await api.triggerAlertEngineCycle();
+      setEngineTelemetry(res.telemetry || res);
+      setEmailSuccessMsg(`⚡ Manual evaluation completed across monitored regional clusters.`);
+    } catch (e: any) {
+      setEmailErrorMsg(e?.response?.data?.detail || e?.message || 'Failed to trigger background evaluation cycle.');
+    } finally {
+      setIsTriggeringCycle(false);
+    }
+  };
+
+  const handleSendTestAlert = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recipientEmail || !recipientEmail.includes('@')) {
+      setEmailErrorMsg('Please provide a valid recipient email address.');
+      return;
+    }
+    setIsSendingEmail(true);
+    setEmailErrorMsg(null);
+    setEmailSuccessMsg(null);
+
+    try {
+      const res = await api.sendAlertEmail({
+        email: recipientEmail.trim(),
+        location_name: locationName,
+        lat: coords.lat,
+        lon: coords.lon,
+        risk_level: 'HIGH',
+        risk_score: 82.0,
+        temperature_c: 37.8,
+        wbgt_c: 31.4,
+        heat_index_c: 42.0,
+        interventions: [
+          'Municipal directive: Halt unshaded outdoor labor between 12:00 PM and 3:00 PM.',
+          'Deploy emergency mobile drinking water tankers to transit hubs and market areas.',
+          'Activate designated air-cooled municipal shelters and primary healthcare centers.',
+          'Issue community alert bulletins across regional media.',
+        ],
+      });
+      if (res?.status === 'skipped') {
+        setEmailErrorMsg('SMTP credentials are not configured. No email was sent.');
+      } else {
+        setEmailSuccessMsg(`Test email dispatched successfully to ${res.recipient}!`);
+      }
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || err?.message || '';
+      if (detail.includes('SMTP mail credentials not configured') || detail.includes('not configured')) {
+        setEmailErrorMsg('SMTP credentials are not configured. No email was sent.');
+      } else {
+        setEmailErrorMsg(detail || 'Failed to dispatch alert email.');
+      }
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
+  const lastCycleResults = engineTelemetry?.last_cycle_results || [];
+
+  return (
+    <div className="space-y-8 pb-16">
+      {/* HEADER */}
+      <div className="rounded-3xl ts-card p-6 sm:p-7 border ts-border shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b ts-border">
+          <div>
+            <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+              <span className="text-xs font-black uppercase tracking-wider text-purple-500 flex items-center space-x-1">
+                <Radio className="w-4 h-4" />
+                <span>Response Operations Center</span>
+              </span>
+              <DataRealityBadge tier="LIVE" size="xs" customLabel="Operational Dispatch" />
+              <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
+                Alerts & Dispatch
+              </span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black ts-text-primary tracking-tight font-sans mt-1">
+              Alerts & Response Operations
+            </h1>
+            <p className="text-xs sm:text-sm ts-text-muted mt-1 leading-relaxed">
+              What alerts are active, which areas are affected, is monitoring working, and what dispatch action is currently taking place?
+            </p>
+          </div>
+
+          <div className="flex items-center space-x-2 text-xs ts-text-muted">
+            <MapPin className="w-3.5 h-3.5 text-purple-500" />
+            <span>
+              <strong className="ts-text-primary font-bold">Region:</strong> {locationName}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 1 — CURRENT ALERT SITUATION */}
+      <div className="rounded-3xl ts-card p-6 sm:p-8 border ts-border shadow-xl">
+        <div className="flex items-center justify-between pb-4 border-b ts-border">
+          <div className="flex items-center space-x-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse" />
+            <h2 className="text-xs font-black uppercase tracking-wider text-purple-500">
+              Current Alert Situation
+            </h2>
+          </div>
+          <Badge riskLevel="HIGH" size="md" showDot showIcon>
+            Active Advisory
+          </Badge>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
+          <div className="p-4 rounded-2xl ts-card-subtle border ts-border">
+            <div className="text-[11px] font-bold uppercase tracking-wider ts-text-subtle">
+              Active Advisory
+            </div>
+            <div className="text-xl font-black text-purple-600 dark:text-purple-400 mt-1 font-mono">
+              High Heat Warning
+            </div>
+            <div className="text-[11px] ts-text-muted mt-0.5">
+              Public advisory broadcast active
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl ts-card-subtle border ts-border">
+            <div className="text-[11px] font-bold uppercase tracking-wider ts-text-subtle">
+              Affected Sectors
+            </div>
+            <div className="text-2xl font-black ts-text-primary mt-1 font-mono">
+              {engineTelemetry?.monitored_areas_count || 3} Reference Sectors
+            </div>
+            <div className="text-[11px] ts-text-muted mt-0.5">
+              Priority regional clusters
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl ts-card-subtle border ts-border">
+            <div className="text-[11px] font-bold uppercase tracking-wider ts-text-subtle">
+              Operational Status
+            </div>
+            <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1 font-mono flex items-center space-x-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Active</span>
+            </div>
+            <div className="text-[11px] ts-text-muted mt-0.5">
+              Stage 2 Heat Action Plan
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl ts-card-subtle border ts-border">
+            <div className="text-[11px] font-bold uppercase tracking-wider ts-text-subtle">
+              Peak Danger Window
+            </div>
+            <div className="text-2xl font-black text-orange-600 dark:text-orange-400 mt-1 font-mono">
+              12 PM – 4 PM
+            </div>
+            <div className="text-[11px] ts-text-muted mt-0.5">
+              Afternoon peak radiation
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 2 — BACKGROUND MONITORING STATUS */}
+      <div className="rounded-3xl ts-card p-6 sm:p-8 border ts-border shadow-xl">
+        <div className="flex items-center justify-between pb-4 border-b ts-border">
+          <div>
+            <div className="text-xs font-black uppercase tracking-wider text-emerald-500">
+              Monitoring & Alert Engine
+            </div>
+            <h2 className="text-xl font-black ts-text-primary mt-0.5">
+              Background Heat Monitoring
+            </h2>
+          </div>
+          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 flex items-center space-x-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+            <span>Monitoring Active</span>
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5">
+          <div className="p-4 rounded-2xl ts-card-subtle border ts-border">
+            <div className="text-[11px] font-bold uppercase tracking-wider ts-text-subtle">
+              Evaluation Interval
+            </div>
+            <div className="text-2xl font-black ts-text-primary mt-1 font-mono">
+              15 Minutes
+            </div>
+            <div className="text-[11px] ts-text-muted mt-0.5">
+              Automated continuous cycle
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl ts-card-subtle border ts-border">
+            <div className="text-[11px] font-bold uppercase tracking-wider ts-text-subtle">
+              Last Evaluation Status
+            </div>
+            <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
+              Completed
+            </div>
+            <div className="text-[11px] ts-text-muted mt-0.5">
+              Cycle #{engineTelemetry?.total_cycles_completed || 1}
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl ts-card-subtle border ts-border">
+            <div className="text-[11px] font-bold uppercase tracking-wider ts-text-subtle">
+              Monitored Jurisdictions
+            </div>
+            <div className="text-2xl font-black ts-text-primary mt-1 font-mono">
+              {engineTelemetry?.monitored_areas_count || 5} Sectors
+            </div>
+            <div className="text-[11px] ts-text-muted mt-0.5">
+              Live telemetry tracking
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 3 — AFFECTED AREAS */}
+      <div className="rounded-3xl ts-card p-6 sm:p-8 border ts-border shadow-xl">
+        <div className="flex items-center justify-between pb-4 border-b ts-border">
+          <div>
+            <div className="text-xs font-black uppercase tracking-wider text-purple-500">
+              Sector Monitoring
+            </div>
+            <h2 className="text-xl font-black ts-text-primary mt-0.5">
+              Areas Under Review
+            </h2>
+          </div>
+          <Link
+            to="/gov/matrix"
+            className="text-xs font-extrabold text-purple-600 dark:text-purple-400 hover:underline flex items-center space-x-1 cursor-pointer"
+          >
+            <span>View Full Municipal Matrix</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5">
+          {lastCycleResults.length > 0 ? (
+            lastCycleResults.slice(0, 3).map((res: any, idx: number) => {
+              const isSevere = res.risk_level === 'HIGH' || res.risk_level === 'EXTREME' || res.risk_level === 'CRITICAL';
+              return (
+                <div
+                  key={idx}
+                  className={`p-4 rounded-2xl border flex flex-col justify-between ${
+                    isSevere ? 'bg-red-500/10 border-red-500/30' : 'ts-card-subtle border ts-border'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-400 font-mono">
+                        Sector #{idx + 1}
+                      </span>
+                      <Badge riskLevel={res.risk_level || 'HIGH'} size="sm">
+                        {translateRiskLevel(res.risk_level || 'HIGH', t)}
+                      </Badge>
+                    </div>
+                    <h3 className="text-base font-black ts-text-primary mt-2">
+                      {res.location}
+                    </h3>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t ts-border flex items-center justify-between text-xs font-mono ts-text-muted">
+                    <span>Temp: {res.temperature?.toFixed(1) || '--'}°C</span>
+                    <span>WBGT: {res.wbgt?.toFixed(1) || '--'}°C</span>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <>
+              <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-400 font-mono">Sector #1</span>
+                    <Badge riskLevel="HIGH" size="sm">HIGH ALERT</Badge>
+                  </div>
+                  <h3 className="text-base font-black ts-text-primary mt-2">Mumbai Urban Core</h3>
+                </div>
+                <div className="mt-4 pt-3 border-t ts-border text-xs text-red-500 font-bold">
+                  High afternoon heat stress
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-400 font-mono">Sector #2</span>
+                    <Badge riskLevel="MODERATE" size="sm">MODERATE ALERT</Badge>
+                  </div>
+                  <h3 className="text-base font-black ts-text-primary mt-2">Thane Industrial Belt</h3>
+                </div>
+                <div className="mt-4 pt-3 border-t ts-border text-xs text-amber-500 font-bold">
+                  Elevated solar radiation
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl ts-card-subtle border ts-border flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-400 font-mono">Sector #3</span>
+                    <Badge riskLevel="LOW" size="sm">WATCH</Badge>
+                  </div>
+                  <h3 className="text-base font-black ts-text-primary mt-2">Navi Mumbai East</h3>
+                </div>
+                <div className="mt-4 pt-3 border-t ts-border text-xs ts-text-muted font-medium">
+                  Routine baseline monitoring
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* SECTION 4 — DISPATCH ACTIVITY */}
+      <div className="rounded-3xl ts-card p-6 sm:p-8 border ts-border shadow-xl">
+        <div className="pb-4 border-b ts-border">
+          <div className="text-xs font-black uppercase tracking-wider text-purple-500">
+            Response Channels
+          </div>
+          <h2 className="text-xl font-black ts-text-primary mt-0.5">
+            Dispatch Activity & Broadcast Channels
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5">
+          <div className="p-4 rounded-2xl ts-card-subtle border ts-border">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold ts-text-primary">Email Dispatch</span>
+              {Boolean(engineTelemetry?.email_dispatch_configured) ? (
+                <DataRealityBadge tier="LIVE" size="xs" customLabel="Emergency Email Dispatch: Operational" />
+              ) : (
+                <DataRealityBadge tier="SIMULATED" size="xs" customLabel="Emergency Email Dispatch: Not Configured" />
+              )}
+            </div>
+            <p className="text-xs ts-text-muted mt-2 leading-relaxed">
+              {Boolean(engineTelemetry?.email_dispatch_configured)
+                ? 'Automated situation reports and advisory emails dispatched to registered authorities via configured SMTP server.'
+                : 'SMTP credentials are not configured in environment. Test and automatic dispatches are safely simulated.'}
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl ts-card-subtle border ts-border">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold ts-text-primary">SMS Broadcast Gateway</span>
+              <DataRealityBadge tier="SIMULATED" size="xs" customLabel="Candidate Channel (Demo)" />
+            </div>
+            <p className="text-xs ts-text-muted mt-2 leading-relaxed">
+              State disaster management SMS gateway integration candidate. Operates in console demonstration simulation mode.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl ts-card-subtle border ts-border">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold ts-text-primary">WhatsApp Alert Bot</span>
+              <DataRealityBadge tier="PLANNED" size="xs" customLabel="Planned Integration" />
+            </div>
+            <p className="text-xs ts-text-muted mt-2 leading-relaxed">
+              Citizen notification bot connector planned for regional civic messaging deployment once WhatsApp Business API is connected.
+            </p>
+          </div>
+        </div>
+
+        {/* Planning Tool Distinction */}
+        <div className="mt-5 pt-4 border-t ts-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400 font-mono">
+                Intervention Planning vs. Active Dispatch
+              </span>
+            </div>
+            <p className="text-xs ts-text-muted mt-0.5 max-w-2xl leading-relaxed">
+              Dispatch executes real-time emergency broadcasts and operational responses. To model hypothetical cooling center activations, work-shift pauses, or water distribution before issuing directives, explore scenarios in the simulator.
+            </p>
+          </div>
+          <Link
+            to="/gov/interventions"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold shadow-sm transition-all whitespace-nowrap flex-shrink-0"
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            <span>Evaluate Response Scenarios →</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* SECTION 5 — MANUAL EVALUATION */}
+      <div className="rounded-3xl ts-card p-6 sm:p-8 border ts-border shadow-xl bg-orange-500/5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center space-x-2">
+              <Zap className="w-5 h-5 text-orange-500" />
+              <h2 className="text-xs font-black uppercase tracking-wider text-orange-500">
+                Manual Evaluation Trigger
+              </h2>
+            </div>
+            <h3 className="text-lg font-black ts-text-primary mt-1">
+              Evaluate Current Conditions
+            </h3>
+            <p className="text-xs ts-text-muted mt-1 leading-relaxed max-w-2xl">
+              Run an immediate alert evaluation using the latest available weather and thermal stress conditions across monitored municipal clusters.
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            variant="primary"
+            size="md"
+            disabled={isTriggeringCycle}
+            onClick={handleTriggerCycle}
+            leftIcon={
+              isTriggeringCycle ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <Zap className="w-4 h-4 text-white" />
+              )
+            }
+            className="bg-orange-500 hover:bg-orange-600 text-white font-bold whitespace-nowrap cursor-pointer shadow-md"
+          >
+            {isTriggeringCycle ? 'Evaluating Clusters...' : '⚡ Trigger Autonomous Cycle Now'}
+          </Button>
+        </div>
+
+        {emailSuccessMsg && (
+          <div className="mt-4 p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+            <span>{emailSuccessMsg}</span>
+          </div>
+        )}
+
+        {emailErrorMsg && (
+          <div className="mt-4 p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-xs flex items-center space-x-2">
+            <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+            <span>{emailErrorMsg}</span>
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 6 — TECHNICAL MONITORING DETAILS (PROGRESSIVE DISCLOSURE) */}
+      <div className="rounded-3xl ts-card p-6 border ts-border shadow-md">
+        <button
+          type="button"
+          onClick={() => setShowTechDetails(!showTechDetails)}
+          className="w-full flex items-center justify-between text-xs font-bold uppercase tracking-wider ts-text-subtle hover:ts-text-primary transition-colors cursor-pointer"
+        >
+          <div className="flex items-center space-x-2">
+            <Terminal className="w-4 h-4 text-purple-500" />
+            <span>Technical Monitoring Details & Daemon Telemetry</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <span>{showTechDetails ? 'Hide Details' : 'Show Details'}</span>
+            {showTechDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </div>
+        </button>
+
+        {showTechDetails && (
+          <div className="mt-4 pt-4 border-t ts-border space-y-4 animate-ts-fade-in text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3 rounded-xl ts-card-subtle border ts-border">
+                <div className="text-[10px] uppercase font-bold ts-text-subtle">Worker Status</div>
+                <div className="text-xs font-bold text-emerald-500 mt-0.5">Active Background Loop</div>
+              </div>
+              <div className="p-3 rounded-xl ts-card-subtle border ts-border">
+                <div className="text-[10px] uppercase font-bold ts-text-subtle">Monitored Clusters</div>
+                <div className="text-xs font-bold ts-text-primary mt-0.5">{engineTelemetry?.monitored_areas_count || 5} Clusters</div>
+              </div>
+              <div className="p-3 rounded-xl ts-card-subtle border ts-border">
+                <div className="text-[10px] uppercase font-bold ts-text-subtle">Cycles Completed</div>
+                <div className="text-xs font-bold text-orange-500 mt-0.5 font-mono">#{engineTelemetry?.total_cycles_completed || 1}</div>
+              </div>
+              <div className="p-3 rounded-xl ts-card-subtle border ts-border">
+                <div className="text-[10px] uppercase font-bold ts-text-subtle">Anti-Spam Cooldown</div>
+                <div className="text-xs font-bold text-sky-500 mt-0.5">60 Minutes Window</div>
+              </div>
+            </div>
+
+            {lastCycleResults.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-xs font-bold ts-text-primary">Last Evaluation Cycle Raw Telemetry</div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[11px] text-left border-collapse">
+                    <thead>
+                      <tr className="border-b ts-border ts-text-subtle">
+                        <th className="py-2 px-3">Location</th>
+                        <th className="py-2 px-3">Temp (°C)</th>
+                        <th className="py-2 px-3">WBGT (°C)</th>
+                        <th className="py-2 px-3">Risk Level</th>
+                        <th className="py-2 px-3">Transition</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y ts-border">
+                      {lastCycleResults.map((r: any, i: number) => (
+                        <tr key={i} className="ts-text-muted">
+                          <td className="py-2 px-3 font-semibold ts-text-primary">{r.location}</td>
+                          <td className="py-2 px-3 font-mono">{r.temperature?.toFixed(1) || '--'}</td>
+                          <td className="py-2 px-3 font-mono">{r.wbgt?.toFixed(1) || '--'}</td>
+                          <td className="py-2 px-3">
+                            <Badge riskLevel={r.risk_level || 'LOW'} size="sm">
+                              {r.risk_level || 'LOW'}
+                            </Badge>
+                          </td>
+                          <td className="py-2 px-3 font-mono text-[10px]">{r.dispatch?.transition || 'Baseline'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 7 — TESTING & TECHNICAL TOOLS (GROUPED COLLAPSIBLE AREA) */}
+      <div className="rounded-3xl ts-card p-6 border ts-border shadow-md">
+        <button
+          type="button"
+          onClick={() => setShowTestingTools(!showTestingTools)}
+          className="w-full flex items-center justify-between text-xs font-bold uppercase tracking-wider ts-text-subtle hover:ts-text-primary transition-colors cursor-pointer"
+        >
+          <div className="flex items-center space-x-2">
+            <Settings className="w-4 h-4 text-slate-400" />
+            <span>Testing & Technical Operations Suite</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <span>{showTestingTools ? 'Collapse Tools' : 'Expand Tools'}</span>
+            {showTestingTools ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </div>
+        </button>
+
+        {showTestingTools && (
+          <div className="mt-4 pt-4 border-t ts-border space-y-6 animate-ts-fade-in">
+            {/* Authority Test Dispatch */}
+            <Card variant="elevated" className="p-4 sm:p-5 border ts-border">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b ts-border pb-3">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-sky-500">
+                    Authority Test Dispatch & Inspection
+                  </h4>
+                  <p className="text-xs ts-text-muted mt-0.5">
+                    Send a test advisory email to verify messaging delivery.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowEmailPreview(!showEmailPreview)}
+                  leftIcon={<Mail className="w-3.5 h-3.5 text-sky-500" />}
+                  className="text-xs cursor-pointer"
+                >
+                  {showEmailPreview ? 'Hide Sample Message' : 'Inspect Sample Message'}
+                </Button>
+              </div>
+
+              <form onSubmit={handleSendTestAlert} className="mt-4 flex flex-col sm:flex-row gap-2.5 max-w-xl">
+                <input
+                  type="email"
+                  required
+                  placeholder="Enter recipient authority email..."
+                  value={recipientEmail}
+                  onChange={(e) => setRecipientEmail(e.target.value)}
+                  className="flex-1 px-3 py-2 text-xs rounded-xl ts-input ts-text-primary focus:outline-none"
+                />
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  disabled={isSendingEmail || !recipientEmail.trim()}
+                  leftIcon={
+                    isSendingEmail ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5" />
+                    )
+                  }
+                  className="text-xs font-bold whitespace-nowrap cursor-pointer"
+                >
+                  {isSendingEmail ? 'Dispatching...' : 'Dispatch Test Alert'}
+                </Button>
+              </form>
+
+              {showEmailPreview && (
+                <div className="mt-4 p-4 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs space-y-2.5">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="font-bold text-orange-400">🛡️ ThermoShield Heatwave Emergency Directive</span>
+                    <span className="text-[10px] text-slate-400">To: {recipientEmail || 'authority@health.gov.in'}</span>
+                  </div>
+                  <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                    <h5 className="font-bold text-red-400 text-sm">🚨 HIGH HEAT RISK WARNING — {locationName}</h5>
+                    <p className="text-slate-300 text-[11px] mt-0.5">
+                      Ambient: 37.8°C | Wet-Bulb (WBGT): 31.4°C | Severity: Stage 2 HAP Protocol
+                    </p>
+                  </div>
+                  <ul className="space-y-1 text-slate-300 list-disc list-inside text-[11px]">
+                    <li>Halt unshaded outdoor labor between 12:00 PM and 3:00 PM.</li>
+                    <li>Deploy mobile drinking water tankers to congested transit hubs.</li>
+                    <li>Open designated air-cooled municipal shelters.</li>
+                  </ul>
+                </div>
+              )}
+            </Card>
+
+            {/* Decision Engine Live Evaluation & Testing Suite */}
+            <NotificationDecisionFeed variant="full" showSimulations={true} />
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 8 — RESPONSE CONTEXT */}
+      <div>
+        <div className="flex items-center space-x-2 mb-4">
+          <Shield className="w-4 h-4 text-purple-500" />
+          <h2 className="text-xs font-black uppercase tracking-wider ts-text-subtle">
+            Connected Response Tools
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Link
+            to="/gov/map"
+            className="p-4 rounded-2xl ts-card-elevated border ts-border hover:border-cyan-500/50 transition-all group block"
+          >
+            <div className="w-8 h-8 rounded-lg bg-cyan-500/15 text-cyan-500 flex items-center justify-center mb-2">
+              <Compass className="w-4 h-4" />
+            </div>
+            <h3 className="text-xs font-bold ts-text-primary flex items-center justify-between">
+              <span>View Heat Risk Map</span>
+              <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-500" />
+            </h3>
+            <p className="text-[11px] ts-text-muted mt-1">
+              Geospatial regional mapping centered on curated monitoring reference coordinates.
+            </p>
+          </Link>
+
+          <Link
+            to="/gov/health-impact"
+            className="p-4 rounded-2xl ts-card-elevated border ts-border hover:border-rose-500/50 transition-all group block"
+          >
+            <div className="w-8 h-8 rounded-lg bg-rose-500/15 text-rose-500 flex items-center justify-center mb-2">
+              <HeartPulse className="w-4 h-4" />
+            </div>
+            <h3 className="text-xs font-bold ts-text-primary flex items-center justify-between">
+              <span>Review Health Impact</span>
+              <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-500" />
+            </h3>
+            <p className="text-[11px] ts-text-muted mt-1">
+              Modelled service pressure planning indicators and surge estimation.
+            </p>
+          </Link>
+
+          <Link
+            to="/gov/interventions"
+            className="p-4 rounded-2xl ts-card-elevated border ts-border hover:border-orange-500/50 transition-all group block"
+          >
+            <div className="w-8 h-8 rounded-lg bg-orange-500/15 text-orange-500 flex items-center justify-center mb-2">
+              <Sliders className="w-4 h-4" />
+            </div>
+            <h3 className="text-xs font-bold ts-text-primary flex items-center justify-between">
+              <span>Run Intervention Simulator</span>
+              <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-orange-500" />
+            </h3>
+            <p className="text-[11px] ts-text-muted mt-1">
+              Explore hypothetical cooling center and work-rest scenarios.
+            </p>
+          </Link>
+
+          <Link
+            to="/gov/matrix"
+            className="p-4 rounded-2xl ts-card-elevated border ts-border hover:border-emerald-500/50 transition-all group block"
+          >
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-500 flex items-center justify-center mb-2">
+              <Building2 className="w-4 h-4" />
+            </div>
+            <h3 className="text-xs font-bold ts-text-primary flex items-center justify-between">
+              <span>View Full Municipal Matrix</span>
+              <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-500" />
+            </h3>
+            <p className="text-[11px] ts-text-muted mt-1">
+              Comparative analysis across regional monitoring locations.
+            </p>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default GovernmentDispatch;

@@ -63,6 +63,9 @@ from app.services.intervention import generate_interventions
 from app.services.simulator import simulate_intervention
 from app.services.sms import send_sms
 from app.services.email import send_notification_email
+from app.services.email_templates import generate_action_first_alert_html
+from app.services.alert_engine import dispatch_automatic_early_warning, get_engine_status_summary
+from app.services.monitor import monitor_daemon
 
 
 from app.schemas import (
@@ -194,12 +197,24 @@ def _seed_demo_accounts_if_needed():
 
 
 @app.on_event("startup")
-def on_startup():
+async def on_startup():
     try:
         init_db()
         _seed_demo_accounts_if_needed()
+        # Start proactive autonomous background monitoring daemon
+        monitor_daemon.start()
+        logger.info("ThermoShield autonomous monitoring daemon initialized on startup.")
     except Exception as e:
         logger.warning(f"Database initialization warning: {e}")
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    try:
+        monitor_daemon.stop()
+        logger.info("ThermoShield autonomous monitoring daemon stopped on shutdown.")
+    except Exception as e:
+        logger.warning(f"Shutdown notice: {e}")
 
 app.include_router(personal_risk_router)
 app.include_router(copilot_router, prefix="/copilot", tags=["AI Copilot"])
@@ -513,6 +528,34 @@ def get_alerts_api(
     return get_user_alerts(db, current_user.id)
 
 
+@app.get("/alerts/engine-status")
+def get_alert_engine_status_api():
+    """
+    Returns live telemetry of the proactive background monitoring daemon:
+    - Daemon operational status
+    - Monitored municipal areas
+    - Total evaluation cycles completed
+    - Active anti-spam cooldown states
+    - Recent automatic early-warning dispatches
+    """
+    return monitor_daemon.get_telemetry()
+
+
+@app.post("/alerts/engine-trigger")
+async def trigger_alert_engine_cycle_api():
+    """
+    Manually triggers an immediate proactive thermal evaluation cycle
+    across all monitored areas without waiting for the 15-minute scheduled timer.
+    """
+    results = await monitor_daemon.run_evaluation_cycle()
+    return {
+        "status": "success",
+        "message": f"Evaluated {len(results)} monitored regions proactively.",
+        "results": results,
+        "telemetry": monitor_daemon.get_telemetry()
+    }
+
+
 @app.get(
     "/alerts/{alert_id}",
     response_model=AlertResponse
@@ -600,6 +643,8 @@ def delete_alert_api(
     }
 
 
+
+
 @app.post(
     "/alerts/send-email",
     response_model=SendAlertEmailResponse
@@ -610,15 +655,15 @@ def send_alert_email_direct_api(
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
-    Directly dispatch a heat alert email to a candidate or user.
-    The receiver is dynamically set to payload.email (provided by candidate).
+    Directly dispatch a heat alert email to a candidate or user (Simulation / Test Dispatch).
+    The receiver is dynamically set to payload.email.
     The sender is always the system's configured MAIL_USERNAME from environment.
     """
     candidate_email = str(payload.email).strip().lower()
     location_name = payload.location_name or "Your Area"
     risk_level = (payload.risk_level or "HIGH").upper()
     risk_score = payload.risk_score if payload.risk_score is not None else 75.0
-    temp_str = f"{payload.temperature_c:.1f}°C" if payload.temperature_c is not None else "Elevated"
+    temp_val = payload.temperature_c if payload.temperature_c is not None else 36.5
 
     interventions = payload.interventions or [
         "Hydrate frequently with water and electrolyte replenishment (ORS).",
@@ -632,63 +677,29 @@ def send_alert_email_direct_api(
     # Plain text version
     bullet_points = "\n".join([f"• {item}" for item in interventions])
     plain_body = (
-        f"ThermoShield Heat Health Advisory\n\n"
-        f"Hello,\n\n"
-        f"A {risk_level} heat-health risk alert has been issued for {location_name}.\n"
+        f"ThermoShield Heat Health Advisory (Test Dispatch)\n\n"
+        f"A {risk_level} heat-health risk alert has been evaluated for {location_name}.\n"
         f"• Risk Level: {risk_level}\n"
         f"• Risk Score: {risk_score}/100\n"
-        f"• Current Temperature: {temp_str}\n\n"
+        f"• Current Temperature: {temp_val:.1f}°C\n\n"
         f"Recommended Safety Actions:\n"
         f"{bullet_points}\n\n"
-        f"{payload.custom_note if payload.custom_note else 'Please take necessary safety measures and stay hydrated.'}\n\n"
-        f"— ThermoShield Civic Early Warning System\n"
-        f"You received this automated advisory because this address is registered for civic heat defense alerts."
+        f"— ThermoShield Civic Early Warning System"
     )
 
-    # HTML version
-    badge_color = "#ef4444" if risk_level == "EXTREME" else "#f97316" if risk_level == "HIGH" else "#eab308"
-    interventions_html = "".join([f"<li style='margin-bottom: 8px;'>{item}</li>" for item in interventions])
-    html_body = f"""<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"/></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1120; color: #f8fafc; margin: 0; padding: 24px;">
-  <div style="max-width: 600px; margin: 0 auto; background-color: #0f172a; border-radius: 16px; border: 1px solid #334155; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
-    <div style="background: linear-gradient(135deg, #1e293b, #0f172a); padding: 24px; border-bottom: 1px solid #334155;">
-      <h1 style="margin: 0; font-size: 22px; font-weight: 800; color: #f97316; letter-spacing: -0.5px;">🛡️ ThermoShield Early Warning</h1>
-      <p style="margin: 6px 0 0 0; font-size: 13px; color: #94a3b8;">Real-Time Biometeorological Heat Defense System</p>
-    </div>
-
-    <div style="padding: 24px;">
-      <div style="background-color: rgba(249, 115, 22, 0.08); border-left: 4px solid {badge_color}; border-radius: 8px; padding: 18px; margin-bottom: 24px;">
-        <div style="display: inline-block; background-color: {badge_color}; color: #ffffff; font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 3px 10px; border-radius: 9999px; letter-spacing: 0.5px; margin-bottom: 8px;">
-          {risk_level} THREAT TIER
-        </div>
-        <h2 style="margin: 4px 0 6px 0; font-size: 20px; font-weight: 700; color: #f8fafc;">Heat Alert for {location_name}</h2>
-        <div style="display: flex; gap: 16px; font-size: 13px; color: #cbd5e1; margin-top: 10px;">
-          <span>🌡️ Temp: <strong>{temp_str}</strong></span>
-          <span>⚡ Risk Score: <strong>{risk_score}/100</strong></span>
-        </div>
-      </div>
-
-      <div style="background-color: #1e293b; border-radius: 12px; padding: 18px; margin-bottom: 24px; border: 1px solid #334155;">
-        <h3 style="margin: 0 0 12px 0; font-size: 15px; font-weight: 700; color: #38bdf8;">🛡️ Recommended Heat Safety Actions:</h3>
-        <ul style="margin: 0; padding-left: 20px; color: #e2e8f0; font-size: 13px; line-height: 1.6;">
-          {interventions_html}
-        </ul>
-      </div>
-
-      <p style="margin: 0; font-size: 12px; color: #64748b; line-height: 1.5;">
-        This email was sent specifically to candidate: <strong style="color: #cbd5e1;">{candidate_email}</strong>.<br/>
-        Stay safe and take proactive heat mitigation measures.
-      </p>
-    </div>
-
-    <div style="background-color: #0b1120; padding: 14px 24px; border-top: 1px solid #1e293b; text-align: center; font-size: 11px; color: #475569;">
-      © 2026 ThermoShield • AI-Powered Dynamic Heatwave Decision System
-    </div>
-  </div>
-</body>
-</html>"""
+    # High-fidelity Action-First HTML
+    html_body = generate_action_first_alert_html(
+        location_name=location_name,
+        risk_level=risk_level,
+        risk_score=risk_score,
+        temperature_c=temp_val,
+        wbgt_c=payload.wbgt_c,
+        heat_index_c=payload.heat_index_c,
+        transition_type="EVALUATOR SIMULATION / DIRECT DISPATCH",
+        recommended_actions=interventions,
+        recipient_email=candidate_email,
+        custom_note=payload.custom_note
+    )
 
     res = send_notification_email(
         to_email=candidate_email,
@@ -704,8 +715,11 @@ def send_alert_email_direct_api(
         )
     elif res.get("status") == "skipped":
         raise HTTPException(
-            status_code=500,
-            detail=f"Email dispatch skipped: {res.get('message')}"
+            status_code=400,
+            detail=(
+                "Email dispatch skipped: SMTP mail credentials not configured. "
+                "Please set MAIL_USERNAME and MAIL_PASSWORD (e.g. Gmail App Password) in your .env file."
+            )
         )
 
     # Log/persist alert in DB if possible
@@ -1035,6 +1049,7 @@ async def thermal(
         "location": weather_data["location"],
         "weather": weather,
         "thermal": thermal_result,
+        "forecast": weather_data.get("forecast", {}),
     }
 
 
@@ -1300,144 +1315,25 @@ async def risk(
         )
 
         # -----------------------------------------------------------------
-        # AUTOMATED CITIZEN ALERT ENGINE (NO MANUAL EMAIL ENTRY REQUIRED)
-        # Whenever High or Extreme heat strikes an area, all registered citizens
-        # of that area are automatically notified, with intelligent 30-minute cooldown.
+        # UNIFIED PROACTIVE EARLY-WARNING ENGINE DISPATCH
         # -----------------------------------------------------------------
-        loc_id = location.id if location else 1
-        cutoff_cooldown = datetime.utcnow() - timedelta(minutes=30)
+        loc_id = location.id if location else None
+        loc_name = weather_data['location'].get('name', f'Location ({lat:.2f}, {lon:.2f})')
 
-        # Find recent alerts to prevent duplicate spamming to the same citizen within 30 mins
-        recently_alerted_user_ids = set()
-        try:
-            recent_alerts = (
-                db.query(Alert)
-                .filter(
-                    Alert.location_id == loc_id,
-                    Alert.created_at >= cutoff_cooldown,
-                    Alert.status == "SENT"
-                )
-                .all()
-            )
-            recently_alerted_user_ids = {a.user_id for a in recent_alerts}
-        except Exception as e:
-            logger.warning(f"Could not query recent alert cooldown: {e}")
+        dispatch_report = dispatch_automatic_early_warning(
+            db=db,
+            location_name=loc_name,
+            location_id=loc_id,
+            risk_level=current_risk_level,
+            risk_score=risk_result["risk_score"],
+            temperature_c=weather["temperature"],
+            wbgt_c=wbgt,
+            heat_index_c=heat_index,
+            interventions=intervention_texts if intervention_texts else None,
+            force_test_recipient=email if (email and "@" in email) else None
+        )
 
-        # Gather eligible citizens to alert
-        citizens_to_notify = []
-        seen_emails = set()
-
-        # 1. Explicit candidate email passed via query (e.g. testing)
-        if email and email.strip() and "@" in email:
-            c_email = email.strip().lower()
-            u_obj = db.query(User).filter(User.email.ilike(c_email)).first()
-            if not u_obj:
-                u_obj = User(
-                    name=c_email.split("@")[0],
-                    phone_number=phone_number or f"999{int(time.time()) % 10000000:07d}",
-                    email=c_email,
-                    role="candidate"
-                )
-                try:
-                    db.add(u_obj)
-                    db.commit()
-                    db.refresh(u_obj)
-                except Exception:
-                    db.rollback()
-                    u_obj = db.query(User).filter(User.email.ilike(c_email)).first()
-            if u_obj and u_obj.email not in seen_emails:
-                citizens_to_notify.append(u_obj)
-                seen_emails.add(u_obj.email)
-
-        # 2. Currently logged-in user
-        if current_user and getattr(current_user, "email", None):
-            if current_user.email not in seen_emails:
-                citizens_to_notify.append(current_user)
-                seen_emails.add(current_user.email)
-
-        # 3. All registered citizens in database
-        try:
-            registered_citizens = (
-                db.query(User)
-                .filter(
-                    User.email.isnot(None),
-                    User.email.like("%@%")
-                )
-                .all()
-            )
-            for citizen in registered_citizens:
-                if citizen.email not in seen_emails:
-                    # Enforce 30-minute cooldown so citizens aren't spammed on repeated page views
-                    if citizen.id not in recently_alerted_user_ids:
-                        citizens_to_notify.append(citizen)
-                        seen_emails.add(citizen.email)
-        except Exception as err:
-            logger.warning(f"Could not load registered citizens for auto-alert: {err}")
-
-        # Dispatch automated notifications
-        dispatched_count = 0
-        loc_name = weather_data['location'].get('name', 'your monitored region')
-        subject = f"ThermoShield Alert: {current_risk_level} Heat Risk in {loc_name}"
-        interventions_html = "".join([f"<li style='margin-bottom:6px;'>{t.lstrip('- ')}</li>" for t in intervention_texts]) if intervention_texts else "<li>Stay hydrated and avoid direct sunlight.</li>"
-
-        for citizen in citizens_to_notify:
-            html_body = f"""
-            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background: #0f172a; color: #f8fafc; border-radius: 16px; border: 1px solid #334155;">
-                <h2 style="color: #f97316; margin-top: 0;">🛡️ ThermoShield Early Warning</h2>
-                <div style="background: rgba(239,68,68,0.15); border: 1px solid #ef4444; border-radius: 10px; padding: 16px; margin: 16px 0;">
-                    <div style="display:inline-block;background:#ef4444;color:#fff;font-size:11px;font-weight:800;padding:2px 8px;border-radius:9999px;margin-bottom:6px;">AUTOMATED CIVIC HEAT ADVISORY</div>
-                    <h3 style="color: #ef4444; margin: 0 0 8px 0;">{current_risk_level} Heat Threat Detected</h3>
-                    <p style="margin: 0; color: #cbd5e1; font-size: 13px;">Location: <strong>{loc_name}</strong> | Temp: <strong>{weather['temperature']}°C</strong></p>
-                </div>
-                <div style="background: #1e293b; padding: 16px; border-radius: 10px; margin-bottom: 16px;">
-                    <h4 style="color: #38bdf8; margin: 0 0 8px 0;">🛡️ Recommended Heat Safety Actions:</h4>
-                    <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #e2e8f0; line-height: 1.6;">
-                        {interventions_html}
-                    </ul>
-                </div>
-                <p style="font-size: 11px; color: #64748b; margin: 0;">Automated broadcast to registered citizen: <strong>{citizen.email}</strong> by ThermoShield Early Warning System.</p>
-            </div>
-            """
-
-            background_tasks.add_task(
-                send_notification_email,
-                to_email=citizen.email,
-                subject=subject,
-                body=message,
-                html_body=html_body
-            )
-            dispatched_count += 1
-
-            # Dispatch SMS if phone number available
-            if getattr(citizen, "phone_number", None):
-                try:
-                    sms_alert = await send_sms(
-                        phone_number=citizen.phone_number,
-                        message=message
-                    )
-                except Exception:
-                    pass
-
-            # Record SENT alert in DB for cooldown tracking
-            try:
-                alert_record = AlertCreate(
-                    user_id=citizen.id,
-                    location_id=loc_id,
-                    risk_level=current_risk_level,
-                    risk_score=risk_result["risk_score"],
-                    message=f"Automated {current_risk_level} heat alert for {loc_name} dispatched to {citizen.email}.",
-                    status="SENT",
-                    phone_number=citizen.phone_number,
-                    reference_id=f"AUTO-{citizen.id}-{int(time.time())}"
-                )
-                create_alert(db, alert_record)
-            except Exception as e:
-                logger.warning(f"Failed to record automated alert: {e}")
-
-        if dispatched_count > 0:
-            email_status = f"Dispatched automated alert to {dispatched_count} citizen(s)"
-        else:
-            email_status = "Citizens already alerted (30m cooldown active)"
+        email_status = f"Engine: {dispatch_report.get('transition')} ({dispatch_report.get('dispatched_count', 0)} sent, {dispatch_report.get('skipped_count', 0)} cooldown-guarded)"
 
         if alert is not None:
             try:

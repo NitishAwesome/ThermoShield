@@ -21,10 +21,25 @@ def send_notification_email(
     Includes RFC 5322 compliant headers (Date, Message-ID, Reply-To, Auto-Submitted)
     to maximize inbox deliverability and prevent automated spam classification.
     """
-    sender_email = os.getenv("MAIL_USERNAME")
-    sender_password = os.getenv("MAIL_PASSWORD")
+    from dotenv import load_dotenv
+    from pathlib import Path
+
+    # Reload .env files dynamically: root first, then backend/.env takes ultimate priority
+    root_env = Path(__file__).resolve().parent.parent.parent.parent / ".env"
+    if root_env.exists():
+        load_dotenv(root_env, override=True)
+    backend_env = Path(__file__).resolve().parent.parent.parent / ".env"
+    if backend_env.exists():
+        load_dotenv(backend_env, override=True)
+
+    sender_email = (os.getenv("MAIL_USERNAME") or "").strip()
+    sender_password = (os.getenv("MAIL_PASSWORD") or "").strip()
+    # Google App Passwords are 16 letters, often entered with spaces like 'abcd efgh ijkl mnop'
+    if sender_password and " " in sender_password and len(sender_password.replace(" ", "")) == 16:
+        sender_password = sender_password.replace(" ", "")
+
     smtp_server = os.getenv("MAIL_SERVER", "smtp.gmail.com")
-    smtp_port = int(os.getenv("MAIL_PORT", 587))
+    smtp_port = int(os.getenv("MAIL_PORT", 465))
 
     if not sender_email or not sender_password:
         logger.warning("Mail credentials not configured in environment. Skipping email dispatch.")
@@ -56,10 +71,27 @@ def send_notification_email(
         message.attach(MIMEText(html_body, "html"))
 
     try:
-        with smtplib.SMTP(smtp_server, smtp_port, timeout=15) as server:
-            server.starttls()
-            server.login(sender_email, sender_password)
-            server.sendmail(sender_email, to_clean, message.as_string())
+        # Port 465 uses SSL direct connection, which avoids ISP/firewall blocks on STARTTLS (587)
+        if smtp_port == 465:
+            with smtplib.SMTP_SSL(smtp_server, 465, timeout=15) as server:
+                server.login(sender_email, sender_password)
+                server.sendmail(sender_email, to_clean, message.as_string())
+        else:
+            try:
+                with smtplib.SMTP(smtp_server, smtp_port, timeout=15) as server:
+                    server.starttls()
+                    server.login(sender_email, sender_password)
+                    server.sendmail(sender_email, to_clean, message.as_string())
+            except Exception as tls_err:
+                # If port 587 STARTTLS handshake fails, automatically fallback to Gmail port 465 SSL
+                if "gmail.com" in smtp_server:
+                    logger.info(f"Port {smtp_port} failed ({tls_err}), attempting SSL fallback on port 465...")
+                    with smtplib.SMTP_SSL(smtp_server, 465, timeout=15) as server:
+                        server.login(sender_email, sender_password)
+                        server.sendmail(sender_email, to_clean, message.as_string())
+                else:
+                    raise tls_err
+
         logger.info(f"Notification email dispatched successfully to {to_clean} from {sender_email}")
         return {
             "status": "success",
@@ -67,7 +99,38 @@ def send_notification_email(
             "recipient": to_clean,
             "sender": sender_email
         }
+    except smtplib.SMTPAuthenticationError as e:
+        logger.error(f"SMTP Authentication failed for {sender_email}: {e}")
+        return {
+            "status": "error",
+            "message": (
+                f"Gmail authentication failed (BadCredentials) for '{sender_email}'. "
+                "Please make sure 2-Step Verification is enabled on that Google account, "
+                "and that the 16-character App Password at myaccount.google.com/apppasswords "
+                f"was generated specifically for '{sender_email}'."
+            ),
+            "recipient": to_clean
+        }
     except Exception as e:
         logger.error(f"Failed to send email alert to {to_clean}: {e}")
         return {"status": "error", "message": str(e), "recipient": to_clean}
+
+
+def is_smtp_configured() -> bool:
+    """
+    Checks whether SMTP credentials (MAIL_USERNAME and MAIL_PASSWORD) are configured in the environment.
+    """
+    from dotenv import load_dotenv
+    from pathlib import Path
+
+    root_env = Path(__file__).resolve().parent.parent.parent.parent / ".env"
+    if root_env.exists():
+        load_dotenv(root_env, override=False)
+    backend_env = Path(__file__).resolve().parent.parent.parent / ".env"
+    if backend_env.exists():
+        load_dotenv(backend_env, override=False)
+
+    sender_email = (os.getenv("MAIL_USERNAME") or "").strip()
+    sender_password = (os.getenv("MAIL_PASSWORD") or "").strip()
+    return bool(sender_email and sender_password)
 

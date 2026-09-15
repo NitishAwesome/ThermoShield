@@ -69,7 +69,7 @@ const GOOGLE_DEMO_ACCOUNTS = [
 export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, register, loginWithGoogle, isAuthenticated, error: authError, clearError } = useAuth();
+  const { user, login, register, loginWithGoogle, isAuthenticated, error: authError, clearError } = useAuth();
   const { t } = useTranslation();
 
   const [mode, setMode] = useState<'login' | 'register'>(() => {
@@ -124,7 +124,11 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
     }
   }, []);
 
-  const targetUrl = (location.state as any)?.from || '/';
+  const userRole = (user?.role || '').toLowerCase();
+  const defaultRoleDest = ['official', 'responder', 'analyst', 'admin'].includes(userRole)
+    ? '/gov/dashboard'
+    : '/';
+  const targetUrl = (location.state as any)?.from || defaultRoleDest;
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -195,9 +199,15 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
     setLocalError(null);
     clearError();
     try {
+      const activeRole = (selectedRole || role || '').toLowerCase();
+      const defaultDest = ['official', 'responder', 'analyst', 'admin'].includes(activeRole)
+        ? '/gov/dashboard'
+        : '/';
+      const redirectDest = (location.state as any)?.from || defaultDest;
+
       await loginWithGoogle(credential, selectedRole || role);
       setSuccessMsg('Successfully authenticated with Google! Redirecting...');
-      setTimeout(() => navigate(targetUrl), 600);
+      setTimeout(() => navigate(redirectDest), 600);
     } catch (err: any) {
       setLocalError(err.message || 'Google authentication failed. Please try again.');
     } finally {

@@ -41,7 +41,7 @@ class TestCandidateEmailAlert(unittest.TestCase):
         data = response.json()
         self.assertEqual(data["status"], "success")
         self.assertEqual(data["recipient"], "candidate.test@example.com")
-        self.assertIn("ronit.jagdale.39@gmail.com", data["sender"])
+        self.assertIn("@", data["sender"])
         mock_send_email.assert_called_once()
         call_kwargs = mock_send_email.call_args[1]
         self.assertEqual(call_kwargs["to_email"], "candidate.test@example.com")

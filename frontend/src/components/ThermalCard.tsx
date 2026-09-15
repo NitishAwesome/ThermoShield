@@ -5,6 +5,7 @@ import { formatTemperature } from '../utils/risk';
 import { Card, CardHeader, CardContent, Badge } from './ui';
 import { useTranslation } from '../context/LanguageContext';
 import { translateExplainabilityFactor } from '../utils/translationHelpers';
+import { MetricExplainer } from './MetricExplainer';
 
 interface ThermalCardProps {
   indices?: ThermalIndices;
@@ -173,6 +174,12 @@ export const ThermalCard: React.FC<ThermalCardProps> = ({
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Compact Metric Explanations for Plain Language Readability */}
+        <div className="flex flex-wrap gap-2 pt-1 border-t ts-border">
+          <MetricExplainer metricType="wbgt" customLabel={t('explainer.whatDoesThisMean', undefined, 'What is WBGT?')} />
+          <MetricExplainer metricType="heatIndex" customLabel={t('explainer.whatDoesThisMean', undefined, 'What is Heat Index?')} />
         </div>
 
         {/* Expandable Scientific Details */}
