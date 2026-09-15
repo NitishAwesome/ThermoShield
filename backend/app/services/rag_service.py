@@ -9,7 +9,9 @@ Grounded in authoritative guidelines from:
 """
 
 import re
+import json
 import logging
+from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional
 from dataclasses import dataclass
 
@@ -25,6 +27,29 @@ class KnowledgeChunk:
     content: str
     keywords: List[str]
     priority: int = 1  # 1 = standard, 2 = critical/emergency
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "chunk_id": self.chunk_id,
+            "title": self.title,
+            "authority": self.authority,
+            "category": self.category,
+            "content": self.content,
+            "keywords": self.keywords,
+            "priority": self.priority,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "KnowledgeChunk":
+        return cls(
+            chunk_id=data["chunk_id"],
+            title=data["title"],
+            authority=data.get("authority", "Custom Training"),
+            category=data.get("category", "general"),
+            content=data["content"],
+            keywords=data.get("keywords", []),
+            priority=data.get("priority", 1),
+        )
 
 
 # ==============================================================================
@@ -282,10 +307,134 @@ class ThermoShieldRAGService:
     Pulls authoritative NDMA, IMD, and WHO guidelines and provides:
     1. Grounded Context Chunks for Google Gemini API prompts.
     2. High-fidelity Autonomous Synthesis when LLM API keys are unconfigured.
+    3. Dynamic Knowledge Base Training & Ingestion (Municipal HAPs, custom guidelines).
+    4. Anti-redundancy sub-chunk filtering and multi-turn conversation memory.
     """
 
     def __init__(self, corpus: Optional[List[KnowledgeChunk]] = None):
-        self.corpus = corpus or RAG_KNOWLEDGE_CORPUS
+        self.default_corpus = list(RAG_KNOWLEDGE_CORPUS)
+        self.custom_corpus: List[KnowledgeChunk] = []
+
+        # Persistence path in data/ directory
+        base_dir = Path(__file__).resolve().parents[2]
+        self.data_dir = base_dir / "data"
+        self.storage_file = self.data_dir / "custom_knowledge.json"
+
+        self.load_persisted_corpus()
+        self.corpus = corpus or (self.default_corpus + self.custom_corpus)
+
+    def load_persisted_corpus(self) -> None:
+        """Loads custom trained knowledge chunks from disk if available."""
+        self.custom_corpus = []
+        if self.storage_file.exists():
+            try:
+                with open(self.storage_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        for item in data:
+                            self.custom_corpus.append(KnowledgeChunk.from_dict(item))
+                logger.info(f"Loaded {len(self.custom_corpus)} custom knowledge chunks from {self.storage_file}")
+            except Exception as e:
+                logger.warning(f"Failed to load persisted knowledge corpus from {self.storage_file}: {e}")
+
+    def save_persisted_corpus(self) -> None:
+        """Saves custom trained knowledge chunks to disk."""
+        try:
+            self.data_dir.mkdir(parents=True, exist_ok=True)
+            with open(self.storage_file, "w", encoding="utf-8") as f:
+                json.dump([c.to_dict() for c in self.custom_corpus], f, indent=2, ensure_ascii=False)
+            logger.info(f"Successfully saved {len(self.custom_corpus)} custom chunks to {self.storage_file}")
+        except Exception as e:
+            logger.error(f"Failed to save persisted knowledge corpus: {e}")
+
+    def add_knowledge_chunk(self, chunk: KnowledgeChunk, persist: bool = True) -> bool:
+        """
+        Adds or updates a knowledge chunk in the active corpus.
+        Prevents duplicate chunk_ids.
+        """
+        for i, c in enumerate(self.custom_corpus):
+            if c.chunk_id == chunk.chunk_id:
+                self.custom_corpus[i] = chunk
+                self.corpus = self.default_corpus + self.custom_corpus
+                if persist:
+                    self.save_persisted_corpus()
+                return True
+
+        self.custom_corpus.append(chunk)
+        self.corpus = self.default_corpus + self.custom_corpus
+        if persist:
+            self.save_persisted_corpus()
+        return True
+
+    def train_from_text(
+        self,
+        title: str,
+        authority: str,
+        category: str,
+        content: str,
+        keywords: Optional[List[str]] = None,
+        priority: int = 1
+    ) -> KnowledgeChunk:
+        """
+        Trains/ingests a new knowledge chunk into the RAG knowledge base.
+        Automatically extracts keywords if none provided.
+        """
+        slug = re.sub(r"[^a-zA-Z0-9_]+", "_", title.lower().strip())
+        chunk_id = f"custom_{slug[:40]}"
+
+        # Auto-extract meaningful keywords if not provided
+        if not keywords:
+            raw_tokens = re.findall(r"\b[a-zA-Z0-9_\u0900-\u097F]{3,20}\b", (title + " " + content).lower())
+            stop_words = {
+                "the", "and", "for", "that", "this", "with", "from", "are", "have", "has",
+                "will", "can", "what", "how", "when", "where", "should", "must", "which",
+                "such", "into", "over", "than", "then", "more", "most", "about", "other"
+            }
+            meaningful = [t for t in raw_tokens if t not in stop_words]
+            freq = {}
+            for t in meaningful:
+                freq[t] = freq.get(t, 0) + 1
+            keywords = [k for k, _ in sorted(freq.items(), key=lambda x: x[1], reverse=True)[:15]]
+
+        new_chunk = KnowledgeChunk(
+            chunk_id=chunk_id,
+            title=title.strip(),
+            authority=authority.strip(),
+            category=category.strip().lower(),
+            content=content.strip(),
+            keywords=keywords,
+            priority=priority
+        )
+        self.add_knowledge_chunk(new_chunk, persist=True)
+        return new_chunk
+
+    def get_all_chunks(self) -> List[Dict[str, Any]]:
+        """Returns metadata of all active knowledge chunks."""
+        result = []
+        for c in self.corpus:
+            is_custom = c in self.custom_corpus or c.chunk_id.startswith("custom_")
+            result.append({
+                "chunk_id": c.chunk_id,
+                "title": c.title,
+                "authority": c.authority,
+                "category": c.category,
+                "priority": c.priority,
+                "keyword_count": len(c.keywords),
+                "keywords_sample": c.keywords[:6],
+                "char_length": len(c.content),
+                "is_custom": is_custom
+            })
+        return result
+
+    def delete_knowledge_chunk(self, chunk_id: str) -> bool:
+        """Deletes a custom knowledge chunk by id."""
+        initial_len = len(self.custom_corpus)
+        self.custom_corpus = [c for c in self.custom_corpus if c.chunk_id != chunk_id]
+        if len(self.custom_corpus) < initial_len:
+            self.corpus = self.default_corpus + self.custom_corpus
+            self.save_persisted_corpus()
+            return True
+        return False
 
     def _expand_query(self, query: str) -> List[str]:
         """Expands query terms with bilingual biometeorological synonyms."""
@@ -373,6 +522,83 @@ class ThermoShieldRAGService:
             )
         return "\n\n".join(blocks)
 
+    def _extract_focused_content(self, query: str, chunk: KnowledgeChunk, previous_text: str = "") -> str:
+        """
+        Anti-redundancy extractor: Extracts only the most relevant, non-redundant sections
+        or bullet points from a knowledge chunk rather than dumping the entire static chunk.
+        """
+        content = chunk.content.strip()
+        q_lower = query.lower()
+        expanded_tokens = self._expand_query(query)
+
+        # For severe heatstroke emergency, keep the full clinical protocol for life safety
+        if chunk.category == "first_aid" and any(w in q_lower for w in ["stroke", "unconscious", "collapse", "behosh", "108", "112"]):
+            return content
+
+        # Split content into header and numbered/bulleted items
+        lines = content.split("\n")
+        header_lines = []
+        items = []
+        current_item = []
+
+        for line in lines:
+            if re.match(r"^(\d+\.|\•|\-)\s+", line.strip()):
+                if current_item:
+                    items.append("\n".join(current_item).strip())
+                    current_item = []
+                current_item.append(line)
+            elif current_item:
+                current_item.append(line)
+            else:
+                header_lines.append(line)
+
+        if current_item:
+            items.append("\n".join(current_item).strip())
+
+        if not items:
+            return content
+
+        header = "\n".join(header_lines).strip()
+
+        # Score items against query tokens and filter previously stated points
+        scored_items = []
+        prev_lower = previous_text.lower() if previous_text else ""
+
+        for idx, item in enumerate(items):
+            item_lower = item.lower()
+
+            # Anti-redundancy check: check if this item's key phrase was already given in this chat
+            first_phrase = re.sub(r'[^a-z0-9 ]', '', item_lower[:50]).strip()
+            if prev_lower and len(first_phrase) > 15 and first_phrase in prev_lower:
+                continue  # Skip items already stated!
+
+            item_score = 0.0
+            for token in expanded_tokens:
+                if len(token) > 2 and token in item_lower:
+                    item_score += 3.0
+
+            for kw in chunk.keywords:
+                if kw in q_lower and kw in item_lower:
+                    item_score += 5.0
+
+            scored_items.append((item_score, idx, item))
+
+        scored_items.sort(key=lambda x: x[0], reverse=True)
+
+        if any(s[0] > 0 for s in scored_items):
+            selected = [s[2] for s in scored_items if s[0] > 0][:3]
+        else:
+            selected = [s[2] for s in scored_items][:2]
+
+        if not selected:
+            selected = items[:2]
+
+        result_parts = []
+        if header:
+            result_parts.append(header)
+        result_parts.extend(selected)
+        return "\n\n".join(result_parts)
+
     def synthesize_rag_response(
         self,
         query: str,
@@ -381,13 +607,14 @@ class ThermoShieldRAGService:
         humidity: float,
         risk_level: str,
         chunks: List[KnowledgeChunk],
-        extra_weather: Optional[Dict[str, Any]] = None
+        extra_weather: Optional[Dict[str, Any]] = None,
+        conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
         """
         Autonomous RAG Synthesizer.
         Generates a direct, question-specific, verified biometeorological response
         derived exclusively from the top retrieved knowledge chunks and live telemetry.
-        Used when the external LLM key is absent or unreachable.
+        Eliminates redundancy across multi-turn dialogues.
         """
         if not chunks:
             chunks = self.corpus[:2]
@@ -400,16 +627,26 @@ class ThermoShieldRAGService:
         is_emergency = any(
             w in q_lower for w in ["stroke", "unconscious", "collapse", "collapsed", "behosh", "faint", "seizure", "108", "112", "emergency"]
         )
+        is_followup = bool(conversation_history and len(conversation_history) > 0)
 
-        intro = (
-            f"🛡️ **ThermoShield Biometeorological Advisory for {location}**\n"
-            f"*Live Open-Meteo Telemetry:* **{temp:.1f}°C** | **{humidity:.0f}% Humidity** | Risk Tier: **{risk_level}**\n"
-            f"*Grounded in:* **{source_str}**\n\n"
-        )
+        # Anti-redundancy Header:
+        # On follow-up turns, omit the repetitive telemetry intro block unless user specifically asks for weather
+        wants_weather = any(w in q_lower for w in ["weather", "temperature", "temp", "mausam", "forecast", "garmi", "climate", "barish", "rain"])
+
+        if is_emergency:
+            intro = "🚨 **EMERGENCY HEAT ILLNESS PROTOCOL (Immediate Action Required)**\n\n"
+        elif is_followup and not wants_weather:
+            intro = ""
+        else:
+            intro = (
+                f"🛡️ **ThermoShield Biometeorological Advisory for {location}**\n"
+                f"*Live Telemetry:* **{temp:.1f}°C** | **{humidity:.0f}% Humidity** | Risk Tier: **{risk_level}**\n"
+                f"*Grounded in:* **{source_str}**\n\n"
+            )
 
         # Weather & Forecast section if asked
         weather_section = ""
-        if any(w in q_lower for w in ["weather", "temperature", "temp", "mausam", "forecast", "garmi", "climate", "barish", "rain"]):
+        if wants_weather:
             extra = extra_weather or {}
             weather_desc = extra.get("description", "Clear Sky")
             app_t = extra.get("apparent_temperature", temp)
@@ -433,14 +670,33 @@ class ThermoShieldRAGService:
             lines.append(f"• **ThermoShield Thermal Risk:** {risk_level.upper()} Risk Tier")
             weather_section = "\n".join(lines) + "\n\n"
 
-        # Body synthesized from top chunks
+        # Collect prior bot responses to avoid repetitive output
+        prior_bot_text = ""
+        if conversation_history:
+            for turn in conversation_history:
+                if turn.get("role") in ["model", "assistant", "copilot"]:
+                    prior_bot_text += " " + (turn.get("text") or turn.get("content") or "")
+
         body_parts = []
         if weather_section:
             body_parts.append(weather_section.strip())
-        for chunk in chunks[:2]:
-            body_parts.append(chunk.content)
 
-        full_reply = intro + "\n\n---\n\n".join(body_parts)
+        # Extract focused, non-redundant points from top chunk
+        top_content = self._extract_focused_content(query, top_chunk, previous_text=prior_bot_text)
+        if top_content:
+            body_parts.append(top_content)
+
+        # Only include a second chunk if it adds distinctly different, relevant info
+        if len(chunks) > 1 and chunks[1].category != top_chunk.category:
+            c2_matches = any(kw in q_lower for kw in chunks[1].keywords[:5])
+            if c2_matches:
+                c2_content = self._extract_focused_content(
+                    query, chunks[1], previous_text=prior_bot_text + " " + top_content
+                )
+                if c2_content and c2_content.strip() != top_content.strip():
+                    body_parts.append(c2_content)
+
+        full_reply = (intro + "\n\n---\n\n".join(body_parts)).strip()
 
         return {
             "reply": full_reply,
