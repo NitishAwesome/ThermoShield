@@ -33,7 +33,7 @@ class TestBackendIntegration(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertEqual(data["status"], "healthy")
-        self.assertIn(data["database"], ["sqlite", "postgresql"])
+        self.assertIn(data.get("database_engine", data.get("database")), ["sqlite", "postgresql"])
 
     def test_02_weather_wind_speed_unit(self):
         """Test GET /weather returns live weather with wind_speed in m/s."""

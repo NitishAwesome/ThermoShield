@@ -176,7 +176,7 @@ class TestDatabaseFoundation(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         body = res.json()
         self.assertEqual(body["status"], "healthy")
-        self.assertIn(body["database"], ["sqlite", "postgresql"])
+        self.assertIn(body.get("database_engine", body.get("database")), ["sqlite", "postgresql"])
 
     # 10. Performance Indexes Verification
     def test_10_performance_indexes_exist(self):
