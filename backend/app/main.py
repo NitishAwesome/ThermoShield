@@ -64,7 +64,7 @@ from app.services.simulator import simulate_intervention
 from app.services.sms import send_sms, get_sms_delivery_status
 from app.services.email import send_notification_email, is_smtp_configured
 from app.services.email_templates import generate_action_first_alert_html
-from app.services.alert_engine import dispatch_automatic_early_warning, get_engine_status_summary
+from app.services.alert_engine import dispatch_automatic_early_warning, get_engine_status_summary, init_cooldown_registry_from_db
 from app.services.monitor import monitor_daemon
 
 
@@ -218,6 +218,12 @@ async def on_startup():
     try:
         init_db()
         _seed_demo_accounts_if_needed()
+        # Hydrate alert cooldown registry from DB
+        db = next(get_db())
+        try:
+            init_cooldown_registry_from_db(db)
+        finally:
+            db.close()
         # Start proactive autonomous background monitoring daemon
         monitor_daemon.start()
         logger.info("ThermoShield autonomous monitoring daemon initialized on startup.")
@@ -1084,12 +1090,20 @@ def health():
 async def location_search(
     q: str = Query(..., min_length=2)
 ):
-    locations = await search_location(q)
+    try:
+        locations = await search_location(q)
+        return {
+            "count": len(locations),
+            "locations": locations
+        }
+    except Exception as e:
+        logger.warning(f"Location search query failed for '{q}': {e}")
+        return {
+            "count": 0,
+            "locations": [],
+            "error": "Location search temporarily unavailable."
+        }
 
-    return {
-        "count": len(locations),
-        "locations": locations
-    }
 
 
 @app.get("/location/reverse")

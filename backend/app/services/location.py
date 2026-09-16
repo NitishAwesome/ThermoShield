@@ -6,7 +6,10 @@ from app.config import NOMINATIM_URL
 logger = logging.getLogger(__name__)
 
 # In-memory search cache to accelerate autocomplete and eliminate redundant network calls
+MAX_LOCATION_CACHE_ENTRIES = 500
+MAX_REVERSE_CACHE_ENTRIES = 500
 _LOCATION_CACHE: Dict[str, List[Dict[str, Any]]] = {}
+
 
 # Instant offline Indian cities directory as a 100% reliable fallback
 POPULAR_INDIAN_CITIES: List[Dict[str, Any]] = [
@@ -120,9 +123,14 @@ async def search_location(query: str) -> List[Dict[str, Any]]:
 
     # Cache successful results
     if locations:
+        if len(_LOCATION_CACHE) > MAX_LOCATION_CACHE_ENTRIES:
+            # Drop oldest keys
+            for k in list(_LOCATION_CACHE.keys())[:MAX_LOCATION_CACHE_ENTRIES // 5]:
+                _LOCATION_CACHE.pop(k, None)
         _LOCATION_CACHE[normalized_q] = locations
 
     return locations
+
 
 
 _REVERSE_CACHE: Dict[tuple, Dict[str, Any]] = {}
@@ -208,6 +216,10 @@ async def reverse_location(lat: float, lon: float) -> Dict[str, Any]:
         "latitude": lat,
         "longitude": lon,
     }
+
+    if len(_REVERSE_CACHE) > MAX_REVERSE_CACHE_ENTRIES:
+        for k in list(_REVERSE_CACHE.keys())[:MAX_REVERSE_CACHE_ENTRIES // 5]:
+            _REVERSE_CACHE.pop(k, None)
 
     _REVERSE_CACHE[cache_key] = result
     return result

@@ -67,6 +67,35 @@ def get_engine_status_summary() -> Dict[str, Any]:
     }
 
 
+def init_cooldown_registry_from_db(db: Session) -> int:
+    """
+    Hydrates recent citizen cooldown timestamps from the Alert table on startup.
+    Ensures anti-spam cooldown protection survives backend process restarts.
+    """
+    try:
+        cutoff = datetime.utcnow() - timedelta(seconds=DEFAULT_STEADY_COOLDOWN_SECONDS)
+        recent_alerts = (
+            db.query(Alert)
+            .filter(Alert.created_at >= cutoff)
+            .all()
+        )
+        hydrated_count = 0
+        now = time.time()
+        for alert in recent_alerts:
+            user = db.query(User).filter(User.id == alert.user_id).first() if alert.user_id else None
+            loc = db.query(Location).filter(Location.id == alert.location_id).first() if alert.location_id else None
+            if user and user.email and loc and alert.risk_level:
+                fingerprint = f"{user.email.strip().lower()}::{loc.name}::{alert.risk_level.upper().strip()}"
+                ts = alert.created_at.timestamp() if hasattr(alert, "created_at") and alert.created_at else now
+                if fingerprint not in _CITIZEN_COOLDOWN_REGISTRY or ts > _CITIZEN_COOLDOWN_REGISTRY[fingerprint]:
+                    _CITIZEN_COOLDOWN_REGISTRY[fingerprint] = ts
+                    hydrated_count += 1
+        logger.info(f"Hydrated {hydrated_count} active cooldowns from DB onto alert engine.")
+        return hydrated_count
+    except Exception as e:
+        logger.warning(f"Could not hydrate cooldown registry from DB: {e}")
+        return 0
+
 
 def evaluate_risk_transition(
     location_key: str,
@@ -157,6 +186,12 @@ def check_anti_spam_cooldown(
         return False, f"Suppressed by anti-spam cooldown ({remaining_mins}m remaining)"
 
     # Cooldown expired, allow dispatch and update fingerprint timestamp
+    if len(_CITIZEN_COOLDOWN_REGISTRY) > 1000:
+        stale_cutoff = now - (DEFAULT_STEADY_COOLDOWN_SECONDS * 2)
+        stale_keys = [k for k, v in _CITIZEN_COOLDOWN_REGISTRY.items() if v < stale_cutoff]
+        for k in stale_keys:
+            _CITIZEN_COOLDOWN_REGISTRY.pop(k, None)
+
     _CITIZEN_COOLDOWN_REGISTRY[fingerprint] = now
     return True, "Cooldown clear"
 

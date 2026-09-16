@@ -44,6 +44,15 @@ def predict_risk(
     temperature_trend: float = 0.0,
     thermal_stress_trend: float = 0.0,
 ):
+    """
+    Predicts composite heat-health risk score and level.
+
+    SIH-24B Architecture Decision (Option B):
+    historical_health_events (default 17/18) and lag_health_events (default 15) are fixed
+    prototype baseline seeds calibrated to average municipal surveillance numbers.
+    Retraining risk_model.pkl was avoided to maintain model behavioral stability.
+    Future production versions will bind to live IDSP/HMIS health surveillance registries.
+    """
     model = get_model()
 
     # Calibrated Biometeorological Components:

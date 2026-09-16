@@ -67,11 +67,12 @@ def _get_dynamic_forecast_dates(count: int = 5) -> List[str]:
 def _generate_synthetic_hourly(
     temp_max: float = 34.0,
     temp_min: float = 26.0,
-    start_time: Optional[datetime] = None
+    start_time: Optional[datetime] = None,
+    num_hours: int = 120,
 ) -> Dict[str, Any]:
     """
-    Generates a 48-hour diurnal hourly curve for temperature, relative humidity,
-    apparent temperature, UV index, and day/night status. Used as fallback
+    Generates a multi-day (default 120h / 5d) diurnal hourly curve for temperature, relative humidity,
+    apparent temperature, wind speed, solar radiation, UV index, and day/night status. Used as fallback
     when hourly telemetry is temporarily unavailable.
     """
     if start_time is None:
@@ -83,11 +84,13 @@ def _generate_synthetic_hourly(
     app_temps = []
     uvs = []
     is_days = []
+    winds = []
+    solars = []
 
     mid_temp = (temp_max + temp_min) / 2.0
     amp_temp = max(1.5, (temp_max - temp_min) / 2.0)
 
-    for i in range(48):
+    for i in range(num_hours):
         dt = base + timedelta(hours=i)
         times.append(dt.strftime("%Y-%m-%dT%H:00"))
         hour = dt.hour
@@ -107,21 +110,28 @@ def _generate_synthetic_hourly(
         at = max(t - 1.0, at)
         app_temps.append(at)
 
-        # UV Index and is_day determination
+        # UV Index, solar radiation, and is_day determination
         if 6 <= hour <= 18:
             is_days.append(1)
             sun_factor = max(0.0, math.cos((hour - 12.5) * math.pi / 7.0))
             uv = round(8.5 * sun_factor, 1)
             uvs.append(uv)
+            solar = round(sun_factor * 750.0, 1)
+            solars.append(solar)
         else:
             is_days.append(0)
             uvs.append(0.0)
+            solars.append(0.0)
+
+        winds.append(2.5)
 
     return {
         "time": times,
         "temperature": temps,
         "humidity": humidities,
         "apparent_temperature": app_temps,
+        "wind_speed": winds,
+        "shortwave_radiation": solars,
         "uv_index": uvs,
         "is_day": is_days,
     }
@@ -134,6 +144,19 @@ _INFLIGHT_REQUESTS: Dict[Tuple[float, float], asyncio.Future] = {}
 
 FRESH_TTL_SECONDS = 60.0
 STALE_TTL_SECONDS = 3600.0
+MAX_CACHE_ENTRIES = 500  # Bounded cache limit to prevent memory bloat on arbitrary map clicks
+
+
+def _evict_cache_if_needed():
+    """Evicts oldest entries when cache exceeds MAX_CACHE_ENTRIES."""
+    if len(_CACHE) > MAX_CACHE_ENTRIES:
+        # Sort by timestamp ascending (oldest first)
+        sorted_keys = sorted(_CACHE.keys(), key=lambda k: _CACHE[k].get("timestamp", 0))
+        # Remove oldest 20%
+        num_to_remove = max(1, len(_CACHE) // 5)
+        for k in sorted_keys[:num_to_remove]:
+            _CACHE.pop(k, None)
+
 
 
 def _normalize_coords(latitude: float, longitude: float) -> Tuple[float, float]:
@@ -221,12 +244,41 @@ def get_cached_weather(key: Tuple[float, float], allow_stale: bool = False) -> O
     entry = _CACHE.get(key)
     if not entry:
         return None
-    age = time.time() - entry["timestamp"]
+    now = time.time()
+    age = now - entry["timestamp"]
     if age <= FRESH_TTL_SECONDS:
-        return entry["data"]
+        data = dict(entry["data"])
+        # If it was live, expose CACHED with age if over 5s
+        if age > 5.0 and data.get("source_status") == "LIVE":
+            data = {
+                **data,
+                "source_status": "CACHED",
+                "cache_age_seconds": round(age, 1),
+                "data_timestamp": datetime.utcfromtimestamp(entry["timestamp"]).isoformat() + "Z",
+            }
+        return data
     if allow_stale and age <= STALE_TTL_SECONDS:
-        return entry["data"]
+        base = dict(entry["data"])
+        stale_copy = {
+            **base,
+            "source_status": "STALE_CACHED",
+            "source_name": f"Cached Observation ({round(age, 0):.0f}s old)",
+            "cache_age_seconds": round(age, 1),
+            "data_timestamp": datetime.utcfromtimestamp(entry["timestamp"]).isoformat() + "Z",
+            "is_fallback": True,
+        }
+        if "weather" in stale_copy:
+            stale_copy["weather"] = {
+                **stale_copy["weather"],
+                "source_status": "STALE_CACHED",
+                "source_name": f"Cached Observation ({round(age, 0):.0f}s old)",
+                "cache_age_seconds": round(age, 1),
+                "data_timestamp": datetime.utcfromtimestamp(entry["timestamp"]).isoformat() + "Z",
+                "is_fallback": True,
+            }
+        return stale_copy
     return None
+
 
 
 async def _fetch_from_open_meteo(latitude: float, longitude: float) -> Dict[str, Any]:
@@ -250,6 +302,8 @@ async def _fetch_from_open_meteo(latitude: float, longitude: float) -> Dict[str,
             "temperature_2m,"
             "relative_humidity_2m,"
             "apparent_temperature,"
+            "wind_speed_10m,"
+            "shortwave_radiation,"
             "uv_index,"
             "is_day"
         ),
@@ -316,15 +370,36 @@ async def _fetch_from_open_meteo(latitude: float, longitude: float) -> Dict[str,
                 if "weather_code" in daily and daily["weather_code"]:
                     forecast_dict["weather_code"] = [int(x) for x in daily.get("weather_code", [])]
 
-                # Extract 48-hour hourly sequence
+                # Extract multi-day hourly sequence
                 if hourly and "time" in hourly and len(hourly["time"]) > 0:
+                    raw_times = list(hourly.get("time", []))
+                    raw_temps = [float(x) for x in hourly.get("temperature_2m", [])]
+                    raw_rh = [float(x) for x in hourly.get("relative_humidity_2m", [])]
+                    raw_at = [float(x) for x in hourly.get("apparent_temperature", [])]
+                    raw_uv = [float(x) for x in hourly.get("uv_index", [])]
+                    raw_day = [int(x) for x in hourly.get("is_day", [])]
+
+                    # Wind speed
+                    if "wind_speed_10m" in hourly and hourly["wind_speed_10m"]:
+                        raw_wind = [max(0.1, float(x)) if x is not None else 1.0 for x in hourly["wind_speed_10m"]]
+                    else:
+                        raw_wind = [2.5] * len(raw_times)
+
+                    # Shortwave radiation
+                    if "shortwave_radiation" in hourly and hourly["shortwave_radiation"]:
+                        raw_solar = [max(0.0, float(x)) if x is not None else 0.0 for x in hourly["shortwave_radiation"]]
+                    else:
+                        raw_solar = [max(0.0, round(float(u) * 85.0, 1)) if d == 1 else 0.0 for u, d in zip(raw_uv, raw_day)]
+
                     forecast_dict["hourly"] = {
-                        "time": list(hourly.get("time", []))[:48],
-                        "temperature": [float(x) for x in hourly.get("temperature_2m", [])][:48],
-                        "humidity": [float(x) for x in hourly.get("relative_humidity_2m", [])][:48],
-                        "apparent_temperature": [float(x) for x in hourly.get("apparent_temperature", [])][:48],
-                        "uv_index": [float(x) for x in hourly.get("uv_index", [])][:48],
-                        "is_day": [int(x) for x in hourly.get("is_day", [])][:48],
+                        "time": raw_times,
+                        "temperature": raw_temps,
+                        "humidity": raw_rh,
+                        "apparent_temperature": raw_at,
+                        "wind_speed": raw_wind,
+                        "shortwave_radiation": raw_solar,
+                        "uv_index": raw_uv,
+                        "is_day": raw_day,
                     }
                 else:
                     max_t = forecast_dict["max_temperature"][0] if forecast_dict["max_temperature"] else 34.0
@@ -504,29 +579,35 @@ async def _execute_fetch_and_resolve(
             "data": data,
             "timestamp": time.time()
         }
+        _evict_cache_if_needed()
         if not future.done():
             future.set_result(data)
     except Exception as exc:
         # Check if stale cached data exists as a fallback
         stale_data = get_cached_weather(key, allow_stale=True)
         if stale_data is not None:
+            cache_age = stale_data.get("cache_age_seconds", 60.0)
             logger.warning(
                 f"Upstream weather request failed for {key}: {exc}. "
-                f"Returning stale cached data fallback."
+                f"Returning stale cached data fallback ({cache_age}s old)."
             )
             fallback_data = {
                 "location": dict(stale_data.get("location", {})),
                 "weather": dict(stale_data.get("weather", {})),
                 "forecast": dict(stale_data.get("forecast", {})),
-                "source_status": "OFFLINE_FALLBACK",
-                "source_name": "Cached Data Fallback",
+                "source_status": "STALE_CACHED",
+                "source_name": stale_data.get("source_name", "Stale Cached Observation"),
+                "cache_age_seconds": cache_age,
+                "data_timestamp": stale_data.get("data_timestamp"),
                 "is_fallback": True,
             }
             if _is_nighttime_at_location(latitude, longitude):
                 fallback_data["weather"]["solar_radiation"] = 0.0
                 fallback_data["weather"]["is_day"] = 0
-            fallback_data["weather"]["source_status"] = "OFFLINE_FALLBACK"
-            fallback_data["weather"]["source_name"] = "Cached Data Fallback"
+            fallback_data["weather"]["source_status"] = "STALE_CACHED"
+            fallback_data["weather"]["source_name"] = stale_data.get("source_name", "Stale Cached Observation")
+            fallback_data["weather"]["cache_age_seconds"] = cache_age
+            fallback_data["weather"]["data_timestamp"] = stale_data.get("data_timestamp")
             fallback_data["weather"]["is_fallback"] = True
             if not future.done():
                 future.set_result(fallback_data)
@@ -540,11 +621,16 @@ async def _execute_fetch_and_resolve(
                 "data": fallback_data,
                 "timestamp": time.time()
             }
+            _evict_cache_if_needed()
             if not future.done():
                 future.set_result(fallback_data)
     finally:
-        async with _CACHE_LOCK:
+        try:
+            async with _CACHE_LOCK:
+                _INFLIGHT_REQUESTS.pop(key, None)
+        except Exception:
             _INFLIGHT_REQUESTS.pop(key, None)
+
 
 
 async def get_forecast(

@@ -125,8 +125,12 @@ class BackgroundMonitorDaemon:
         db = SessionLocal()
         try:
             for area in MONITORED_MUNICIPAL_AREAS:
-                res = await self.evaluate_single_location(area, db)
-                cycle_results.append(res)
+                try:
+                    res = await self.evaluate_single_location(area, db)
+                    cycle_results.append(res)
+                except Exception as eval_err:
+                    logger.error(f"Error evaluating area {area.get('name')}: {eval_err}")
+                    cycle_results.append({"location": area.get("name"), "error": str(eval_err)})
                 # Small pause between Open-Meteo queries to respect rate limits
                 await asyncio.sleep(0.5)
         finally:
