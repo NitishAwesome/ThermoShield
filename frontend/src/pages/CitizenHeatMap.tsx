@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   MapPin,
@@ -25,13 +25,16 @@ import { DataRealityBadge, FallbackModeBanner } from '../components/provenance';
 import { useLocation } from '../context/LocationContext';
 import { useProfile } from '../context/ProfileContext';
 import { api } from '../services/api';
-import { ThermalResponse, RiskLevel, ThermalZone, MapLocationRisk, GlobalHeatStation } from '../types';
+import { ThermalResponse, RiskLevel, ThermalZone, MapLocationRisk, GlobalHeatStation, HeatRiskArea } from '../types';
 import { MUMBAI_PROTOTYPE_ZONES } from '../data/thermalZones';
 import { GLOBAL_HEAT_STATIONS } from '../data/globalHeatHotspots';
+import { getOrGenerateCityWards } from '../utils/cityWardsGenerator';
+import { getRiskStyle } from '../utils/risk';
 
 // Popular Indian reference regions for rapid citizen exploration
 const REGIONAL_PRESETS = [
   { name: 'Central Mumbai (UHI)', lat: 19.0400, lon: 72.8550 },
+  { name: 'Pune (Shivajinagar)', lat: 18.5204, lon: 73.8567 },
   { name: 'South Mumbai (Coastal)', lat: 18.9320, lon: 72.8340 },
   { name: 'Delhi NCR', lat: 28.6139, lon: 77.2090 },
   { name: 'Ahmedabad (Dry Heat)', lat: 23.0225, lon: 72.5714 },
@@ -134,6 +137,23 @@ export const CitizenHeatMap: React.FC = () => {
   const riskLevel = (['LOW', 'MODERATE', 'HIGH', 'EXTREME', 'CRITICAL'].includes(rawRiskLevel)
     ? rawRiskLevel
     : 'MODERATE') as RiskLevel;
+
+  const [selectedWard, setSelectedWard] = useState<HeatRiskArea | null>(null);
+
+  // Dynamically generate or load official wards for current monitored city
+  const activeCityWards = useMemo(() => {
+    return getOrGenerateCityWards(locationName, coords.lat, coords.lon, tempC, humidity);
+  }, [locationName, coords.lat, coords.lon, tempC, humidity]);
+
+  useEffect(() => {
+    if (activeCityWards.length > 0) {
+      const stillValid = selectedWard && activeCityWards.some((w) => w.id === selectedWard.id);
+      if (!stillValid) {
+        const topRisk = [...activeCityWards].sort((a, b) => b.risk.score - a.risk.score)[0];
+        setSelectedWard(topRisk || activeCityWards[0]);
+      }
+    }
+  }, [activeCityWards]);
 
   const isFallback = Boolean(
     thermalData?.weather?.is_fallback ||
@@ -448,6 +468,9 @@ export const CitizenHeatMap: React.FC = () => {
             longitude: station.lon,
           });
         }}
+        adminWards={viewScope === 'local' ? activeCityWards : []}
+        selectedWardId={selectedWard?.id}
+        onSelectWard={(ward) => setSelectedWard(ward)}
         thermalZones={MUMBAI_PROTOTYPE_ZONES}
         selectedZoneId={selectedZone?.id}
         onSelectZone={(zone) => setSelectedZone(zone)}
@@ -455,13 +478,47 @@ export const CitizenHeatMap: React.FC = () => {
         isLoadingMap={isLoading}
         mapError={error}
         isCitizenView={true}
-        title={viewScope === 'world' ? 'Planetary Heat Stress & Worldwide Diffusion' : 'Local Heat Stress Map'}
+        title={viewScope === 'world' ? 'Planetary Heat Stress & Worldwide Diffusion' : `${locationName.split(',')[0]} Heat Stress & Ward Microclimate Map`}
         subtitle={
           viewScope === 'world'
             ? 'Continuous planetary thermal diffusion fields and 38+ megacity observation stations — tap anywhere on Earth to inspect'
-            : `Displaying conditions around ${locationName} — tap the map to explore`
+            : `Displaying administrative ward boundaries and thermal heat diffusion around ${locationName} — tap anywhere to inspect`
         }
       />
+
+      {/* Selected Administrative Ward Details (if citizen selects a ward on map) */}
+      {selectedWard && viewScope === 'local' && (
+        <div className="p-5 rounded-2xl ts-card border border-orange-500/30 bg-orange-500/5 space-y-2 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-orange-400 uppercase text-[11px] font-mono">
+              Selected Administrative Ward ({selectedWard.wardCode})
+            </span>
+            <span className={`px-2.5 py-0.5 rounded-full text-[10.5px] font-bold ${getRiskStyle(selectedWard.risk.level).badge}`}>
+              {getRiskStyle(selectedWard.risk.level).emoji} {selectedWard.risk.level} ({selectedWard.risk.score}/100)
+            </span>
+          </div>
+          <h3 className="text-base font-black ts-text-primary">{selectedWard.name}</h3>
+          <p className="ts-text-muted">{selectedWard.attentionReason || selectedWard.demographicsNote}</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 font-mono">
+            <div>
+              <span className="ts-text-subtle text-[10px] block">Temperature:</span>
+              <strong className="text-orange-400">{selectedWard.weather.temperatureC.toFixed(1)}°C</strong>
+            </div>
+            <div>
+              <span className="ts-text-subtle text-[10px] block">Est. WBGT:</span>
+              <strong className="text-rose-400">{selectedWard.thermal.estimatedWbgtC.toFixed(1)}°C</strong>
+            </div>
+            <div>
+              <span className="ts-text-subtle text-[10px] block">Heat Index:</span>
+              <strong className="text-amber-400">{selectedWard.thermal.heatIndexC.toFixed(1)}°C</strong>
+            </div>
+            <div>
+              <span className="ts-text-subtle text-[10px] block">Microclimate UHI:</span>
+              <strong className="ts-text-primary">+{selectedWard.microclimateOffsetC ?? 0}°C</strong>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Selected Prototype Zone Details (if user selects a zone on map) */}
       {selectedZone && (

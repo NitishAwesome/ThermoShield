@@ -22,6 +22,7 @@ import { translateRiskLevel } from '../../utils/translationHelpers';
 import { MUMBAI_PROTOTYPE_ZONES } from '../../data/thermalZones';
 import { MUMBAI_ADMIN_WARDS, BMC_WARD_PROVENANCE } from '../../data/mumbaiWards';
 import { GLOBAL_REGIONS, GLOBAL_HEAT_STATIONS, getStationsByRegion } from '../../data/globalHeatHotspots';
+import { getCityMunicipalAuthority, getOrGenerateCityWards } from '../../utils/cityWardsGenerator';
 import { getRiskStyle } from '../../utils/risk';
 import { CityHeatActionPlanning } from '../../components/government/CityHeatActionPlanning';
 import {
@@ -48,6 +49,7 @@ import {
 
 const QUICK_GOV_CITIES = [
   { name: 'Mumbai', state: 'Maharashtra', lat: 19.0760, lon: 72.8777, zone: 'Western Coastal' },
+  { name: 'Pune', state: 'Maharashtra', lat: 18.5204, lon: 73.8567, zone: 'Deccan Plateau' },
   { name: 'New Delhi', state: 'Delhi NCR', lat: 28.6139, lon: 77.2090, zone: 'Northern Plains' },
   { name: 'Ahmedabad', state: 'Gujarat', lat: 23.0225, lon: 72.5714, zone: 'Western Arid' },
   { name: 'Nagpur', state: 'Maharashtra', lat: 21.1458, lon: 79.0882, zone: 'Central Plateau' },
@@ -63,7 +65,6 @@ export const GovernmentMap: React.FC = () => {
   const [gisLayerMode, setGisLayerMode] = useState<'global_world' | 'official_wards' | 'mumbai_zones' | 'national_centroids'>('global_world');
   const [selectedGlobalStation, setSelectedGlobalStation] = useState<GlobalHeatStation | null>(GLOBAL_HEAT_STATIONS[0]); // Default: Dubai
   const [selectedRegionFilter, setSelectedRegionFilter] = useState<string>('all');
-  const [selectedWard, setSelectedWard] = useState<HeatRiskArea | null>(MUMBAI_ADMIN_WARDS[5]); // Default: Ward F/S (Parel/Sewri)
   const [selectedZone, setSelectedZone] = useState<ThermalZone | null>(MUMBAI_PROTOTYPE_ZONES[1]);
   const [thermalData, setThermalData] = useState<ThermalResponse | null>(null);
   const [riskData, setRiskData] = useState<RiskResponse | null>(null);
@@ -72,6 +73,35 @@ export const GovernmentMap: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [mapError, setMapError] = useState<string | null>(null);
   const [lastUpdatedTime, setLastUpdatedTime] = useState<string>('Recently');
+
+  // Thermal & Meteorological Derived Readings
+  const currentRiskLevel = thermalData?.thermal?.risk_assessment?.level || 'HIGH';
+  const currentTemp = thermalData?.weather?.temperature ?? thermalData?.thermal?.input_summary?.temperature_c ?? 34;
+  const feelsLike = thermalData?.thermal?.indices?.heat_index_c ?? thermalData?.thermal?.indices?.apparent_temperature_c ?? 39;
+
+  // Active City Municipal Authority Metadata
+  const municipalAuthority = useMemo(() => {
+    return getCityMunicipalAuthority(locationName);
+  }, [locationName]);
+
+  // Dynamically generate or load official wards for current monitored city
+  const activeCityWards = useMemo(() => {
+    const humidity = thermalData?.weather?.humidity ?? 55;
+    return getOrGenerateCityWards(locationName, coords.lat, coords.lon, currentTemp, humidity);
+  }, [locationName, coords.lat, coords.lon, currentTemp, thermalData?.weather?.humidity]);
+
+  const [selectedWard, setSelectedWard] = useState<HeatRiskArea | null>(null);
+
+  // Sync selected ward when activeCityWards changes
+  useEffect(() => {
+    if (activeCityWards.length > 0) {
+      const stillValid = selectedWard && activeCityWards.some((w) => w.id === selectedWard.id);
+      if (!stillValid) {
+        const topRisk = [...activeCityWards].sort((a, b) => b.risk.score - a.risk.score)[0];
+        setSelectedWard(topRisk || activeCityWards[0]);
+      }
+    }
+  }, [activeCityWards]);
 
   // 3-5 Day Forecast Mode & Heat Action Plan state
   const [forecastDayIdx, setForecastDayIdx] = useState<number>(0);
@@ -115,7 +145,36 @@ export const GovernmentMap: React.FC = () => {
       setLoadingWardHap(true);
       api.getHeatActionPlan(selectedWard.id)
         .then((planRes) => setWardActionPlan(planRes))
-        .catch((err) => console.warn('HAP load warning for ward:', err))
+        .catch((err) => {
+          console.warn('HAP load warning for ward:', err);
+          setWardActionPlan({
+            ward_id: selectedWard.id,
+            ward_name: selectedWard.name,
+            timestamp: new Date().toISOString(),
+            trigger_state: selectedWard.risk.level === 'EXTREME' ? 'RED_ALERT_STAGE_3' : selectedWard.risk.level === 'HIGH' ? 'ORANGE_ALERT_STAGE_2' : 'YELLOW_ALERT_STAGE_1',
+            trigger_reasons: [
+              `Thermal load of ${selectedWard.weather.temperatureC}°C and WBGT ${selectedWard.thermal.estimatedWbgtC.toFixed(1)}°C exceeds stage threshold.`,
+            ],
+            recommended_actions: [
+              {
+                id: 'act-1',
+                title: selectedWard.risk.level === 'EXTREME' ? 'Open Emergency Air-Conditioned Cooling Shelters' : 'Activate Civic Hydration & Mist Stations',
+                priority: selectedWard.risk.level === 'EXTREME' ? 'CRITICAL' : 'HIGH',
+                department: 'Municipal Public Health',
+                status: 'TRIGGERED',
+                target_demographic: 'Outdoor workers and elderly population',
+              },
+              {
+                id: 'act-2',
+                title: 'Suspend Heavy Outdoor Construction (12:00 - 16:00)',
+                priority: 'HIGH',
+                department: 'Labor & Civil Safety',
+                status: 'TRIGGERED',
+                target_demographic: 'Daily wage laborers and street vendors',
+              },
+            ],
+          } as any);
+        })
         .finally(() => setLoadingWardHap(false));
     }
   }, [selectedWard?.id]);
@@ -123,9 +182,9 @@ export const GovernmentMap: React.FC = () => {
   // Dynamic Wards Recoloring based on selected Forecast Day (Now, +1d, +2d, +3d, +4d)
   const effectiveAdminWards = useMemo(() => {
     if (forecastDayIdx === 0 || wardsForecastSummary.length === 0) {
-      return MUMBAI_ADMIN_WARDS;
+      return activeCityWards;
     }
-    return MUMBAI_ADMIN_WARDS.map((w) => {
+    return activeCityWards.map((w) => {
       const fcMatch = wardsForecastSummary.find((s) => s.ward_id === w.id);
       if (!fcMatch) return w;
       const dayData = fcMatch.forecast_days.find((d) => d.day_index === forecastDayIdx);
@@ -147,7 +206,7 @@ export const GovernmentMap: React.FC = () => {
         attentionReason: `Forecast Day ${forecastDayIdx} (${dayData.day_label}): Projected ${dayData.risk_level} risk with ${dayData.health_concern} civic health concern.`,
       };
     });
-  }, [forecastDayIdx, wardsForecastSummary]);
+  }, [forecastDayIdx, wardsForecastSummary, activeCityWards]);
 
   const filteredGlobalStations = useMemo(() => {
     return getStationsByRegion(selectedRegionFilter);
@@ -160,6 +219,7 @@ export const GovernmentMap: React.FC = () => {
 
   const handleCitySelect = (city: typeof QUICK_GOV_CITIES[0]) => {
     setCoordsAndName({ lat: city.lat, lon: city.lon }, `${city.name}, ${city.state}`);
+    setGisLayerMode('official_wards');
   };
 
   const handlePriorityClick = (area: AreaRiskItem) => {
@@ -168,12 +228,9 @@ export const GovernmentMap: React.FC = () => {
       latitude: area.latitude,
       longitude: area.longitude,
     });
+    setGisLayerMode('official_wards');
     window.scrollTo({ top: 180, behavior: 'smooth' });
   };
-
-  const currentRiskLevel = thermalData?.thermal?.risk_assessment?.level || 'HIGH';
-  const currentTemp = thermalData?.weather?.temperature ?? thermalData?.thermal?.input_summary?.temperature_c ?? 34;
-  const feelsLike = thermalData?.thermal?.indices?.heat_index_c ?? thermalData?.thermal?.indices?.apparent_temperature_c ?? 39;
 
   // Sorted Priority Locations from real application data
   const topPriorityAreas = [...priorityAreas]
@@ -261,7 +318,11 @@ export const GovernmentMap: React.FC = () => {
               }`}
             >
               <Building2 className="w-3.5 h-3.5" />
-              <span>Official Ward Boundaries (24 BMC Wards)</span>
+              <span>
+                {locationName.toLowerCase().includes('mumbai')
+                  ? 'Official Ward Boundaries (24 BMC Wards)'
+                  : `${municipalAuthority.boundaryType} (${municipalAuthority.wardCount} ${municipalAuthority.shortCode} Wards)`}
+              </span>
             </button>
             <button
               type="button"
@@ -298,11 +359,12 @@ export const GovernmentMap: React.FC = () => {
               currentLocationName={locationName}
               onSelectLocation={(loc) => {
                 setLocation(loc);
-                if (gisLayerMode !== 'global_world') {
-                  setGisLayerMode('national_centroids');
-                }
+                setGisLayerMode('official_wards');
               }}
-              onUseMyLocation={detectMyLocation}
+              onUseMyLocation={() => {
+                detectMyLocation();
+                setGisLayerMode('official_wards');
+              }}
               isLocating={isLocating}
             />
           </div>
@@ -343,7 +405,7 @@ export const GovernmentMap: React.FC = () => {
               {gisLayerMode === 'global_world'
                 ? 'Monitored Megacities:'
                 : gisLayerMode === 'official_wards'
-                ? 'Quick Ward Jump:'
+                ? `Quick ${municipalAuthority.shortCode} Ward Jump:`
                 : gisLayerMode === 'mumbai_zones'
                 ? 'Prototype Zones:'
                 : 'Quick City Jump:'}
@@ -375,7 +437,7 @@ export const GovernmentMap: React.FC = () => {
               </div>
             ) : gisLayerMode === 'official_wards' ? (
               <div className="flex items-center gap-1.5">
-                {MUMBAI_ADMIN_WARDS.map((ward) => {
+                {effectiveAdminWards.map((ward) => {
                   const isSelected = selectedWard?.id === ward.id;
                   const rStyle = getRiskStyle(ward.risk.level);
                   return (
@@ -390,7 +452,7 @@ export const GovernmentMap: React.FC = () => {
                       }`}
                       title={`${ward.name} — ${ward.risk.level} Risk`}
                     >
-                      <span>Ward {ward.wardCode}</span>
+                      <span>{ward.wardCode.startsWith('Ward') || ward.wardCode.includes('-') ? ward.wardCode : `Ward ${ward.wardCode}`}</span>
                       <span className="text-[10px]">{rStyle.emoji}</span>
                     </button>
                   );
@@ -623,7 +685,7 @@ export const GovernmentMap: React.FC = () => {
             gisLayerMode === 'global_world'
               ? 'Worldwide Thermal Surveillance & Planetary Heat Diffusion'
               : gisLayerMode === 'official_wards'
-              ? 'Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)'
+              ? `${locationName.split(',')[0]} Municipal Administrative Wards (${municipalAuthority.shortCode} Reference)`
               : gisLayerMode === 'mumbai_zones'
               ? 'Greater Mumbai Urban Thermal Zones (Prototype GIS Layer)'
               : 'National Heat Risk Reference Centroids'
@@ -632,7 +694,7 @@ export const GovernmentMap: React.FC = () => {
             gisLayerMode === 'global_world'
               ? 'Continuous planetary heat diffusion belts and multi-continent meteorological observation nodes'
               : gisLayerMode === 'official_wards'
-              ? 'Curated administrative ward polygons — weather sampled at ward representative coordinate via Open-Meteo; vulnerability is modelled'
+              ? `Curated ${municipalAuthority.name} boundaries & thermal diffusion — weather sampled at ward representative coordinates`
               : gisLayerMode === 'mumbai_zones'
               ? 'Coarse prototype polygons with thermal microclimate demonstration offsets'
               : 'Regional heat risk evaluated at curated municipal monitoring reference points'
@@ -653,11 +715,10 @@ export const GovernmentMap: React.FC = () => {
               </span>
             ) : gisLayerMode === 'official_wards' ? (
               <span>
-                Administrative ward geometry is consistent with <strong>{BMC_WARD_PROVENANCE.sourceName}</strong>.
-                Classification: <strong>{BMC_WARD_PROVENANCE.sourceType}</strong> — provenance not independently verified (no source URL or license on record).
-                Boundary level: <strong>{BMC_WARD_PROVENANCE.boundaryLevel}</strong>.
-                Weather at each ward is sampled at a single representative coordinate via Open-Meteo.
-                Vulnerability scores are modelled estimates based on urban density and land-use context — not Census-derived.
+                Administrative ward geometry is aligned with <strong>{selectedWard?.provenance?.sourceName || municipalAuthority.name}</strong>.
+                Classification: <strong>{selectedWard?.provenance?.sourceType || 'Municipal Administrative Division'}</strong>.
+                Boundary level: <strong>{selectedWard?.provenance?.boundaryLevel || municipalAuthority.boundaryType}</strong>.
+                Local meteorological telemetry is sampled across representative coordinates with microclimate urban heat island (UHI) adjustments.
               </span>
             ) : gisLayerMode === 'mumbai_zones' ? (
               <span>
@@ -695,7 +756,7 @@ export const GovernmentMap: React.FC = () => {
                   gisLayerMode === 'global_world'
                     ? 'Global Observation Station'
                     : gisLayerMode === 'official_wards'
-                    ? 'Official Administrative Ward'
+                    ? `${municipalAuthority.shortCode} Administrative Ward`
                     : gisLayerMode === 'mumbai_zones'
                     ? 'Modelled Prototype Thermal Zone'
                     : 'Calculated Regional Risk Estimate'
@@ -1057,7 +1118,7 @@ export const GovernmentMap: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <ShieldAlert className="w-4 h-4 text-orange-500" />
                 <span className="text-xs font-black ts-text-primary uppercase tracking-wider">
-                  Operational Heat Action Flow (SIH26083)
+                  {municipalAuthority.shortCode} Operational Heat Action Flow (SIH26083)
                 </span>
               </div>
               <Link

@@ -62,13 +62,13 @@ interface RiskMapProps {
 }
 
 // ─────────────────────────────────────────────
-// MapRecenter: smoothly fly to new center
+// MapRecenter: smoothly fly to new center and zoom
 // ─────────────────────────────────────────────
-const MapRecenter: React.FC<{ center: [number, number] }> = ({ center }) => {
+const MapRecenter: React.FC<{ center: [number, number]; zoom?: number }> = ({ center, zoom }) => {
   const map = useMap();
   useEffect(() => {
-    map.flyTo(center, map.getZoom(), { duration: 1.2 });
-  }, [center, map]);
+    map.flyTo(center, zoom !== undefined ? zoom : map.getZoom(), { duration: 1.2 });
+  }, [center[0], center[1], zoom, map]);
   return null;
 };
 
@@ -274,8 +274,9 @@ const createGlobalStationDotIcon = (level: RiskLevel, isSelected: boolean) => {
 const WorldHeatmapCanvas: React.FC<{
   points: HeatmapSeedPoint[];
   stations: GlobalHeatStation[];
+  wards?: HeatRiskArea[];
   visible: boolean;
-}> = ({ points, stations, visible }) => {
+}> = ({ points, stations, wards = [], visible }) => {
   const map = useMap();
 
   useEffect(() => {
@@ -364,6 +365,38 @@ const WorldHeatmapCanvas: React.FC<{
         ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
         ctx.fill();
       });
+
+      // 3. Draw Municipal Ward Thermal Blobs (Local City Ward Heatmap Diffusion)
+      if (wards && wards.length > 0) {
+        wards.forEach((w) => {
+          const pt = map.latLngToContainerPoint([w.centroid.latitude, w.centroid.longitude]);
+          const radius = Math.min(220, Math.max(25, 30 * zoomFactor));
+
+          const grad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, radius);
+          if (w.risk.level === 'EXTREME') {
+            grad.addColorStop(0, 'rgba(239, 68, 68, 0.82)');
+            grad.addColorStop(0.45, 'rgba(249, 115, 22, 0.55)');
+            grad.addColorStop(1, 'rgba(249, 115, 22, 0)');
+          } else if (w.risk.level === 'HIGH') {
+            grad.addColorStop(0, 'rgba(249, 115, 22, 0.78)');
+            grad.addColorStop(0.5, 'rgba(245, 158, 11, 0.45)');
+            grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+          } else if (w.risk.level === 'MODERATE') {
+            grad.addColorStop(0, 'rgba(245, 158, 11, 0.7)');
+            grad.addColorStop(0.6, 'rgba(234, 179, 8, 0.35)');
+            grad.addColorStop(1, 'rgba(234, 179, 8, 0)');
+          } else {
+            grad.addColorStop(0, 'rgba(16, 185, 129, 0.65)');
+            grad.addColorStop(0.6, 'rgba(52, 211, 153, 0.3)');
+            grad.addColorStop(1, 'rgba(52, 211, 153, 0)');
+          }
+
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
     };
 
     render();
@@ -379,7 +412,7 @@ const WorldHeatmapCanvas: React.FC<{
         canvas.parentNode.removeChild(canvas);
       }
     };
-  }, [map, visible, points, stations]);
+  }, [map, visible, points, stations, wards]);
 
   return null;
 };
@@ -546,7 +579,7 @@ export const RiskMap: React.FC<RiskMapProps> = ({
             scrollWheelZoom={true}
             style={{ height: '100%', width: '100%' }}
           >
-            <MapRecenter center={center} />
+            <MapRecenter center={center} zoom={zoom} />
             <MapClickHandler onMapClick={onMapClick} />
             <ZoomWatcher onChange={setCurrentZoom} />
 
@@ -560,6 +593,7 @@ export const RiskMap: React.FC<RiskMapProps> = ({
             <WorldHeatmapCanvas
               points={WORLD_HEAT_DIFFUSION_SEEDS}
               stations={globalStations}
+              wards={adminWards}
               visible={heatmapVisible}
             />
 
@@ -601,7 +635,7 @@ export const RiskMap: React.FC<RiskMapProps> = ({
                           <div>
                             <div className="font-bold ts-text-primary text-sm">{ward.name}</div>
                             <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider">
-                              Official Administrative Ward (MCGM Open Data)
+                              {ward.provenance?.sourceName ? `Official Ward (${ward.provenance.sourceName})` : 'Official Administrative Ward'}
                             </div>
                           </div>
                           <span className={`px-2 py-0.5 rounded text-[10.5px] font-extrabold ${rStyle.badge}`}>

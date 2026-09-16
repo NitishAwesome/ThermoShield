@@ -575,9 +575,12 @@ async def _evaluate_single_global_area(area_cfg: Dict[str, Any]) -> Dict[str, An
         solar_radiation=solar
     )
 
-    wbgt = round(thermal_result["indices"]["wbgt_c"], 1)
-    heat_index = round(thermal_result["indices"].get("heat_index_c", temp + 3.0), 1)
-    thermal_stress = round(thermal_result["risk_assessment"]["score"] * 100, 2)
+    raw_wbgt = thermal_result["indices"].get("wbgt_c")
+    wbgt = round(raw_wbgt if raw_wbgt is not None else temp, 1)
+    raw_hi = thermal_result["indices"].get("heat_index_c")
+    heat_index = round(raw_hi if raw_hi is not None else (temp + 2.0), 1)
+    raw_ts = thermal_result["risk_assessment"].get("score", 0.5)
+    thermal_stress = round(raw_ts * 100, 2)
 
     risk_result = predict_risk(
         temperature_c=temp,
