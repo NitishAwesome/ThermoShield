@@ -40,8 +40,25 @@ elif DATABASE_URL.startswith("sqlite:///") and not DATABASE_URL.startswith("sqli
 
 
 def _create_database_engine(url: str):
-    is_prod = os.getenv("ENVIRONMENT", "development").lower() == "production"
-    is_sqlite = url.startswith("sqlite")
+    is_prod = os.getenv("ENVIRONMENT", "development").lower() in ("production", "prod")
+    is_sqlite = url.lower().startswith("sqlite")
+
+    # ------------------------------------------------------------------
+    # PRODUCTION SQLite FAIL-FAST (SIH-25C)
+    # SQLite uses an ephemeral local file on Render and similar cloud
+    # platforms. Citizen accounts, alert logs, cooldown state, and
+    # health profiles would be silently lost on every deploy/restart.
+    # Production MUST use a persistent relational database (PostgreSQL).
+    # ------------------------------------------------------------------
+    if is_prod and is_sqlite:
+        raise RuntimeError(
+            "CRITICAL: Production environment is configured to use SQLite. "
+            "SQLite data is not persistent on Render and other cloud platforms — "
+            "citizen accounts and alert history would be lost on every restart. "
+            "Production requires a persistent database such as PostgreSQL. "
+            "Set DATABASE_URL to a valid PostgreSQL connection string in your "
+            "deployment environment (Render dashboard → Environment → DATABASE_URL)."
+        )
 
     if is_sqlite:
         connect_args = {"check_same_thread": False}

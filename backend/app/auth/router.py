@@ -33,29 +33,69 @@ security = HTTPBearer(auto_error=False)
 # JWT SECRET RESOLUTION
 # ==================================================
 
+_JWT_DEV_FALLBACK = "thermoshield-super-secret-jwt-key-sih26083-2026"
+_JWT_MIN_LENGTH = 32
+
+
+def _is_production_environment() -> bool:
+    """Returns True if ENVIRONMENT is set to production or prod."""
+    return os.getenv("ENVIRONMENT", "").lower() in ("production", "prod")
+
+
 def get_jwt_secret() -> str:
     """
     Retrieve JWT secret from environment.
-    Provides a stable fallback key if not explicitly set in the cloud environment,
-    ensuring sign-in and registration always work without crashing.
-    In strict production environments, fails safely and loudly if JWT_SECRET is unset.
+
+    Production rules (ENVIRONMENT=production|prod — including Render):
+      1. JWT_SECRET must be set and non-blank.
+      2. JWT_SECRET must NOT equal the known development fallback value.
+      3. JWT_SECRET must be at least 32 characters.
+    If any rule is violated the application refuses to start with RuntimeError.
+
+    Development / testing (any other ENVIRONMENT):
+      Falls back to the internal development secret with a warning.
+      This fallback is intentionally weak and must never be used in production.
+
+    Security: the secret value is never logged.
     """
-    secret = os.getenv("JWT_SECRET")
-    if secret and secret.strip():
-        return secret.strip()
+    secret = os.getenv("JWT_SECRET", "").strip()
 
-    is_production = (
-        os.getenv("ENVIRONMENT", "").lower() in ("production", "prod")
-        and not os.getenv("RENDER")
+    if _is_production_environment():
+        # Rule 1: must be present and non-blank
+        if not secret:
+            raise RuntimeError(
+                "CRITICAL: JWT_SECRET environment variable is missing or blank in "
+                "production. Configure JWT_SECRET in your deployment environment "
+                "(Render dashboard → Environment → JWT_SECRET)."
+            )
+
+        # Rule 2: must not be the known development fallback
+        if secret == _JWT_DEV_FALLBACK:
+            raise RuntimeError(
+                "CRITICAL: JWT_SECRET is set to the known development fallback value "
+                "in production. This is a security vulnerability. Configure a "
+                "cryptographically strong JWT_SECRET (minimum 32 characters)."
+            )
+
+        # Rule 3: minimum length
+        if len(secret) < _JWT_MIN_LENGTH:
+            raise RuntimeError(
+                f"CRITICAL: JWT_SECRET is too short for production use "
+                f"(minimum {_JWT_MIN_LENGTH} characters required). "
+                "Configure a cryptographically strong JWT_SECRET."
+            )
+
+        return secret
+
+    # Development / testing — fallback allowed
+    if secret:
+        return secret
+
+    logger.warning(
+        "JWT_SECRET is unset in the environment. "
+        "Using development fallback secret — DO NOT use in production."
     )
-    if is_production:
-        raise RuntimeError(
-            "CRITICAL: JWT_SECRET environment variable is missing in production. "
-            "The application will not start without a securely configured JWT_SECRET."
-        )
-
-    logger.warning("JWT_SECRET is unset in the environment. Using system fallback secret.")
-    return "thermoshield-super-secret-jwt-key-sih26083-2026"
+    return _JWT_DEV_FALLBACK
 
 
 # ==================================================

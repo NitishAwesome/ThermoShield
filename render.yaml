@@ -3,8 +3,14 @@ services:
     name: thermoshield-backend
     runtime: python
     buildCommand: pip install -r requirements.txt
+    # Single-worker uvicorn is intentional.
+    # The background monitoring daemon is an asyncio task inside the FastAPI event loop.
+    # Using multiple workers (--workers N) would create N daemon instances, each independently
+    # polling Open-Meteo and dispatching duplicate alerts. Single-worker avoids this.
     startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
     envVars:
+      - key: ENVIRONMENT
+        value: production
       - key: DATABASE_URL
         sync: false
       - key: ALLOWED_ORIGINS

@@ -279,6 +279,157 @@ app.include_router(auth_router)
 
 
 # ==================================================
+# HEALTH & READINESS PROBES (SIH-25C PRODUCTION HARDENING)
+#
+# Canonical endpoints:
+#   GET /health        — liveness:  is the process alive?
+#   GET /health/ready  — readiness: are critical dependencies operational?
+#
+# Critical services (failure → NOT_READY, HTTP 503):
+#   - Database connectivity
+#
+# Optional / degraded services (absence → READY_WITH_DEGRADED_OPTIONAL_SERVICES):
+#   - SMTP email
+#   - SMS (demo mode is acceptable)
+#   - Gemini API (autonomous RAG fallback available)
+#   - Monitoring daemon (non-critical; system still functions)
+# ==================================================
+
+@app.get("/health")
+def health_liveness():
+    """
+    Liveness probe: confirms the process is alive.
+    Zero-cost — no database or upstream calls.
+    Used by Render, Docker, and Kubernetes health checks.
+    """
+    db_engine_name = engine.dialect.name if hasattr(engine, "dialect") and engine.dialect else "unknown"
+    return {
+        "status": "healthy",
+        "service": "ThermoShield API",
+        "database_engine": db_engine_name,
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    }
+
+
+@app.get("/health/ready")
+def health_readiness(db: Session = Depends(get_db)):
+    """
+    Readiness probe: verifies critical and optional dependencies.
+
+    Critical dependencies — a failure renders the service NOT_READY:
+      - Database connectivity (data persistence required for all core features)
+
+    Optional dependencies — absence degrades but does not block readiness:
+      - SMTP email (alerts degrade to in-app only)
+      - SMS (demo mode is acceptable for SIH deployment)
+      - Gemini API (autonomous RAG fallback is available)
+      - Monitoring daemon (non-critical background process)
+
+    Never exposes credentials, API keys, or connection strings.
+    """
+    # ---- CRITICAL: Database connectivity -----------------------------------
+    db_ok = False
+    db_dialect = "unknown"
+    db_status_detail = "OPERATIONAL"
+    try:
+        db.execute(text("SELECT 1"))
+        db_ok = True
+        db_dialect = db.bind.dialect.name if hasattr(db, "bind") and db.bind else "unknown"
+    except Exception as e:
+        db_status_detail = f"UNREACHABLE: {type(e).__name__}"
+
+    # ---- OPTIONAL: Weather cache state (no upstream call) ------------------
+    from app.services.weather import _CACHE
+    weather_info = {
+        "provider": "Open-Meteo Global API",
+        "status": "OPERATIONAL",
+        "cache_entries": len(_CACHE),
+        "classification": "OPTIONAL",
+    }
+
+    # ---- OPTIONAL: SMTP email ----------------------------------------------
+    smtp_ok = is_smtp_configured()
+    email_info = {
+        "channel": "SMTP Direct",
+        "configured": smtp_ok,
+        "status": "OPERATIONAL" if smtp_ok else "NOT_CONFIGURED",
+        "classification": "OPTIONAL",
+        "note": "In-app alerts remain available when SMTP is not configured.",
+    }
+
+    # ---- OPTIONAL: SMS -----------------------------------------------------
+    sms_status = get_sms_delivery_status()
+    sms_status["classification"] = "OPTIONAL"
+
+    # ---- OPTIONAL: HeatCopilot / Gemini ------------------------------------
+    gemini_key = bool(os.getenv("GEMINI_API_KEY", "").strip())
+    copilot_info = {
+        "primary_model": "Gemini" if gemini_key else "Autonomous RAG (local)",
+        "status": "OPERATIONAL" if gemini_key else "FALLBACK_RAG_ACTIVE",
+        "gemini_configured": gemini_key,
+        "knowledge_chunks": 6,
+        "classification": "OPTIONAL",
+        "note": "Autonomous RAG fallback is available when Gemini API key is absent.",
+    }
+
+    # ---- OPTIONAL: Autonomous monitoring daemon ----------------------------
+    daemon_telemetry = monitor_daemon.get_telemetry()
+    daemon_info = {
+        "running": daemon_telemetry.get("daemon_running", False),
+        "cycles_completed": daemon_telemetry.get("total_cycles_completed", 0),
+        "monitored_areas": daemon_telemetry.get("monitored_areas_count", 0),
+        "classification": "OPTIONAL",
+    }
+
+    # ---- Compute overall readiness -----------------------------------------
+    optional_degraded = not smtp_ok or not gemini_key
+    if db_ok:
+        overall_status = (
+            "READY_WITH_DEGRADED_OPTIONAL_SERVICES" if optional_degraded else "READY"
+        )
+    else:
+        overall_status = "NOT_READY"
+
+    payload = {
+        "status": overall_status,
+        "service": "ThermoShield Heat Health Platform",
+        "critical_dependencies": {
+            "database": {
+                "status": db_status_detail,
+                "engine": db_dialect,
+                "is_critical": True,
+            }
+        },
+        "optional_services": {
+            "weather_cache": weather_info,
+            "email": email_info,
+            "sms": sms_status,
+            "copilot": copilot_info,
+            "daemon": daemon_info,
+        },
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }
+
+    if not db_ok:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=503, content=payload)
+
+    return payload
+
+
+@app.get("/ready")
+def health_ready_alias(db: Session = Depends(get_db)):
+    """
+    Backward-compatible alias for /health/ready.
+    Kept for monitoring systems that poll /ready.
+    Delegates to the canonical /health/ready implementation.
+    """
+    return health_readiness(db)
+
+
+
+# ==================================================
 # USER CRUD (PROTECTED)
 # ==================================================
 
