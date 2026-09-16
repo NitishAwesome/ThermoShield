@@ -62,7 +62,7 @@ export const GovernmentMap: React.FC = () => {
   const { coords, locationName, setCoordsAndName, setLocation, detectMyLocation, isLocating } = useLocation();
   const { t } = useTranslation();
 
-  const [gisLayerMode, setGisLayerMode] = useState<'global_world' | 'official_wards' | 'mumbai_zones' | 'national_centroids'>('global_world');
+  const [gisLayerMode, setGisLayerMode] = useState<'global_world' | 'official_wards' | 'mumbai_zones' | 'national_centroids'>('official_wards');
   const [selectedGlobalStation, setSelectedGlobalStation] = useState<GlobalHeatStation | null>(GLOBAL_HEAT_STATIONS[0]); // Default: Dubai
   const [selectedRegionFilter, setSelectedRegionFilter] = useState<string>('all');
   const [selectedZone, setSelectedZone] = useState<ThermalZone | null>(MUMBAI_PROTOTYPE_ZONES[1]);
@@ -268,50 +268,36 @@ export const GovernmentMap: React.FC = () => {
         />
       )}
 
-      {/* SECTION 1 — MAP HEADER */}
-      <div className="rounded-3xl ts-card p-6 sm:p-7 border ts-border shadow-xl">
+      {/* SECTION 1 — STREAMLINED MAP COMMAND HEADER */}
+      <div className="rounded-3xl ts-card p-5 sm:p-6 border ts-border shadow-xl space-y-3.5">
+        {/* Top Bar: Title & Status on Left, Clean Segmented Layer Switcher on Right */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b ts-border">
-          <div>
+          <div className="space-y-1">
             <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-              <span className="text-xs font-black uppercase tracking-wider text-orange-500 flex items-center space-x-1">
-                <Compass className="w-4 h-4" />
-                <span>Authority GIS Intelligence</span>
+              <span className="text-[11px] font-black uppercase tracking-wider text-orange-500 flex items-center space-x-1">
+                <Compass className="w-3.5 h-3.5" />
+                <span>Authority GIS Command</span>
               </span>
               <DataRealityBadge
                 tier={isFallback ? 'OFFLINE_FALLBACK' : 'LIVE'}
                 size="sm"
-                customLabel={isFallback ? 'Offline Baseline' : 'Live Regional Feeds'}
+                customLabel={isFallback ? 'Offline Baseline' : 'Live Regional Telemetry'}
               />
-              <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-slate-500/15 text-slate-700 dark:text-slate-300 border border-slate-500/30">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-500/15 text-slate-400 border border-slate-500/25">
                 Updated {lastUpdatedTime}
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black ts-text-primary tracking-tight font-sans mt-1">
+            <h1 className="text-xl sm:text-2xl font-black ts-text-primary tracking-tight font-sans">
               Geospatial Heat Stress Intelligence
             </h1>
-            <p className="text-xs sm:text-sm ts-text-muted mt-1 leading-relaxed">
-              Hyperlocal GIS monitoring workspace for city administrations, public health coordinators, and emergency response authorities.
-            </p>
           </div>
 
-          {/* GIS Layer Switcher */}
-          <div className="flex items-center flex-wrap gap-1 p-1 rounded-2xl bg-slate-500/10 border ts-border text-xs self-start lg:self-auto flex-shrink-0">
-            <button
-              type="button"
-              onClick={() => setGisLayerMode('global_world')}
-              className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
-                gisLayerMode === 'global_world'
-                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm'
-                  : 'ts-text-muted hover:ts-text-primary'
-              }`}
-            >
-              <Globe className="w-3.5 h-3.5" />
-              <span>Global Surveillance (World Heatmap)</span>
-            </button>
+          {/* Sleek Segmented GIS Layer Switcher */}
+          <div className="inline-flex items-center p-1 rounded-2xl bg-slate-500/10 border ts-border text-xs flex-shrink-0 overflow-x-auto max-w-full">
             <button
               type="button"
               onClick={() => setGisLayerMode('official_wards')}
-              className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 whitespace-nowrap ${
                 gisLayerMode === 'official_wards'
                   ? 'bg-orange-500 text-white shadow-sm'
                   : 'ts-text-muted hover:ts-text-primary'
@@ -320,40 +306,54 @@ export const GovernmentMap: React.FC = () => {
               <Building2 className="w-3.5 h-3.5" />
               <span>
                 {locationName.toLowerCase().includes('mumbai')
-                  ? 'Official Ward Boundaries (24 BMC Wards)'
-                  : `${municipalAuthority.boundaryType} (${municipalAuthority.wardCount} ${municipalAuthority.shortCode} Wards)`}
+                  ? 'Mumbai BMC Wards (24)'
+                  : `${municipalAuthority.shortCode} Wards (${effectiveAdminWards.length})`}
               </span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setGisLayerMode('global_world')}
+              className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 whitespace-nowrap ${
+                gisLayerMode === 'global_world'
+                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm'
+                  : 'ts-text-muted hover:ts-text-primary'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span>World Heatmap (38)</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setGisLayerMode('mumbai_zones')}
-              className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 whitespace-nowrap ${
                 gisLayerMode === 'mumbai_zones'
                   ? 'bg-orange-500 text-white shadow-sm'
                   : 'ts-text-muted hover:ts-text-primary'
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>Prototype Thermal Zones</span>
+              <span>Prototype Zones</span>
             </button>
+
             <button
               type="button"
               onClick={() => setGisLayerMode('national_centroids')}
-              className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 whitespace-nowrap ${
                 gisLayerMode === 'national_centroids'
                   ? 'bg-orange-500 text-white shadow-sm'
                   : 'ts-text-muted hover:ts-text-primary'
               }`}
             >
               <MapIcon className="w-3.5 h-3.5" />
-              <span>National Reference Centroids</span>
+              <span>Centroids</span>
             </button>
           </div>
         </div>
 
-        {/* SECTION 2 — LOCATION SEARCH & QUICK ACCESS */}
-        <div className="mt-4 space-y-3">
-          {/* Location Search Bar */}
+        {/* Row 2: Location Search Bar & Active Status Badge */}
+        <div className="space-y-2">
           <div className="relative z-30">
             <LocationSearch
               currentLocationName={locationName}
@@ -369,12 +369,67 @@ export const GovernmentMap: React.FC = () => {
             />
           </div>
 
-          {/* Global World Region Filter Tabs */}
-          {gisLayerMode === 'global_world' && (
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs scrollbar-none border-b ts-border pb-2.5">
+          <div className="flex items-center justify-between gap-2 text-xs flex-wrap px-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-orange-500 font-bold flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5" />
+                <span>Monitored Zone:</span>
+              </span>
+              <span className="font-bold ts-text-primary">{locationName}</span>
+              <span className="px-2 py-0.5 rounded-full text-[10.5px] font-mono font-bold bg-orange-500/10 text-orange-400 border border-orange-500/30">
+                {municipalAuthority.name} • {effectiveAdminWards.length} Wards Monitored
+              </span>
+            </div>
+
+            {selectedWard && gisLayerMode === 'official_wards' && (
+              <div className="text-[11px] ts-text-muted flex items-center gap-1.5">
+                <span>Active Ward:</span>
+                <strong className="text-orange-400">{selectedWard.name}</strong>
+                <span>({selectedWard.weather.temperatureC}°C, {selectedWard.risk.level} Risk)</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Row 3: Mode-Specific Quick Jump Tracks */}
+        {gisLayerMode === 'official_wards' && (
+          <div className="pt-2 border-t ts-border flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap flex items-center gap-1 shrink-0">
+              <Building2 className="w-3.5 h-3.5 text-orange-500" />
+              <span>Ward Quick Jump ({effectiveAdminWards.length}):</span>
+            </span>
+            <div className="flex items-center gap-1.5">
+              {effectiveAdminWards.map((ward) => {
+                const isSelected = selectedWard?.id === ward.id;
+                const rStyle = getRiskStyle(ward.risk.level);
+                return (
+                  <button
+                    key={ward.id}
+                    type="button"
+                    onClick={() => setSelectedWard(ward)}
+                    className={`px-2.5 py-1 rounded-xl border text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center space-x-1.5 ${
+                      isSelected
+                        ? 'bg-orange-500 text-white border-orange-500 shadow-sm font-bold'
+                        : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary hover:bg-slate-500/10'
+                    }`}
+                    title={`${ward.name} — ${ward.risk.level} Risk (${ward.risk.score}/100)`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: rStyle.fill }} />
+                    <span>{ward.wardCode.startsWith('Ward') || ward.wardCode.includes('-') ? ward.wardCode : `Ward ${ward.wardCode}`}</span>
+                    <span className="text-[10.5px] font-mono opacity-80">{ward.weather.temperatureC.toFixed(0)}°C</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {gisLayerMode === 'global_world' && (
+          <div className="pt-2 border-t ts-border space-y-2">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs scrollbar-none">
               <span className="ts-text-subtle font-bold whitespace-nowrap text-[11px] flex items-center gap-1 mr-1">
                 <Globe className="w-3.5 h-3.5 text-orange-500" />
-                <span>Continents / Regions:</span>
+                <span>Regions:</span>
               </span>
               {GLOBAL_REGIONS.map((region) => {
                 const isSelected = selectedRegionFilter === region.id;
@@ -383,7 +438,7 @@ export const GovernmentMap: React.FC = () => {
                     key={region.id}
                     type="button"
                     onClick={() => setSelectedRegionFilter(region.id)}
-                    className={`px-3 py-1 rounded-xl font-semibold whitespace-nowrap transition-all cursor-pointer text-xs ${
+                    className={`px-2.5 py-0.5 rounded-xl font-semibold whitespace-nowrap transition-all cursor-pointer text-xs ${
                       isSelected
                         ? 'bg-orange-500 text-white shadow-sm font-bold'
                         : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary hover:bg-slate-500/10'
@@ -397,21 +452,11 @@ export const GovernmentMap: React.FC = () => {
                 );
               })}
             </div>
-          )}
 
-          {/* Quick Jump (Global Megacities, Official Wards, Prototype Zones, or Cities) */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
-            <span className="ts-text-subtle font-bold whitespace-nowrap text-[11px]">
-              {gisLayerMode === 'global_world'
-                ? 'Monitored Megacities:'
-                : gisLayerMode === 'official_wards'
-                ? `Quick ${municipalAuthority.shortCode} Ward Jump:`
-                : gisLayerMode === 'mumbai_zones'
-                ? 'Prototype Zones:'
-                : 'Quick City Jump:'}
-            </span>
-
-            {gisLayerMode === 'global_world' ? (
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
+              <span className="ts-text-subtle font-bold whitespace-nowrap text-[11px]">
+                Megacities:
+              </span>
               <div className="flex items-center gap-1.5">
                 {filteredGlobalStations.map((station) => {
                   const isSelected = selectedGlobalStation?.id === station.id;
@@ -426,7 +471,6 @@ export const GovernmentMap: React.FC = () => {
                           ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white border-orange-500 shadow-sm font-bold'
                           : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary hover:bg-slate-500/10'
                       }`}
-                      title={`${station.name}, ${station.country} — ${station.baselineTemp}°C, ${station.riskLevel} Risk`}
                     >
                       <span>{station.name}</span>
                       <span className="font-mono text-[10px] opacity-90">{station.baselineTemp.toFixed(0)}°C</span>
@@ -435,31 +479,17 @@ export const GovernmentMap: React.FC = () => {
                   );
                 })}
               </div>
-            ) : gisLayerMode === 'official_wards' ? (
-              <div className="flex items-center gap-1.5">
-                {effectiveAdminWards.map((ward) => {
-                  const isSelected = selectedWard?.id === ward.id;
-                  const rStyle = getRiskStyle(ward.risk.level);
-                  return (
-                    <button
-                      key={ward.id}
-                      type="button"
-                      onClick={() => setSelectedWard(ward)}
-                      className={`px-2.5 py-1 rounded-xl border text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center space-x-1.5 ${
-                        isSelected
-                          ? 'bg-orange-500 text-white border-orange-500 shadow-sm font-bold'
-                          : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary hover:bg-slate-500/10'
-                      }`}
-                      title={`${ward.name} — ${ward.risk.level} Risk`}
-                    >
-                      <span>{ward.wardCode.startsWith('Ward') || ward.wardCode.includes('-') ? ward.wardCode : `Ward ${ward.wardCode}`}</span>
-                      <span className="text-[10px]">{rStyle.emoji}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : gisLayerMode === 'mumbai_zones' ? (
-              MUMBAI_PROTOTYPE_ZONES.map((zone) => {
+            </div>
+          </div>
+        )}
+
+        {gisLayerMode === 'mumbai_zones' && (
+          <div className="pt-2 border-t ts-border flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
+            <span className="ts-text-subtle font-bold whitespace-nowrap text-[11px]">
+              Prototype Zones:
+            </span>
+            <div className="flex items-center gap-1.5">
+              {MUMBAI_PROTOTYPE_ZONES.map((zone) => {
                 const isSelected = selectedZone?.id === zone.id;
                 return (
                   <button
@@ -475,9 +505,18 @@ export const GovernmentMap: React.FC = () => {
                     {zone.shortName}
                   </button>
                 );
-              })
-            ) : (
-              QUICK_GOV_CITIES.map((c) => {
+              })}
+            </div>
+          </div>
+        )}
+
+        {gisLayerMode === 'national_centroids' && (
+          <div className="pt-2 border-t ts-border flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
+            <span className="ts-text-subtle font-bold whitespace-nowrap text-[11px]">
+              Quick City Jump:
+            </span>
+            <div className="flex items-center gap-1.5">
+              {QUICK_GOV_CITIES.map((c) => {
                 const isSelected = Math.abs(coords.lat - c.lat) < 0.05 && Math.abs(coords.lon - c.lon) < 0.05;
                 return (
                   <button
@@ -493,10 +532,10 @@ export const GovernmentMap: React.FC = () => {
                     {c.name} ({c.zone})
                   </button>
                 );
-              })
-            )}
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* SECTION 3 — PRIMARY GEOGRAPHIC MAP */}
