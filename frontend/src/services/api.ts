@@ -203,6 +203,14 @@ export const api = {
     return res.data;
   },
 
+  // Global Worldwide Heat Risk Overview (Multi-continent Surveillance)
+  getGlobalAreasRiskOverview: async (region?: string): Promise<AreasRiskOverviewResponse> => {
+    const res = await apiClient.get<AreasRiskOverviewResponse>('/areas/global-risk-overview', {
+      params: region ? { region } : undefined,
+    });
+    return res.data;
+  },
+
   // Dynamic Candidate Email Dispatch
   sendAlertEmail: async (data: {
     email: string;

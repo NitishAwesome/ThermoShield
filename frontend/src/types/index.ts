@@ -265,18 +265,40 @@ export interface AreaRiskItem {
   name: string;
   state: string;
   zone: string;
+  region?: string;
   latitude: number;
   longitude: number;
   temperature_c: number;
   humidity_pct: number;
   wind_speed_mps?: number;
   wbgt_c: number;
+  heat_index_c?: number;
   risk_score: number;
   risk_level: RiskLevel;
   vulnerability_tag: string;
   summary_advisory: string;
-  area_type?: 'prototype_zone' | 'regional_centroid';
+  area_type?: 'prototype_zone' | 'regional_centroid' | 'global_hotspot' | 'global_megacity' | 'national_anchor';
 }
+
+export interface GlobalHeatStation {
+  id: string;
+  name: string;
+  country: string;
+  region: string;
+  lat: number;
+  lon: number;
+  baselineTemp: number;
+  baselineRh: number;
+  baselineWbgt: number;
+  baselineHeatIndex: number;
+  riskLevel: RiskLevel;
+  riskScore: number;
+  vulnerabilityIndex: number;
+  vulnerabilityTag: string;
+  hazardNote: string;
+  populationMillions?: number;
+}
+
 
 export interface ThermalZone {
   id: string;

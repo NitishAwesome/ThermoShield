@@ -10,12 +10,13 @@ import {
   useMap,
   useMapEvents,
 } from 'react-leaflet';
-import { AlertCircle, Info, FlaskConical } from 'lucide-react';
+import { AlertCircle, Info, FlaskConical, Globe, Flame, Layers } from 'lucide-react';
 import L from 'leaflet';
-import { RiskLevel, MapLocationRisk, ThermalZone, HeatRiskArea } from '../types';
+import { RiskLevel, MapLocationRisk, ThermalZone, HeatRiskArea, GlobalHeatStation } from '../types';
 import { getRiskColor, getRiskStyle } from '../utils/risk';
 import { Card, CardHeader, CardContent, Badge } from './ui';
 import { useTranslation } from '../context/LanguageContext';
+import { WORLD_HEAT_DIFFUSION_SEEDS, HeatmapSeedPoint } from '../data/globalHeatHotspots';
 
 // ─────────────────────────────────────────────
 // Fix leaflet default marker icon in React
@@ -50,6 +51,14 @@ interface RiskMapProps {
   title?: string;
   subtitle?: string;
   isCitizenView?: boolean;
+
+  // Global World Heatmap Extensions
+  globalStations?: GlobalHeatStation[];
+  selectedGlobalStationId?: string;
+  onSelectGlobalStation?: (station: GlobalHeatStation) => void;
+  showHeatmapOverlay?: boolean;
+  onToggleHeatmap?: (enabled: boolean) => void;
+  scope?: 'world' | 'national' | 'wards';
 }
 
 // ─────────────────────────────────────────────
@@ -194,6 +203,188 @@ const createSelectedPinIcon = (riskLevel: RiskLevel) => {
   });
 };
 
+// ─────────────────────────────────────────────
+// GLOBAL STATION ZOOM THRESHOLD: below 5 → glowing dots, above 5 → badge chips
+// ─────────────────────────────────────────────
+const GLOBAL_BADGE_ZOOM_THRESHOLD = 5;
+
+// ─────────────────────────────────────────────
+// Global Station Centroid Badge Marker
+// ─────────────────────────────────────────────
+const createGlobalStationBadgeIcon = (name: string, country: string, level: RiskLevel, isSelected: boolean, temp?: number) => {
+  const style = getRiskStyle(level);
+  return L.divIcon({
+    className: 'custom-global-station-badge',
+    html: `
+      <div style="
+        background: rgba(15, 23, 42, 0.94);
+        color: #fff;
+        border: 2px solid ${isSelected ? '#ea580c' : style.fill};
+        border-radius: 8px;
+        padding: 3px 8px;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.6);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transform: translate(-50%, -50%);
+        pointer-events: auto;
+        cursor: pointer;
+      ">
+        <span style="letter-spacing: -0.2px;">${name}</span>
+        ${temp !== undefined ? `<span style="color: #fdba74; font-family: monospace; font-size: 10.5px;">${temp.toFixed(0)}°C</span>` : ''}
+        <span style="color: ${style.fill}; font-weight: 800; font-size: 9.5px; letter-spacing: 0.3px;">
+          ${style.emoji} ${level}
+        </span>
+      </div>
+    `,
+    iconSize: [0, 0],
+  });
+};
+
+// ─────────────────────────────────────────────
+// Global Station Dot Marker (for macro global view)
+// ─────────────────────────────────────────────
+const createGlobalStationDotIcon = (level: RiskLevel, isSelected: boolean) => {
+  const style = getRiskStyle(level);
+  const color = isSelected ? '#ea580c' : style.fill;
+  return L.divIcon({
+    className: 'custom-global-dot-marker',
+    html: `
+      <div style="
+        width: 14px;
+        height: 14px;
+        background: ${color};
+        border: 2.5px solid rgba(255,255,255,0.92);
+        border-radius: 50%;
+        box-shadow: 0 0 10px ${color}, 0 2px 6px rgba(0,0,0,0.6);
+        transform: translate(-50%, -50%);
+        cursor: pointer;
+      "></div>
+    `,
+    iconSize: [0, 0],
+  });
+};
+
+// ─────────────────────────────────────────────
+// World Heatmap Canvas Layer Component (Smooth Thermal Heat Diffusion)
+// ─────────────────────────────────────────────
+const WorldHeatmapCanvas: React.FC<{
+  points: HeatmapSeedPoint[];
+  stations: GlobalHeatStation[];
+  visible: boolean;
+}> = ({ points, stations, visible }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!visible) return;
+
+    const canvas = L.DomUtil.create('canvas', 'leaflet-world-heatmap-canvas') as HTMLCanvasElement;
+    canvas.style.position = 'absolute';
+    canvas.style.pointerEvents = 'none';
+    canvas.style.zIndex = '350';
+    canvas.style.opacity = '0.62';
+    canvas.style.mixBlendMode = 'multiply';
+
+    const pane = map.getPane('overlayPane');
+    if (!pane) return;
+    pane.appendChild(canvas);
+
+    const render = () => {
+      const size = map.getSize();
+      canvas.width = size.x;
+      canvas.height = size.y;
+
+      const topLeft = map.containerPointToLayerPoint([0, 0]);
+      L.DomUtil.setPosition(canvas, topLeft);
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, size.x, size.y);
+
+      const zoom = map.getZoom();
+      const zoomFactor = Math.max(0.6, Math.pow(1.35, zoom - 2));
+
+      // 1. Draw Planetary Heat Diffusion Seeds (Sahara, Arabian Peninsula, Thar, Sonoran, etc.)
+      points.forEach((p) => {
+        const pt = map.latLngToContainerPoint([p.lat, p.lon]);
+        const radius = Math.min(360, Math.max(50, (p.radiusKm / 100) * 8 * zoomFactor));
+
+        const grad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, radius);
+        if (p.intensity >= 0.93) {
+          grad.addColorStop(0, 'rgba(192, 38, 211, 0.82)'); // Magenta / Critical
+          grad.addColorStop(0.35, 'rgba(239, 68, 68, 0.72)'); // Red / Extreme
+          grad.addColorStop(0.7, 'rgba(249, 115, 22, 0.45)'); // Orange / High
+          grad.addColorStop(1, 'rgba(249, 115, 22, 0)');
+        } else if (p.intensity >= 0.85) {
+          grad.addColorStop(0, 'rgba(239, 68, 68, 0.78)'); // Red / Extreme
+          grad.addColorStop(0.4, 'rgba(249, 115, 22, 0.58)'); // Orange / High
+          grad.addColorStop(0.75, 'rgba(245, 158, 11, 0.35)'); // Amber / Moderate
+          grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+        } else {
+          grad.addColorStop(0, 'rgba(249, 115, 22, 0.72)'); // Orange / High
+          grad.addColorStop(0.5, 'rgba(245, 158, 11, 0.48)'); // Amber / Moderate
+          grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+        }
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // 2. Draw Dynamic Global Megacities & Extreme Heat Stations
+      stations.forEach((s) => {
+        const pt = map.latLngToContainerPoint([s.lat, s.lon]);
+        const radius = Math.min(220, Math.max(35, 45 * zoomFactor));
+
+        const grad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, radius);
+        if (s.riskLevel === 'CRITICAL') {
+          grad.addColorStop(0, 'rgba(217, 70, 239, 0.85)');
+          grad.addColorStop(0.4, 'rgba(239, 68, 68, 0.65)');
+          grad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+        } else if (s.riskLevel === 'EXTREME') {
+          grad.addColorStop(0, 'rgba(239, 68, 68, 0.8)');
+          grad.addColorStop(0.45, 'rgba(249, 115, 22, 0.6)');
+          grad.addColorStop(1, 'rgba(249, 115, 22, 0)');
+        } else if (s.riskLevel === 'HIGH') {
+          grad.addColorStop(0, 'rgba(249, 115, 22, 0.75)');
+          grad.addColorStop(0.5, 'rgba(245, 158, 11, 0.45)');
+          grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+        } else {
+          grad.addColorStop(0, 'rgba(245, 158, 11, 0.65)');
+          grad.addColorStop(0.6, 'rgba(16, 185, 129, 0.3)');
+          grad.addColorStop(1, 'rgba(16, 185, 129, 0)');
+        }
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    };
+
+    render();
+    map.on('move', render);
+    map.on('zoom', render);
+    map.on('resize', render);
+
+    return () => {
+      map.off('move', render);
+      map.off('zoom', render);
+      map.off('resize', render);
+      if (canvas.parentNode) {
+        canvas.parentNode.removeChild(canvas);
+      }
+    };
+  }, [map, visible, points, stations]);
+
+  return null;
+};
+
+
 export const RiskMap: React.FC<RiskMapProps> = ({
   center,
   zoom = 6,
@@ -217,11 +408,25 @@ export const RiskMap: React.FC<RiskMapProps> = ({
   title,
   subtitle,
   isCitizenView = false,
+  globalStations = [],
+  selectedGlobalStationId,
+  onSelectGlobalStation,
+  showHeatmapOverlay = true,
+  onToggleHeatmap,
+  scope = 'wards',
 }) => {
   const { t } = useTranslation();
   const currentRiskColor = getRiskColor(riskLevel);
   const [currentZoom, setCurrentZoom] = useState(zoom);
+  const [heatmapVisible, setHeatmapVisible] = useState<boolean>(showHeatmapOverlay);
+  const [stationsVisible, setStationsVisible] = useState<boolean>(true);
   const showBadges = currentZoom >= BADGE_ZOOM_THRESHOLD;
+
+  useEffect(() => {
+    if (showHeatmapOverlay !== undefined) {
+      setHeatmapVisible(showHeatmapOverlay);
+    }
+  }, [showHeatmapOverlay]);
 
   const getZoneLevel = (zone: ThermalZone): RiskLevel =>
     zone.vulnerabilityIndex >= 0.8
@@ -288,17 +493,56 @@ export const RiskMap: React.FC<RiskMapProps> = ({
         {/* Map Canvas */}
         <div
           className="relative w-full rounded-xl overflow-hidden border ts-border shadow-inner"
-          style={{ height: isCitizenView ? '400px' : '430px' }}
+          style={{ height: isCitizenView ? '420px' : '480px' }}
         >
           {onMapClick && (
-            <div className="absolute top-2 left-2 z-[500] px-2 py-1 rounded-full bg-slate-900/80 border border-orange-500/30 text-[10.5px] text-orange-300 font-semibold flex items-center gap-1.5 pointer-events-none">
+            <div className="absolute top-2.5 left-2.5 z-[500] px-2.5 py-1 rounded-full bg-slate-900/85 border border-orange-500/30 text-[10.5px] text-orange-300 font-semibold flex items-center gap-1.5 pointer-events-none shadow-md backdrop-blur-sm">
               <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
               Tap map to move pin
             </div>
           )}
+
+          {/* Interactive Map Layer Controls */}
+          <div className="absolute top-2.5 right-2.5 z-[500] flex items-center gap-1.5 flex-wrap justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                const next = !heatmapVisible;
+                setHeatmapVisible(next);
+                onToggleHeatmap?.(next);
+              }}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1.5 shadow-md backdrop-blur-sm ${
+                heatmapVisible
+                  ? 'bg-orange-600/90 text-white border-orange-400 shadow-orange-600/25'
+                  : 'bg-slate-900/85 text-slate-300 border-slate-700 hover:bg-slate-800'
+              }`}
+              title="Toggle Global Thermal Stress Heatmap Layer"
+            >
+              <Flame className="w-3.5 h-3.5 text-amber-300" />
+              <span>Heatmap {heatmapVisible ? 'ON' : 'OFF'}</span>
+            </button>
+            {globalStations.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setStationsVisible((v) => !v)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1.5 shadow-md backdrop-blur-sm ${
+                  stationsVisible
+                    ? 'bg-blue-600/90 text-white border-blue-400 shadow-blue-600/25'
+                    : 'bg-slate-900/85 text-slate-300 border-slate-700 hover:bg-slate-800'
+                }`}
+                title="Toggle World Monitoring Stations"
+              >
+                <Globe className="w-3.5 h-3.5 text-cyan-300" />
+                <span>Stations ({globalStations.length})</span>
+              </button>
+            )}
+          </div>
+
           <MapContainer
             center={center}
             zoom={zoom}
+            minZoom={2}
+            worldCopyJump={true}
             scrollWheelZoom={true}
             style={{ height: '100%', width: '100%' }}
           >
@@ -310,6 +554,13 @@ export const RiskMap: React.FC<RiskMapProps> = ({
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+
+            {/* ── World Thermal Heatmap Overlay (Smooth Radial Diffusion) ── */}
+            <WorldHeatmapCanvas
+              points={WORLD_HEAT_DIFFUSION_SEEDS}
+              stations={globalStations}
+              visible={heatmapVisible}
             />
 
             {/* ── Mumbai Administrative Ward References Layer ── */}
@@ -455,8 +706,62 @@ export const RiskMap: React.FC<RiskMapProps> = ({
               );
             })}
 
-            {/* Fallback risk radius circle (no zones/wards) */}
-            {adminWards.length === 0 && thermalZones.length === 0 && (
+            {/* ── Global Heat Surveillance Stations ── */}
+            {stationsVisible && globalStations.length > 0 && globalStations.map((station) => {
+              const isSelected = selectedGlobalStationId === station.id;
+              const sStyle = getRiskStyle(station.riskLevel);
+              const showStationBadges = currentZoom >= GLOBAL_BADGE_ZOOM_THRESHOLD;
+              return (
+                <Marker
+                  key={`g_station_${station.id}`}
+                  position={[station.lat, station.lon]}
+                  icon={showStationBadges
+                    ? createGlobalStationBadgeIcon(station.name, station.country, station.riskLevel, isSelected, station.baselineTemp)
+                    : createGlobalStationDotIcon(station.riskLevel, isSelected)}
+                  eventHandlers={{ click: () => onSelectGlobalStation?.(station) }}
+                >
+                  <Popup className="custom-popup">
+                    <div className="p-1 min-w-[240px] space-y-2 text-xs">
+                      <div className="flex items-center justify-between border-b ts-border pb-1.5">
+                        <div>
+                          <div className="font-bold ts-text-primary text-sm">{station.name}</div>
+                          <div className="text-[10px] text-slate-400 font-medium">
+                            {station.country} • <span className="text-orange-400 font-semibold">{station.region}</span>
+                          </div>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-[10.5px] font-extrabold ${sStyle.badge}`}>
+                          {sStyle.emoji} {station.riskLevel}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5 text-xs ts-text-muted">
+                        <div><strong>Air Temp:</strong> {station.baselineTemp.toFixed(1)}°C</div>
+                        <div><strong>Humidity:</strong> {station.baselineRh}%</div>
+                        <div><strong>Est. WBGT:</strong> {station.baselineWbgt.toFixed(1)}°C</div>
+                        <div><strong>Heat Index:</strong> {station.baselineHeatIndex.toFixed(1)}°C</div>
+                        <div><strong>Risk Score:</strong> {station.riskScore}/100</div>
+                        <div><strong>Vulnerability:</strong> {Math.round(station.vulnerabilityIndex * 100)}%</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-[11px] text-orange-200 leading-relaxed">
+                        <strong>Climate Vulnerability: </strong>
+                        {station.hazardNote}
+                      </div>
+                      {onSelectGlobalStation && (
+                        <button
+                          type="button"
+                          onClick={() => onSelectGlobalStation(station)}
+                          className="w-full mt-1 px-2.5 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold cursor-pointer transition-colors shadow-sm"
+                        >
+                          Inspect Station Telemetry →
+                        </button>
+                      )}
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
+
+            {/* Fallback risk radius circle (no zones/wards/global stations) */}
+            {adminWards.length === 0 && thermalZones.length === 0 && globalStations.length === 0 && (
               <Circle
                 center={center}
                 radius={25000}

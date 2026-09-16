@@ -11,8 +11,9 @@ MAX_REVERSE_CACHE_ENTRIES = 500
 _LOCATION_CACHE: Dict[str, List[Dict[str, Any]]] = {}
 
 
-# Instant offline Indian cities directory as a 100% reliable fallback
-POPULAR_INDIAN_CITIES: List[Dict[str, Any]] = [
+# Instant offline cities directory as a 100% reliable fallback (Indian & Global Megacities)
+POPULAR_GLOBAL_CITIES: List[Dict[str, Any]] = [
+    # Indian Cities
     {"name": "Mumbai, Maharashtra, India", "latitude": 19.0760, "longitude": 72.8777},
     {"name": "Delhi, National Capital Territory of Delhi, India", "latitude": 28.6139, "longitude": 77.2090},
     {"name": "Jaipur, Rajasthan, India", "latitude": 26.9124, "longitude": 75.7873},
@@ -32,7 +33,29 @@ POPULAR_INDIAN_CITIES: List[Dict[str, Any]] = [
     {"name": "Kanpur, Uttar Pradesh, India", "latitude": 26.4499, "longitude": 80.3319},
     {"name": "Thane, Maharashtra, India", "latitude": 19.2183, "longitude": 72.9781},
     {"name": "Chandigarh, India", "latitude": 30.7333, "longitude": 76.7794},
+    # World Megacities & Extreme Heat Hotspots
+    {"name": "Dubai, United Arab Emirates", "latitude": 25.2048, "longitude": 55.2708},
+    {"name": "Riyadh, Saudi Arabia", "latitude": 24.7136, "longitude": 46.6753},
+    {"name": "Kuwait City, Kuwait", "latitude": 29.3759, "longitude": 47.9774},
+    {"name": "Doha, Qatar", "latitude": 25.2854, "longitude": 51.5310},
+    {"name": "Cairo, Egypt", "latitude": 30.0444, "longitude": 31.2357},
+    {"name": "Phoenix, Arizona, United States", "latitude": 33.4484, "longitude": -112.0740},
+    {"name": "Houston, Texas, United States", "latitude": 29.7604, "longitude": -95.3698},
+    {"name": "Las Vegas, Nevada, United States", "latitude": 36.1699, "longitude": -115.1398},
+    {"name": "New York City, New York, United States", "latitude": 40.7128, "longitude": -74.0060},
+    {"name": "London, England, United Kingdom", "latitude": 51.5074, "longitude": -0.1278},
+    {"name": "Paris, Île-de-France, France", "latitude": 48.8566, "longitude": 2.3522},
+    {"name": "Madrid, Spain", "latitude": 40.4168, "longitude": -3.7038},
+    {"name": "Seville, Andalusia, Spain", "latitude": 37.3891, "longitude": -5.9845},
+    {"name": "Rome, Lazio, Italy", "latitude": 41.9028, "longitude": 12.4964},
+    {"name": "Athens, Greece", "latitude": 37.9838, "longitude": 23.7275},
+    {"name": "Bangkok, Thailand", "latitude": 13.7563, "longitude": 100.5018},
+    {"name": "Singapore", "latitude": 1.3521, "longitude": 103.8198},
+    {"name": "Tokyo, Japan", "latitude": 35.6762, "longitude": 139.6503},
+    {"name": "Sydney, New South Wales, Australia", "latitude": -33.8688, "longitude": 151.2093},
+    {"name": "Rio de Janeiro, Brazil", "latitude": -22.9068, "longitude": -43.1729},
 ]
+POPULAR_INDIAN_CITIES = POPULAR_GLOBAL_CITIES
 
 
 async def search_location(query: str) -> List[Dict[str, Any]]:
@@ -86,7 +109,6 @@ async def search_location(query: str) -> List[Dict[str, Any]]:
                 "q": query.strip(),
                 "format": "json",
                 "limit": 8,
-                "countrycodes": "in",
             }
             headers = {
                 "User-Agent": "ThermoShield-HeatHealth-App/2.0 (admin@thermoshield.org)"
@@ -179,6 +201,10 @@ async def reverse_location(lat: float, lon: float) -> Dict[str, Any]:
                 state = address.get("state")
                 if state and state not in parts:
                     parts.append(state)
+                # Country
+                country = address.get("country")
+                if country and country not in parts:
+                    parts.append(country)
 
                 if parts:
                     resolved_name = ", ".join(parts)

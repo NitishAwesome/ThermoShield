@@ -59,6 +59,10 @@ from app.services.map_services import (
     get_all_areas_risk_overview,
     get_area_profile_for_coordinates,
 )
+from app.services.global_areas import (
+    get_all_global_areas_overview,
+    GLOBAL_AREAS,
+)
 from app.services.intervention import generate_interventions
 from app.services.simulator import simulate_intervention
 from app.services.sms import send_sms, get_sms_delivery_status
@@ -1738,6 +1742,17 @@ async def areas_risk_overview():
     Provides immediate visibility for guest users and regional monitoring.
     """
     return await get_all_areas_risk_overview()
+
+
+@app.get("/areas/global-risk-overview")
+async def global_areas_risk_overview(
+    region: Optional[str] = Query(None, description="Optional continent/region filter")
+):
+    """
+    Returns global heatwave and thermal stress risk intelligence across 40+ worldwide megacities and extreme climate zones.
+    """
+    return await get_all_global_areas_overview(region_filter=region)
+
 
 
 # ==================================================

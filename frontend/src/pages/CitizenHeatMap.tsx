@@ -15,6 +15,8 @@ import {
   HeartPulse,
   Compass,
   MousePointerClick,
+  Globe,
+  Flame,
 } from 'lucide-react';
 import { RiskMap } from '../components/RiskMap';
 import { LocationSearch } from '../components/LocationSearch';
@@ -23,8 +25,9 @@ import { DataRealityBadge, FallbackModeBanner } from '../components/provenance';
 import { useLocation } from '../context/LocationContext';
 import { useProfile } from '../context/ProfileContext';
 import { api } from '../services/api';
-import { ThermalResponse, RiskLevel, ThermalZone, MapLocationRisk } from '../types';
+import { ThermalResponse, RiskLevel, ThermalZone, MapLocationRisk, GlobalHeatStation } from '../types';
 import { MUMBAI_PROTOTYPE_ZONES } from '../data/thermalZones';
+import { GLOBAL_HEAT_STATIONS } from '../data/globalHeatHotspots';
 
 // Popular Indian reference regions for rapid citizen exploration
 const REGIONAL_PRESETS = [
@@ -36,10 +39,25 @@ const REGIONAL_PRESETS = [
   { name: 'Chennai (Coastal Heat)', lat: 13.0827, lon: 80.2707 },
 ];
 
+// Worldwide megacities and extreme heat frontiers
+const GLOBAL_EXPLORER_PRESETS = [
+  { name: 'Dubai', country: 'UAE', lat: 25.2048, lon: 55.2708, temp: '43°C' },
+  { name: 'Phoenix', country: 'USA', lat: 33.4484, lon: -112.0740, temp: '44°C' },
+  { name: 'Jacobabad', country: 'Pakistan', lat: 28.2835, lon: 68.4388, temp: '48°C' },
+  { name: 'Cairo', country: 'Egypt', lat: 30.0444, lon: 31.2357, temp: '41°C' },
+  { name: 'Seville', country: 'Spain', lat: 37.3891, lon: -5.9845, temp: '39°C' },
+  { name: 'Bangkok', country: 'Thailand', lat: 13.7563, lon: 100.5018, temp: '36°C' },
+  { name: 'Tokyo', country: 'Japan', lat: 35.6762, lon: 139.6503, temp: '34°C' },
+  { name: 'Sydney', country: 'Australia', lat: -33.8688, lon: 151.2093, temp: '26°C' },
+  { name: 'London', country: 'UK', lat: 51.5074, lon: -0.1278, temp: '25°C' },
+  { name: 'New York', country: 'USA', lat: 40.7128, lon: -74.0060, temp: '31°C' },
+];
+
 export const CitizenHeatMap: React.FC = () => {
   const { coords, locationName, setLocation, detectMyLocation, isLocating } = useLocation();
   const { profile } = useProfile();
 
+  const [viewScope, setViewScope] = useState<'local' | 'world'>('local');
   const [thermalData, setThermalData] = useState<ThermalResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -199,51 +217,102 @@ export const CitizenHeatMap: React.FC = () => {
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-black ts-text-primary tracking-tight font-sans mt-2">
-              Local Heat Map
+              {viewScope === 'world' ? 'World Heat Explorer' : 'Local Heat Map'}
             </h1>
             <p className="text-xs sm:text-sm ts-text-muted mt-1 max-w-2xl leading-relaxed">
-              Estimated thermal stress and heat conditions around your monitored location.
+              {viewScope === 'world'
+                ? 'Continuous planetary thermal diffusion belts, extreme heat frontiers, and megacity telemetry worldwide.'
+                : 'Estimated thermal stress and heat conditions around your monitored location.'}
               {' '}
               <span className="inline-flex items-center gap-1 text-orange-400 font-semibold">
                 <MousePointerClick className="w-3.5 h-3.5" />
-                Tap the map to explore any area.
+                Tap anywhere on Earth to explore.
               </span>
             </p>
           </div>
 
-          {/* Location Search Bar with integrated GPS */}
-          <div className="max-w-md w-full">
-            <LocationSearch
-              currentLocationName={locationName}
-              onSelectLocation={setLocation}
-              onUseMyLocation={detectMyLocation}
-              isLocating={isLocating}
-            />
+          {/* Right controls: View Scope switcher & Location Search */}
+          <div className="flex flex-col sm:items-end gap-2.5 max-w-md w-full">
+            {/* View Scope Switcher */}
+            <div className="flex items-center p-1 rounded-2xl bg-slate-500/10 border ts-border text-xs self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setViewScope('local')}
+                className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
+                  viewScope === 'local'
+                    ? 'bg-orange-500 text-white shadow-sm'
+                    : 'ts-text-muted hover:ts-text-primary'
+                }`}
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span>My Local Area</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewScope('world')}
+                className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
+                  viewScope === 'world'
+                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm'
+                    : 'ts-text-muted hover:ts-text-primary'
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5" />
+                <span>World Heat Explorer</span>
+              </button>
+            </div>
+
+            {/* Location Search Bar with integrated GPS */}
+            <div className="w-full">
+              <LocationSearch
+                currentLocationName={locationName}
+                onSelectLocation={setLocation}
+                onUseMyLocation={detectMyLocation}
+                isLocating={isLocating}
+              />
+            </div>
           </div>
         </div>
 
-        {/* Regional Quick Select Presets */}
+        {/* Quick Select Presets (Sample Areas or World Megacities) */}
         <div className="mt-4 pt-3 border-t ts-border flex items-center gap-2 overflow-x-auto pb-1 text-xs">
           <span className="ts-text-subtle text-[11px] font-semibold whitespace-nowrap flex items-center gap-1">
             <Compass className="w-3 h-3 text-orange-500" />
-            <span>Sample Areas:</span>
+            <span>{viewScope === 'world' ? 'Global Metropolises & Extreme Zones:' : 'Sample Areas:'}</span>
           </span>
-          {REGIONAL_PRESETS.map((preset) => (
-            <button
-              key={preset.name}
-              type="button"
-              onClick={() =>
-                setLocation({
-                  name: preset.name,
-                  latitude: preset.lat,
-                  longitude: preset.lon,
-                })
-              }
-              className="px-2.5 py-1 rounded-full text-[11px] font-medium border ts-border ts-card-subtle hover:border-orange-500/50 hover:bg-orange-500/5 transition-all text-slate-300 whitespace-nowrap cursor-pointer"
-            >
-              {preset.name}
-            </button>
-          ))}
+          {viewScope === 'world'
+            ? GLOBAL_EXPLORER_PRESETS.map((preset) => (
+                <button
+                  key={preset.name}
+                  type="button"
+                  onClick={() =>
+                    setLocation({
+                      name: `${preset.name}, ${preset.country}`,
+                      latitude: preset.lat,
+                      longitude: preset.lon,
+                    })
+                  }
+                  className="px-2.5 py-1 rounded-full text-[11px] font-medium border ts-border ts-card-subtle hover:border-orange-500/50 hover:bg-orange-500/5 transition-all text-slate-300 whitespace-nowrap cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>{preset.name}</span>
+                  <span className="font-mono text-[10px] text-orange-400">{preset.temp}</span>
+                </button>
+              ))
+            : REGIONAL_PRESETS.map((preset) => (
+                <button
+                  key={preset.name}
+                  type="button"
+                  onClick={() =>
+                    setLocation({
+                      name: preset.name,
+                      latitude: preset.lat,
+                      longitude: preset.lon,
+                    })
+                  }
+                  className="px-2.5 py-1 rounded-full text-[11px] font-medium border ts-border ts-card-subtle hover:border-orange-500/50 hover:bg-orange-500/5 transition-all text-slate-300 whitespace-nowrap cursor-pointer"
+                >
+                  {preset.name}
+                </button>
+              ))}
         </div>
       </div>
 
@@ -362,14 +431,23 @@ export const CitizenHeatMap: React.FC = () => {
       {/* 4. INTERACTIVE RISK MAP (CITIZEN VIEW)                                    */}
       {/* ========================================================================= */}
       <RiskMap
+        scope={viewScope === 'world' ? 'world' : 'wards'}
         center={[coords.lat, coords.lon]}
-        zoom={11}
+        zoom={viewScope === 'world' ? 3 : 11}
         locationName={locationName}
         temperature={tempC}
         humidity={humidity}
         wbgt={wbgtC}
         riskLevel={riskLevel}
         mapLocations={mapLocations}
+        globalStations={GLOBAL_HEAT_STATIONS}
+        onSelectGlobalStation={(station) => {
+          setLocation({
+            name: `${station.name}, ${station.country}`,
+            latitude: station.lat,
+            longitude: station.lon,
+          });
+        }}
         thermalZones={MUMBAI_PROTOTYPE_ZONES}
         selectedZoneId={selectedZone?.id}
         onSelectZone={(zone) => setSelectedZone(zone)}
@@ -377,8 +455,12 @@ export const CitizenHeatMap: React.FC = () => {
         isLoadingMap={isLoading}
         mapError={error}
         isCitizenView={true}
-        title="Local Heat Stress Map"
-        subtitle={`Displaying conditions around ${locationName} — tap the map to explore`}
+        title={viewScope === 'world' ? 'Planetary Heat Stress & Worldwide Diffusion' : 'Local Heat Stress Map'}
+        subtitle={
+          viewScope === 'world'
+            ? 'Continuous planetary thermal diffusion fields and 38+ megacity observation stations — tap anywhere on Earth to inspect'
+            : `Displaying conditions around ${locationName} — tap the map to explore`
+        }
       />
 
       {/* Selected Prototype Zone Details (if user selects a zone on map) */}
