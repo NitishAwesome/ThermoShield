@@ -66,6 +66,7 @@ from app.services.email import send_notification_email, is_smtp_configured
 from app.services.email_templates import generate_action_first_alert_html
 from app.services.alert_engine import dispatch_automatic_early_warning, get_engine_status_summary, init_cooldown_registry_from_db
 from app.services.monitor import monitor_daemon
+from app.services.rag_service import get_provenance_report
 
 
 from app.services.heat_action_plan import (
@@ -2158,3 +2159,50 @@ async def get_wards_forecast_summary_api():
         "wards": summaries,
     }
 
+
+# ==============================================================================
+# COPILOT RAG PROVENANCE DISCLOSURE (SIH-25C)
+# ==============================================================================
+
+@app.get(
+    "/copilot/provenance",
+    tags=["Copilot"],
+    summary="RAG Knowledge Corpus Provenance Table",
+)
+def get_rag_provenance():
+    """
+    Returns the full provenance classification table for every knowledge chunk
+    in the ThermoShield HeatCopilot RAG knowledge corpus.
+
+    Each entry is classified as:
+      - VERIFIED_PUBLIC_SOURCE: content paraphrases a specific, publicly
+        accessible primary document (source_url populated).
+      - INTERNAL_SUMMARY: content synthesises multiple published guidelines
+        listed in the authority field; no single citable URL covers the chunk.
+      - NOT_VERIFIED: based on domain knowledge; no traceable primary document.
+
+    Intended for:
+      - SIH evaluation committee auditor review
+      - CI provenance gate checks
+      - Transparency disclosure to judges and end-users
+    """
+    report = get_provenance_report()
+    verified = sum(1 for r in report if r["provenance_class"] == "VERIFIED_PUBLIC_SOURCE")
+    internal = sum(1 for r in report if r["provenance_class"] == "INTERNAL_SUMMARY")
+    not_verified = sum(1 for r in report if r["provenance_class"] == "NOT_VERIFIED")
+
+    return {
+        "corpus_summary": {
+            "total_chunks": len(report),
+            "VERIFIED_PUBLIC_SOURCE": verified,
+            "INTERNAL_SUMMARY": internal,
+            "NOT_VERIFIED": not_verified,
+            "note": (
+                "INTERNAL_SUMMARY chunks synthesise multiple published guidelines "
+                "from the listed authorities. They do not constitute primary clinical "
+                "references and should be read alongside the cited authority documents."
+            ),
+        },
+        "chunks": report,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }

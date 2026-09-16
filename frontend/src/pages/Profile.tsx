@@ -53,6 +53,7 @@ import {
 import { NotificationDecisionFeed } from '../components/NotificationDecisionFeed';
 import { useNotificationDecision } from '../context/NotificationDecisionContext';
 import { NotificationMode } from '../types';
+import { NotificationChannelLegend } from '../components/alerts/NotificationChannelLegend';
 
 export type ProfileTab =
   | 'personal'
@@ -1319,11 +1320,14 @@ export const Profile: React.FC<ProfileProps> = ({ initialTab }) => {
         {/* ========================================================= */}
         {activeTab === 'alerts' && (
           <div className="space-y-6">
+            {/* CHANNEL DELIVERY REALITY — shown first so preferences are contextualized */}
+            <NotificationChannelLegend />
+
             {/* DEVICE NOTIFICATIONS DELIVERY CONTROLS */}
             <Card variant="elevated">
               <CardHeader
-                title="Device & Browser Notifications"
-                subtitle="Receive important ThermoShield heat alerts directly through your browser or device when supported."
+                title="Browser Notifications (Web Notification API)"
+                subtitle="Browser Notifications via the Web Notification API. These are not background Web Push notifications and do not provide service-worker push delivery after the web application is closed."
                 badge={
                   devicePermission === 'granted' ? (
                     <Badge variant="low" size="sm">
@@ -1355,7 +1359,7 @@ export const Profile: React.FC<ProfileProps> = ({ initialTab }) => {
                           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                         </div>
                         <p className="text-xs ts-text-muted mt-0.5 leading-relaxed">
-                          Approved heat alerts will be delivered directly to your device screen while ThermoShield is open or in background tabs.
+                          Browser Notifications via the Web Notification API are enabled. Alerts are delivered while ThermoShield is open in the browser. These are not background Web Push notifications.
                         </p>
                       </div>
                     </div>
@@ -1386,10 +1390,10 @@ export const Profile: React.FC<ProfileProps> = ({ initialTab }) => {
                       <Bell className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
                       <div>
                         <div className="text-sm font-bold ts-text-primary">
-                          Device notifications are available but not enabled.
+                          Browser notifications are available but not enabled.
                         </div>
                         <p className="text-xs ts-text-muted mt-0.5 leading-relaxed">
-                          Enable notifications to receive urgent thermal stress warnings and personal health reminders directly on this device.
+                          Enable browser notification permission to receive urgent thermal stress warnings while ThermoShield is open or in a background tab. Requires an active browser session.
                         </p>
                       </div>
                     </div>
@@ -1427,10 +1431,10 @@ export const Profile: React.FC<ProfileProps> = ({ initialTab }) => {
                     <Info className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                     <div>
                       <div className="text-sm font-bold ts-text-primary">
-                        Device notifications are not supported in this browser.
+                        Browser notifications are not supported in this browser.
                       </div>
                       <p className="text-xs ts-text-muted mt-0.5 leading-relaxed">
-                        Your current browser does not support the native Web Notification API. ThermoShield will continue delivering all approved alerts through the in-app notification feed.
+                        Your current browser does not support the Web Notification API. ThermoShield will continue delivering all approved alerts through the in-app notification feed.
                       </p>
                     </div>
                   </div>
@@ -1439,7 +1443,7 @@ export const Profile: React.FC<ProfileProps> = ({ initialTab }) => {
                 <div className="text-[11px] ts-text-subtle flex items-center space-x-1.5 pt-1">
                   <Info className="w-3.5 h-3.5 shrink-0" />
                   <span>
-                    Native notifications respect all cooldowns, quiet hours, and your selected preference mode below.
+                    Browser Notifications via the Web Notification API respect all cooldowns, quiet hours, and your selected preference mode. These are not background Web Push notifications and do not provide service-worker push delivery after the web application is closed.
                   </span>
                 </div>
               </CardContent>

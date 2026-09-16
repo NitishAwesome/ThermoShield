@@ -1,13 +1,17 @@
 /**
- * ThermoShield Native Browser Notification Service
- * 
- * Closes the gap between decision engine approvals and physical device notification delivery.
- * 
+ * ThermoShield Browser Notification Service (Web Notification API)
+ *
+ * Delivers browser notifications via the Web Notification API (window.Notification)
+ * when ThermoShield is open in the browser.
+ *
  * Strict safety rules:
  * 1. Never requests permission on page load, refresh, or login.
- * 2. Only requests permission upon explicit user action (e.g. clicking "Enable Device Notifications").
+ * 2. Only requests permission upon explicit user action (e.g. clicking "Enable Browser Notifications").
  * 3. Gracefully handles unsupported browsers, denied states, and desktop/mobile environments.
- * 4. Transparent delivery: alerts run via native Notification API while ThermoShield is active.
+ * 4. Transparent delivery: alerts run via the Web Notification API while ThermoShield is active.
+ *
+ * LIMITATION: These are not background Web Push notifications and do not provide
+ * service-worker push delivery after the web application is closed.
  */
 
 export type DeviceNotificationPermission = 'default' | 'granted' | 'denied' | 'unsupported';

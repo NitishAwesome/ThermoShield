@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Bell, Mail, ShieldCheck, CheckCircle2, ArrowRight, RefreshCw, AlertCircle } from 'lucide-react';
+import { Bell, Mail, ShieldCheck, CheckCircle2, ArrowRight, RefreshCw, AlertCircle, Info } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, Button } from '../ui';
 import { api } from '../../services/api';
 import { useTranslation } from '../../context/LanguageContext';
+import { NotificationChannelLegend } from './NotificationChannelLegend';
 
 interface AlertPreferencesCTAProps {
   locationName: string;
@@ -45,7 +46,7 @@ export const AlertPreferencesCTA: React.FC<AlertPreferencesCTAProps> = ({
         lon: coords.lon,
       });
       setSuccessMessage(
-        `Alerts enabled for ${res.email}! You will automatically receive notifications whenever High or Extreme heat hits ${locationName}.`
+        `✓ Email alerts enabled for ${res.email}. You'll receive in-app feed alerts and email warnings whenever High or Extreme heat is detected for ${locationName}.`
       );
     } catch (err: any) {
       setErrorMessage(
@@ -125,6 +126,11 @@ export const AlertPreferencesCTA: React.FC<AlertPreferencesCTAProps> = ({
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
+      </div>
+
+      {/* Truthful channel disclosure */}
+      <div className="mt-3 pt-3 border-t ts-border">
+        <NotificationChannelLegend compact />
       </div>
 
       {successMessage && (
