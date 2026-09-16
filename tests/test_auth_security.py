@@ -217,6 +217,35 @@ class TestAuthSecurity(unittest.TestCase):
         res = self.client.post("/auth/google", json={"credential": ""})
         self.assertIn(res.status_code, [400, 422])
 
+    # 13. PATCH /auth/me updates user name and phone number
+    def test_13_update_me_success(self):
+        data = self._generate_unique_user_data()
+        reg_res = self.client.post("/auth/register", json=data)
+        self.assertEqual(reg_res.status_code, 201)
+        token = reg_res.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Update name and phone
+        new_name = "Updated Citizen FullName"
+        new_phone = f"+9199{uuid.uuid4().hex[:8]}"
+        patch_res = self.client.patch("/auth/me", json={"name": new_name, "phone_number": new_phone}, headers=headers)
+        self.assertEqual(patch_res.status_code, 200, patch_res.text)
+        updated_user = patch_res.json()
+        self.assertEqual(updated_user["name"], new_name)
+        self.assertEqual(updated_user["phone_number"], new_phone)
+        self.assertEqual(updated_user["email"], data["email"])
+
+        # Verify persistence via GET /auth/me
+        get_res = self.client.get("/auth/me", headers=headers)
+        self.assertEqual(get_res.status_code, 200)
+        self.assertEqual(get_res.json()["name"], new_name)
+        self.assertEqual(get_res.json()["phone_number"], new_phone)
+
+    # 14. PATCH /auth/me rejects unauthenticated requests
+    def test_14_update_me_requires_auth(self):
+        res = self.client.patch("/auth/me", json={"name": "Attacker"})
+        self.assertIn(res.status_code, [401, 403])
+
 
 if __name__ == "__main__":
     unittest.main()

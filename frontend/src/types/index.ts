@@ -291,6 +291,65 @@ export interface ThermalZone {
   areaType: 'prototype_zone';
 }
 
+export interface HeatRiskArea {
+  id: string;
+  name: string;
+  wardCode?: string;
+  district?: string;
+  localities?: string[];
+
+  geographyType:
+    | 'official_ward'
+    | 'municipal_zone'
+    | 'prototype_zone'
+    | 'regional_centroid';
+
+  geometry?: any;
+  polygonRings?: [number, number][][];
+
+  centroid: {
+    latitude: number;
+    longitude: number;
+  };
+
+  weather: {
+    temperatureC: number;
+    humidityPercent: number;
+    windSpeedMps: number;
+    solarRadiationWm2: number;
+  };
+
+  thermal: {
+    wetBulbC: number;
+    estimatedWbgtC: number;
+    heatIndexC: number;
+  };
+
+  vulnerability: {
+    score: number;
+    source: 'real' | 'modelled' | 'prototype';
+  };
+
+  risk: {
+    score: number;
+    level: 'LOW' | 'MODERATE' | 'HIGH' | 'EXTREME';
+  };
+
+  trend: 'RISING' | 'STABLE' | 'IMPROVING';
+
+  provenance?: {
+    sourceName: string;
+    sourceType: string;
+    boundaryLevel: string;
+    retrievedAt: string;
+    license: string;
+  };
+
+  microclimateOffsetC?: number;
+  demographicsNote?: string;
+  attentionReason?: string;
+}
+
 export interface AreasRiskOverviewResponse {
   count: number;
   updated_at: string;
@@ -428,5 +487,169 @@ export interface FamilyVulnerableMember {
   addedAt: string;
 }
 
+export interface ChannelDeliveryStatus {
+  status: string;
+  display_status: string;
+  mode?: string;
+  provider?: string;
+  configured: boolean;
+  can_deliver: boolean;
+  channel: string;
+  sender?: string;
+  from_number?: string;
+  note?: string;
+}
+
+export interface AlertDeliveryStatusResponse {
+  sms: ChannelDeliveryStatus;
+  email: ChannelDeliveryStatus;
+  whatsapp: ChannelDeliveryStatus;
+}
+
+export interface SendTestSMSRequest {
+  phone_number: string;
+  location_name?: string;
+  message?: string;
+}
+
+export interface SendTestSMSResponse {
+  success: boolean;
+  status: string;
+  mode: string;
+  provider: string;
+  recipient: string;
+  message: string;
+  message_id?: string;
+  error?: string;
+}
+
+// =========================================================================
+// HEAT ACTION PLAN (HAP) & EARLY WARNING TYPES (PROMPT 21)
+// =========================================================================
+
+export type HeatActionCategory =
+  | 'COOLING'
+  | 'OUTDOOR_WORK'
+  | 'HYDRATION'
+  | 'HEALTH_PREPAREDNESS'
+  | 'INFRASTRUCTURE';
+
+export type HeatActionTriggerState =
+  | 'ACTION_REVIEW_REQUIRED_NOW'
+  | 'PREPARE_WITHIN_24_HOURS'
+  | 'PREPARE_WITHIN_3_DAYS'
+  | 'MONITOR_NORMAL_BASELINE';
+
+export interface HeatActionItem {
+  category: HeatActionCategory;
+  action: string;
+  title: string;
+  description: string;
+  priority: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  status: string;
+  justification: string;
+  decision_status?: string;
+  decision_officer?: string;
+  decision_notes?: string;
+  decision_timestamp?: string;
+}
+
+export interface HeatActionPlanResponse {
+  area_id: string;
+  area_name: string;
+  risk_level: RiskLevel;
+  risk_score: number;
+  trigger_state: HeatActionTriggerState;
+  trigger_reasons: string[];
+  action_count: number;
+  recommended_actions: HeatActionItem[];
+  evaluated_telemetry: Record<string, any>;
+}
+
+export interface HeatActionDecisionUpdateRequest {
+  area_id: string;
+  action_key: string;
+  decision_status: 'Reviewed' | 'Acknowledged' | 'Deferred' | 'Action Initiated Externally' | string;
+  officer_name?: string;
+  officer_notes?: string;
+}
+
+// =========================================================================
+// 3–5 DAY HUMAN HEALTH IMPACT FORECAST TYPES (PROMPT 22)
+// =========================================================================
+
+export interface HealthImpactForecastDay {
+  day_index: number;
+  day_label: string;
+  date: string;
+  temp_max_c: number;
+  temp_min_c: number;
+  apparent_temp_max_c: number;
+  estimated_wbgt_c: number;
+  heat_index_c: number;
+  uv_index_max: number;
+  thermal_risk_level: RiskLevel;
+  thermal_risk_score: number;
+  vulnerability_score: number;
+  projected_health_impact_proxy: number;
+  civic_health_concern: 'LOW' | 'MODERATE' | 'HIGH' | 'SEVERE' | 'CRITICAL';
+  civic_health_label: string;
+  civic_health_description: string;
+  civic_health_color: string;
+  trigger_state: HeatActionTriggerState;
+}
+
+export interface HealthImpactForecastResponse {
+  area_id: string;
+  area_name: string;
+  coordinates: {
+    latitude: number;
+    longitude: number;
+  };
+  days_count: number;
+  forecast_days: HealthImpactForecastDay[];
+  lead_time_intelligence: {
+    first_high_risk_day: string | null;
+    first_extreme_risk_day: string | null;
+    lead_time_hours: number | null;
+    peak_concern_day: string;
+    peak_concern_date: string;
+    peak_concern_score: number;
+    relief_day: string;
+    summary_directive: string;
+  };
+  ml_transparency_disclaimer: string;
+  source_status?: string;
+  source_name?: string;
+}
+
+export interface WardForecastSummaryItem {
+  day_index: number;
+  day_label: string;
+  temperature_c: number;
+  wbgt_c: number;
+  risk_level: RiskLevel;
+  risk_score: number;
+  health_concern: string;
+  health_concern_color: string;
+}
+
+export interface WardForecastSummary {
+  ward_id: string;
+  ward_name: string;
+  district: string;
+  latitude: number;
+  longitude: number;
+  vulnerability_score: number;
+  forecast_days: WardForecastSummaryItem[];
+}
+
+export interface WardsForecastSummaryResponse {
+  count: number;
+  wards: WardForecastSummary[];
+}
+
 export * from './notifications';
 export * from './provenance';
+
+

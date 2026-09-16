@@ -166,17 +166,17 @@ export const SaferOutdoorWindowCard: React.FC<SaferOutdoorWindowCardProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center space-x-2 self-start sm:self-auto">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 self-start sm:self-auto">
             {/* Vulnerability tier pill */}
             <span
-              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border ${vulnInfo.badgeClass}`}
+              className={`inline-flex items-center px-2.5 py-1 text-[11px] font-bold rounded-lg border shadow-xs tracking-wide ${vulnInfo.badgeClass}`}
             >
               {vulnInfo.label}
             </span>
 
             {/* Status pill */}
             <span
-              className={`flex items-center space-x-1.5 px-3 py-1 text-xs font-extrabold rounded-lg border ${statusInfo.badgeClass}`}
+              className={`inline-flex items-center space-x-1.5 px-3 py-1 text-xs font-extrabold rounded-lg border shadow-xs tracking-wide ${statusInfo.badgeClass}`}
             >
               <span className={`w-2 h-2 rounded-full ${statusInfo.dotClass}`} />
               <span>{statusInfo.text}</span>
@@ -188,10 +188,17 @@ export const SaferOutdoorWindowCard: React.FC<SaferOutdoorWindowCardProps> = ({
         <div className="mt-5 grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
           {/* Main Time Range Callout */}
           <div className="md:col-span-7 space-y-2">
-            <div className="flex items-baseline space-x-3">
-              <span className="text-3xl sm:text-4xl font-extrabold ts-text-primary tracking-tight font-mono">
-                {windowResult.windowLabel}
+            <div className="flex flex-col sm:flex-row sm:items-baseline gap-2 sm:gap-3">
+              <span className="text-2xl sm:text-3xl lg:text-4xl font-extrabold ts-text-primary tracking-tight font-mono">
+                {windowResult.status === 'ACTIVE_NOW' && windowResult.activeNowUntil
+                  ? `Safer right now until ${windowResult.activeNowUntil}`
+                  : windowResult.windowLabel}
               </span>
+              {windowResult.status === 'ACTIVE_NOW' && (
+                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-md inline-block w-fit">
+                  Window In Progress
+                </span>
+              )}
             </div>
 
             <p className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
@@ -236,6 +243,24 @@ export const SaferOutdoorWindowCard: React.FC<SaferOutdoorWindowCardProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Practical Daytime Window Callout (when primary window is at night) */}
+        {windowResult.isNightOnlyWindow && windowResult.bestDaytimeWindow && (
+          <div className="mt-4 p-3.5 rounded-xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-transparent border border-emerald-500/25 space-y-1">
+            <div className="flex flex-wrap items-center justify-between gap-1.5">
+              <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                <Sun className="w-4 h-4 text-amber-500" />
+                <span>Best Daytime Outdoor Window: {windowResult.bestDaytimeWindow.label}</span>
+              </span>
+              <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 border border-emerald-500/25 px-2 py-0.5 rounded font-mono">
+                ~{windowResult.bestDaytimeWindow.reliefDeg.toFixed(1)}°C cooler than peak
+              </span>
+            </div>
+            <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium pt-0.5">
+              {windowResult.practicalDaytimeAdvice}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Hourly Thermal Trajectory Strip */}
@@ -410,7 +435,7 @@ export const SaferOutdoorWindowCard: React.FC<SaferOutdoorWindowCardProps> = ({
           )}
         </button>
 
-        {/* Link to 5-day Synoptic Forecast */}
+        {/* Link to 5-day Heat Forecast */}
         <Link
           to="/forecast"
           className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center space-x-2"
@@ -418,7 +443,7 @@ export const SaferOutdoorWindowCard: React.FC<SaferOutdoorWindowCardProps> = ({
           <span>
             {variant === 'compact'
               ? t('outdoorWindow.ctaForecastPlanning', 'View Full Forecast & Planning')
-              : t('outdoorWindow.ctaForecast', 'View 5-Day Synoptic Outlook')}
+              : t('outdoorWindow.ctaForecast', 'View 5-Day Heat Outlook')}
           </span>
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>

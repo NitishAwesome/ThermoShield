@@ -123,3 +123,91 @@ async def search_location(query: str) -> List[Dict[str, Any]]:
         _LOCATION_CACHE[normalized_q] = locations
 
     return locations
+
+
+_REVERSE_CACHE: Dict[tuple, Dict[str, Any]] = {}
+
+async def reverse_location(lat: float, lon: float) -> Dict[str, Any]:
+    """
+    Reverse geocodes coordinates to a human-friendly place name for citizen map interaction.
+    Features in-memory coordinate-bucket caching and reliable multi-tier fallbacks.
+    """
+    cache_key = (round(lat, 3), round(lon, 3))
+    if cache_key in _REVERSE_CACHE:
+        return _REVERSE_CACHE[cache_key]
+
+    resolved_name: Optional[str] = None
+
+    # 1. Primary: OpenStreetMap Nominatim reverse lookup
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://nominatim.openstreetmap.org/reverse",
+                params={
+                    "lat": lat,
+                    "lon": lon,
+                    "format": "json",
+                    "zoom": 14,
+                    "addressdetails": 1,
+                },
+                headers={
+                    "User-Agent": "ThermoShield-HeatHealth-App/2.0 (admin@thermoshield.org)"
+                },
+                timeout=3.5,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                address = data.get("address", {})
+                parts = []
+                # Local neighborhood / suburb / ward
+                locality = address.get("suburb") or address.get("neighbourhood") or address.get("residential") or address.get("hamlet")
+                if locality:
+                    parts.append(locality)
+                # City / Town / Municipal area
+                city = address.get("city") or address.get("town") or address.get("county") or address.get("district")
+                if city and city not in parts:
+                    parts.append(city)
+                # State / Territory
+                state = address.get("state")
+                if state and state not in parts:
+                    parts.append(state)
+
+                if parts:
+                    resolved_name = ", ".join(parts)
+                elif data.get("display_name"):
+                    # Compact display name
+                    disp_parts = [p.strip() for p in data["display_name"].split(",")[:3]]
+                    resolved_name = ", ".join(disp_parts)
+    except Exception as e:
+        logger.warning(f"Reverse geocode failed for ({lat}, {lon}): {e}")
+
+    # 2. Secondary: Nearest popular Indian city (if within 45km)
+    if not resolved_name:
+        import math
+        closest_city = None
+        min_dist = float("inf")
+        for c in POPULAR_INDIAN_CITIES:
+            dlat = math.radians(c["latitude"] - lat)
+            dlon = math.radians(c["longitude"] - lon)
+            a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat)) * math.cos(math.radians(c["latitude"])) * math.sin(dlon / 2) ** 2
+            dist_km = 6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+            if dist_km < min_dist:
+                min_dist = dist_km
+                closest_city = c
+
+        if closest_city and min_dist <= 45.0:
+            c_name = closest_city["name"].split(",")[0]
+            resolved_name = f"{c_name} Outer ({lat:.3f}°N, {lon:.3f}°E)"
+
+    # 3. Tertiary fallback: Clean formatted coordinate name
+    if not resolved_name:
+        resolved_name = f"Selected Point ({lat:.3f}°N, {lon:.3f}°E)"
+
+    result = {
+        "name": resolved_name,
+        "latitude": lat,
+        "longitude": lon,
+    }
+
+    _REVERSE_CACHE[cache_key] = result
+    return result

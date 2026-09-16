@@ -155,30 +155,31 @@ const getRoleConfig = (role?: string, t?: (key: any, fallback?: any) => string):
     default: // Citizen / Public User
       return {
         roleKey: 'user',
-        roleBadge: tr('role.citizen', 'Citizen Safety View'),
+        roleBadge: tr('role.citizenBadge', 'Civic Heat Defense'),
         icon: ShieldCheck,
         iconColor: 'text-emerald-600 dark:text-emerald-400',
         bgGradient: 'from-emerald-500/10 via-emerald-500/5 to-transparent dark:from-emerald-500/15 dark:via-slate-900/40 dark:to-slate-900/60',
         borderColor: 'border-emerald-500/30',
         accentColor: 'text-emerald-600 dark:text-emerald-400',
-        title: tr('roleBanner.citizenTitle', 'Welcome to ThermoShield — Citizen Heat Safety'),
-        compactTitle: tr('role.citizen', 'Citizen View'),
+        title: tr('roleBanner.citizenTitle', 'Welcome to ThermoShield — Civic Heat Defense & Early Warning'),
+        compactTitle: tr('roleBanner.citizenCompactTitle', 'Civic Heat Protection & Early Warning'),
         description: tr(
           'roleBanner.citizenDesc',
-          "Your dashboard is personalized for your location and health profile. Check today's heat conditions, your personal risk, and what to do now."
+          'Your citizen dashboard provides neighborhood-level thermal stress intelligence, personal risk evaluation, and actionable precautions to protect your health and household.'
         ),
         compactDescription: tr(
-          'roleBanner.citizenDesc',
-          'Your dashboard is personalized for your location and health profile.'
+          'roleBanner.citizenCompactDesc',
+          'Personalized thermal stress monitoring, hourly relief windows, and actionable heat defense for your household.'
         ),
         quickActions: [
-          { to: '/personal-risk', label: tr('nav.personalRisk', 'My Heat Risk'), icon: HeartPulse, primary: true },
-          { to: '/alerts', label: tr('nav.alerts', 'View Alerts'), icon: Bell },
+          { to: '/personal-risk', label: tr('nav.personalRisk', 'Personal Heat Risk'), icon: HeartPulse, primary: true },
+          { to: '/forecast', label: tr('nav.forecast', 'Safe Outdoor Hours'), icon: Calendar },
+          { to: '/alerts', label: tr('nav.alerts', 'Live Advisories'), icon: Bell },
         ],
         features: [
-          tr('roleBanner.featureCitizen1', 'Personal heat risk calculator tuned to your health profile and routine'),
-          tr('roleBanner.featureCitizen2', 'Real-time city-specific temperature & WBGT physiological strain'),
-          tr('roleBanner.featureCitizen3', 'Clear, jargon-free protective advice for you and your family'),
+          tr('roleBanner.featureCitizen1', 'Personal heat risk calculator tuned to your health profile and physical routine'),
+          tr('roleBanner.featureCitizen2', 'Real-time city-specific temperature & WBGT physiological strain telemetry'),
+          tr('roleBanner.featureCitizen3', 'Clear, protective hydration and work-rest directives for you and your family'),
         ],
       };
   }
@@ -245,8 +246,11 @@ export const RoleWelcomeBanner: React.FC<RoleWelcomeBannerProps> = ({
   const handleRoleSelect = (roleId: string) => {
     switchRole(roleId);
     setIsRoleMenuOpen(false);
-  };  const config = getRoleConfig(user?.role, t);
+  };
+
+  const config = getRoleConfig(user?.role, t);
   const Icon = config.icon;
+  const isCitizen = !user?.role || user?.role === 'user' || user?.role === 'citizen';
 
   const getLocalizedRoleLabel = (id: string, fallback: string) => {
     if (id === 'user') return t('role.citizen', fallback);
@@ -272,7 +276,9 @@ export const RoleWelcomeBanner: React.FC<RoleWelcomeBannerProps> = ({
               <Icon className="w-4 h-4" />
             </div>
             <div className="flex items-center space-x-2 flex-wrap text-xs">
-              <span className="ts-text-muted hidden sm:inline">{t('roleBanner.viewingAs', 'Currently viewing as:')}</span>
+              <span className="ts-text-muted hidden sm:inline">
+                {isCitizen ? t('roleBanner.citizenActiveNotice', 'Civic Heat Defense:') : t('roleBanner.viewingAs', 'Currently viewing as:')}
+              </span>
               <span className={`font-bold ${config.accentColor}`}>
                 {getLocalizedRoleLabel(config.roleKey, config.roleBadge)}
               </span>
@@ -292,20 +298,21 @@ export const RoleWelcomeBanner: React.FC<RoleWelcomeBannerProps> = ({
               <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
 
-            <div className="relative" ref={menuRef}>
-              <button
-                type="button"
-                onClick={() => setIsRoleMenuOpen(!isRoleMenuOpen)}
-                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-orange-500/15 border border-orange-500/30 text-orange-700 dark:text-orange-300 hover:bg-orange-500/25 transition-all"
-              >
-                {t('roleBanner.changeView', 'Change View')}
-              </button>
+            {!isCitizen && (
+              <div className="relative" ref={menuRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsRoleMenuOpen(!isRoleMenuOpen)}
+                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-orange-500/15 border border-orange-500/30 text-orange-700 dark:text-orange-300 hover:bg-orange-500/25 transition-all"
+                >
+                  {t('roleBanner.changeView', 'Change View')}
+                </button>
 
-              {isRoleMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 ts-card-elevated border ts-border rounded-xl shadow-2xl py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                  <div className="px-3 py-1.5 text-[10px] uppercase font-bold ts-text-subtle tracking-wider border-b ts-border">
-                    {t('roleBanner.switchPersona', 'Switch Active Persona')}
-                  </div>
+                {isRoleMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-64 ts-card-elevated border ts-border rounded-xl shadow-2xl py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="px-3 py-1.5 text-[10px] uppercase font-bold ts-text-subtle tracking-wider border-b ts-border">
+                      {t('roleBanner.switchPersona', 'Switch Active Persona')}
+                    </div>
                   {ALL_ROLES.map((r) => {
                     const RIcon = r.icon;
                     const isCurrent =
@@ -333,6 +340,7 @@ export const RoleWelcomeBanner: React.FC<RoleWelcomeBannerProps> = ({
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
       </div>
@@ -416,14 +424,15 @@ export const RoleWelcomeBanner: React.FC<RoleWelcomeBannerProps> = ({
                   <span className="text-sm leading-none font-bold">—</span>
                 </button>
 
-                <div className="relative" ref={menuRef}>
-                  <button
-                    type="button"
-                    onClick={() => setIsRoleMenuOpen(!isRoleMenuOpen)}
-                    className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-white/90 dark:bg-slate-800/70 border ts-border text-slate-700 dark:text-slate-300 hover:ts-text-primary transition-all"
-                  >
-                    {t('roleBanner.changeView', 'Change View')}
-                  </button>
+                {!isCitizen && (
+                  <div className="relative" ref={menuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsRoleMenuOpen(!isRoleMenuOpen)}
+                      className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-white/90 dark:bg-slate-800/70 border ts-border text-slate-700 dark:text-slate-300 hover:ts-text-primary transition-all"
+                    >
+                      {t('roleBanner.changeView', 'Change View')}
+                    </button>
 
                   {isRoleMenuOpen && (
                     <div className="absolute right-0 mt-2 w-64 ts-card-elevated border ts-border rounded-xl shadow-2xl py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
@@ -457,6 +466,7 @@ export const RoleWelcomeBanner: React.FC<RoleWelcomeBannerProps> = ({
                     </div>
                   )}
                 </div>
+                )}
               </div>
             </div>
           </div>
@@ -562,15 +572,16 @@ export const RoleWelcomeBanner: React.FC<RoleWelcomeBannerProps> = ({
                 );
               })}
 
-              <div className="relative" ref={menuRef}>
-                <button
-                  type="button"
-                  onClick={() => setIsRoleMenuOpen(!isRoleMenuOpen)}
-                  className="px-3 py-2 rounded-xl text-xs font-semibold ts-card-subtle border ts-border text-slate-700 dark:text-slate-300 hover:ts-text-primary transition-all flex items-center space-x-1"
-                >
-                  <span>{t('roleBanner.changeView', 'Change View')}</span>
-                  <ChevronDown className="w-3 h-3 text-slate-400" />
-                </button>
+              {!isCitizen && (
+                <div className="relative" ref={menuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsRoleMenuOpen(!isRoleMenuOpen)}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold ts-card-subtle border ts-border text-slate-700 dark:text-slate-300 hover:ts-text-primary transition-all flex items-center space-x-1"
+                  >
+                    <span>{t('roleBanner.changeView', 'Change View')}</span>
+                    <ChevronDown className="w-3 h-3 text-slate-400" />
+                  </button>
 
                 {isRoleMenuOpen && (
                   <div className="absolute left-0 mt-2 w-64 ts-card-elevated border ts-border rounded-xl shadow-2xl py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
@@ -604,6 +615,7 @@ export const RoleWelcomeBanner: React.FC<RoleWelcomeBannerProps> = ({
                   </div>
                 )}
               </div>
+              )}
 
               <button
                 type="button"

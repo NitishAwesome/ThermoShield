@@ -95,23 +95,28 @@ export const GovernmentLayout: React.FC = () => {
 
   return (
     <div className="government-portal-viewport w-full max-w-7xl mx-auto animate-fadeIn">
-      {/* Authority Portal Subheader Badge */}
-      <div className="mb-5 px-3.5 py-2 rounded-xl bg-orange-500/10 border border-orange-500/25 flex flex-wrap items-center justify-between gap-2 text-xs shadow-sm">
+      {/* Authority Portal Subheader Context Indicator */}
+      <div className="mb-5 px-3.5 py-1.5 rounded-xl bg-slate-500/5 border ts-border flex items-center justify-between gap-3 text-xs shadow-sm">
         <div className="flex items-center space-x-2">
-          <Building2 className="w-4 h-4 text-orange-500 flex-shrink-0" />
+          <Building2 className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
           <span className="font-bold ts-text-primary">
-            Authority Command Portal: <span className="text-orange-600 dark:text-orange-400 uppercase tracking-wide">{userRole}</span>
+            Authority Command Portal
+          </span>
+          <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/30 uppercase">
+            {userRole || 'OFFICIAL'}
           </span>
           <span className="text-slate-400 hidden sm:inline">•</span>
-          <span className="ts-text-muted hidden sm:inline">City Administration & Disaster Management (SIH26083)</span>
+          <span className="ts-text-muted text-[11px] hidden md:inline">
+            City Administration & Disaster Management (SIH26083)
+          </span>
         </div>
 
         <Link
           to="/"
-          className="text-[11px] font-semibold text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1"
+          className="text-[11px] font-medium ts-text-muted hover:ts-text-primary transition-colors flex items-center gap-1 shrink-0"
         >
-          <span>Switch to Citizen Safety Portal</span>
-          <ArrowLeft className="w-3 h-3 rotate-180" />
+          <span>Citizen Safety View</span>
+          <ArrowLeft className="w-3 h-3 rotate-180 text-slate-400" />
         </Link>
       </div>
 

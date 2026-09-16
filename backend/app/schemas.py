@@ -197,3 +197,49 @@ class AlertSubscriptionResponse(BaseModel):
     email: str
     is_new_citizen: bool
     auto_alert_active: bool
+
+
+class SendTestSMSRequest(BaseModel):
+    phone_number: str
+    location_name: str | None = "Current Monitored Area"
+    message: str | None = None
+
+
+class SendTestSMSResponse(BaseModel):
+    success: bool
+    status: str
+    mode: str
+    provider: str
+    recipient: str
+    message: str
+    message_id: str | None = None
+    error: str | None = None
+
+
+class HeatActionEvaluateRequest(BaseModel):
+    area_id: str | None = "custom_area"
+    area_name: str | None = "Custom Zone"
+    temperature_c: float | None = 34.0
+    humidity_pct: float | None = 65.0
+    wbgt_c: float | None = None
+    heat_index_c: float | None = None
+    solar_radiation: float | None = None
+    wind_speed: float | None = None
+    vulnerability_score: float | None = None
+    risk_level: str | None = None
+    risk_score: float | None = None
+    forecast_max_risk: str | None = None
+    forecast_trend: str | None = "STEADY"
+    forecast_lead_time_hours: int | None = None
+    alert_state: str | None = None
+
+
+class HeatActionDecisionUpdateRequest(BaseModel):
+    area_id: str = "general"
+    action_key: str
+    decision_status: str | None = None
+    decision: str | None = None
+    officer_name: str | None = None
+    officer_notes: str | None = None
+    notes: str | None = None
+

@@ -270,7 +270,10 @@ export const Forecast: React.FC = () => {
           </Card>
 
           {/* SECTION 5 — PLAN FOR OUTDOOR ACTIVITIES */}
-          <OutdoorActivityGuide />
+          <OutdoorActivityGuide
+            todayMaxTemp={forecastData?.forecast?.max_temperature?.[0]}
+            apparentTemp={forecastData?.forecast?.apparent_temperature_max?.[0]}
+          />
 
           {/* SECTION 6 — CONNECTION TO PERSONAL RISK & ALERTS */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">

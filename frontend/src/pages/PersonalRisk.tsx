@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   HeartPulse,
   Droplets,
@@ -20,6 +20,18 @@ import {
   Sun,
   ShieldAlert,
   Info,
+  User,
+  Shield,
+  Baby,
+  Cigarette,
+  Brain,
+  FlaskConical,
+  Stethoscope,
+  Zap,
+  PersonStanding,
+  Pill,
+  Flame,
+  MessageSquare,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -39,22 +51,40 @@ import { PersonalRiskExplanation } from '../components/personal-risk/PersonalRis
 import { PersonalSafetyChecklist } from '../components/personal-risk/PersonalSafetyChecklist';
 import { PersonalRiskScience } from '../components/personal-risk/PersonalRiskScience';
 
-const CONDITIONS_META = [
-  { id: 'heart_disease', key: 'risk.condition.cardiovascular', icon: '❤️', label: 'Heart Disease' },
-  { id: 'asthma', key: 'risk.condition.asthma', icon: '🫁', label: 'Asthma / Respiratory' },
-  { id: 'diabetes', key: 'risk.condition.diabetes', icon: '🩸', label: 'Diabetes' },
-  { id: 'kidney_disease', key: 'risk.condition.kidney', icon: '🧪', label: 'Kidney Disease' },
-  { id: 'hypertension', key: 'risk.condition.hypertension', icon: '🩺', label: 'Hypertension' },
-  { id: 'neurological', key: 'risk.condition.neurological', icon: '🧠', label: 'Neurological' },
+// Each condition is passed to the backend health_conditions[] array.
+// The 6 original conditions have explicit scoring weights in the engine.
+// The 3 new additions pass through as named strings; the engine applies
+// a validated additive burden for prior_heat_illness and uses the string
+// for guidance context for the others.
+const CONDITIONS_META: Array<{
+  id: string;
+  label: string;
+  sublabel: string;
+  Icon: React.FC<{ className?: string }>;
+}> = [
+  // ── Original 6 (engine-scored) ──────────────────────────────
+  { id: 'heart_disease',   label: 'Heart Disease',           sublabel: 'Cardiovascular conditions',     Icon: HeartPulse },
+  { id: 'hypertension',    label: 'Hypertension',            sublabel: 'High blood pressure',            Icon: Activity },
+  { id: 'asthma',          label: 'Asthma / Respiratory',    sublabel: 'Breathing difficulties',         Icon: Stethoscope },
+  { id: 'diabetes',        label: 'Diabetes',                sublabel: 'Blood sugar regulation',         Icon: Zap },
+  { id: 'kidney_disease',  label: 'Kidney Disease',          sublabel: 'Renal / urinary conditions',     Icon: FlaskConical },
+  { id: 'neurological',    label: 'Neurological / Mobility', sublabel: 'Movement-limiting conditions',   Icon: Brain },
+  // ── New additions (heat-sensitivity evidence-backed) ────────
+  { id: 'prior_heat_illness', label: 'Prior Heat Illness',      sublabel: 'Past heat stroke / exhaustion',  Icon: Flame },
+  { id: 'mobility_limitation', label: 'Mobility / Disability',  sublabel: 'Limited ability to move to shade', Icon: PersonStanding },
+  { id: 'heat_sensitive_medication', label: 'Heat-Sensitive Medication', sublabel: 'e.g. diuretics, beta-blockers', Icon: Pill },
 ];
 
 export const PersonalRisk: React.FC = () => {
   const { t } = useTranslation();
   const { user, isAuthenticated, isLoading, loginWithGoogle } = useAuth();
-  const navigate = useNavigate();
   const [isDemoLoggingIn, setIsDemoLoggingIn] = useState<boolean>(false);
   const { coords, locationName } = useLocation();
   const { profile, updateProfile, updateHealthProfile, updateExposureProfile, completionPercentage } = useProfile();
+
+  // Result Card Ref for automatic scrolling and focusing after recalculation (Prompt 15)
+  const resultCardRef = useRef<HTMLDivElement>(null);
+  const [isResultHighlighted, setIsResultHighlighted] = useState<boolean>(false);
 
   // Mode: 'saved_profile' | 'scenario'
   const [mode, setMode] = useState<'saved_profile' | 'scenario'>('saved_profile');
@@ -67,6 +97,8 @@ export const PersonalRisk: React.FC = () => {
   const [isAcclimatized, setIsAcclimatized] = useState<boolean>(
     profile.exposure?.isAcclimatized !== undefined ? profile.exposure.isAcclimatized : true
   );
+  // Free-text informational note — not scored, shown to user as disclaimer
+  const [otherConditionNote, setOtherConditionNote] = useState<string>('');
 
   // Conditions list
   const [selectedConditions, setSelectedConditions] = useState<string[]>(
@@ -194,7 +226,7 @@ export const PersonalRisk: React.FC = () => {
     );
   };
 
-  const handleCalculate = async () => {
+  const handleCalculate = async (isManualClick = false) => {
     if (!isAuthenticated) return;
     setIsCalculating(true);
     setError(null);
@@ -219,6 +251,17 @@ export const PersonalRisk: React.FC = () => {
     try {
       const res = await api.calculatePersonalRisk(payload);
       setResult(res);
+
+      if (isManualClick) {
+        setIsResultHighlighted(true);
+        setTimeout(() => {
+          resultCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          resultCardRef.current?.focus();
+        }, 80);
+        setTimeout(() => {
+          setIsResultHighlighted(false);
+        }, 2800);
+      }
     } catch (err: any) {
       console.error('Calculation error:', err);
       if (err?.response?.status === 401) {
@@ -252,7 +295,7 @@ export const PersonalRisk: React.FC = () => {
       <div className="py-8 max-w-4xl mx-auto space-y-6">
         <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400">
           <HeartPulse className="w-4 h-4" />
-          <span>ThermoShield Biometeorology Lab • Personal Heat Risk</span>
+          <span>ThermoShield Personal Heat Risk • How Weather Affects Your Body</span>
         </div>
 
         <Card
@@ -308,10 +351,10 @@ export const PersonalRisk: React.FC = () => {
             </div>
           </div>
 
-          {/* Instant One-Click Demo Access for Testing */}
+          {/* Instant Sample Citizen Access for Evaluators */}
           <div className="mt-6 pt-4 border-t ts-border/60 max-w-md mx-auto">
             <p className="text-[11px] ts-text-muted mb-2 font-medium">
-              Want to test right now? Use quick demo authentication:
+              Exploring as an evaluator? Try with a sample citizen profile:
             </p>
             <button
               type="button"
@@ -329,7 +372,7 @@ export const PersonalRisk: React.FC = () => {
               className="w-full py-2 px-3 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/30 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5 text-orange-500" />
-              <span>{isDemoLoggingIn ? 'Unlocking...' : '⚡ Quick 1-Click Access as Siddharth Patel (Citizen)'}</span>
+              <span>{isDemoLoggingIn ? 'Loading Sample Profile...' : 'Load Sample Citizen Profile (Siddharth Patel)'}</span>
             </button>
           </div>
 
@@ -578,15 +621,17 @@ export const PersonalRisk: React.FC = () => {
       {/* SECTION 2 — YOUR HEAT RISK TODAY */}
       {result ? (
         <PersonalRiskResultCard
+          ref={resultCardRef}
           result={result}
           mode={mode}
           locationName={locationName}
+          isHighlighted={isResultHighlighted}
         />
       ) : (
         <EmptyState
           icon={<HeartPulse className="w-8 h-8 text-orange-600 dark:text-orange-400" />}
           title={t('empty.awaitingCalculation', 'Awaiting Calculation')}
-          description={t('risk.awaitingCalcDesc', 'Computing personal biometeorological risk...')}
+          description={t('risk.awaitingCalcDesc', "Calculating how today's weather affects your body...")}
         />
       )}
 
@@ -597,6 +642,10 @@ export const PersonalRisk: React.FC = () => {
           isOutdoorWorker={isOutdoorWorker}
           hydrationStatus={hydrationStatus}
           hasHealthConditions={activeConditionsCount > 0}
+          outdoorHours={outdoorExposureHours}
+          physicalActivity={physicalActivity}
+          coolingAccess={profile.preparedness?.hasCoolingAccess ?? false}
+          hasFamilyVulnerable={profile.age ? profile.age >= 65 || profile.age <= 12 : false}
         />
       )}
 
@@ -641,11 +690,11 @@ export const PersonalRisk: React.FC = () => {
           <Button
             variant="primary"
             size="sm"
-            onClick={handleCalculate}
+            onClick={() => handleCalculate(true)}
             isLoading={isCalculating}
             leftIcon={<Sparkles className="w-3.5 h-3.5" />}
           >
-            {t('risk.recalculateBtn', 'Recalculate Risk')}
+            {t('risk.recalculateBtn', 'Recalculate Personal Heat Risk')}
           </Button>
         </div>
 
@@ -653,7 +702,7 @@ export const PersonalRisk: React.FC = () => {
           {/* GROUP 1: PERSONAL FACTORS */}
           <div className="space-y-4">
             <div className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 font-mono flex items-center gap-1.5">
-              <span>👤</span>
+              <User className="w-3.5 h-3.5" />
               <span>1. Personal Factors</span>
             </div>
 
@@ -691,14 +740,15 @@ export const PersonalRisk: React.FC = () => {
                   if (mode === 'saved_profile') setMode('scenario');
                   setIsPregnant(!isPregnant);
                 }}
-                className={`p-2 rounded-xl border text-left text-xs transition-all flex items-center justify-between ${
+                className={`p-2 rounded-xl border text-left text-xs transition-all flex items-center gap-2 ${
                   isPregnant
                     ? 'bg-pink-500/15 border-pink-500/40 text-pink-700 dark:text-pink-300 font-bold'
                     : 'ts-card-subtle border ts-border ts-text-muted'
                 }`}
               >
-                <span>🤰 Pregnant</span>
-                <span>{isPregnant ? '✓' : ''}</span>
+                <Baby className="w-3.5 h-3.5 shrink-0" />
+                <span className="flex-1">Pregnant</span>
+                {isPregnant && <span className="text-pink-500 text-[10px]">✓</span>}
               </button>
 
               <button
@@ -707,44 +757,73 @@ export const PersonalRisk: React.FC = () => {
                   if (mode === 'saved_profile') setMode('scenario');
                   setSmoking(!smoking);
                 }}
-                className={`p-2 rounded-xl border text-left text-xs transition-all flex items-center justify-between ${
+                className={`p-2 rounded-xl border text-left text-xs transition-all flex items-center gap-2 ${
                   smoking
                     ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-300 font-bold'
                     : 'ts-card-subtle border ts-border ts-text-muted'
                 }`}
               >
-                <span>🚬 Smoker</span>
-                <span>{smoking ? '✓' : ''}</span>
+                <Cigarette className="w-3.5 h-3.5 shrink-0" />
+                <span className="flex-1">Smoker</span>
+                {smoking && <span className="text-amber-500 text-[10px]">✓</span>}
               </button>
             </div>
 
             {/* Pre-existing Health Conditions */}
             <div>
-              <span className="text-[11px] font-semibold ts-text-muted block mb-1.5">
-                Health Conditions ({selectedConditions.length} active)
-              </span>
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-semibold ts-text-muted">
+                  Heat-Sensitive Conditions
+                </span>
+                <span className="text-[10px] font-mono text-purple-500 font-bold">
+                  {selectedConditions.length} selected
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-1">
                 {CONDITIONS_META.map((cond) => {
                   const isSelected = selectedConditions.includes(cond.id);
+                  const { Icon } = cond;
                   return (
                     <button
                       key={cond.id}
                       type="button"
                       onClick={() => toggleCondition(cond.id)}
-                      className={`p-1.5 rounded-lg border text-left text-[11px] transition-all flex items-center justify-between truncate ${
+                      className={`p-2 rounded-lg border text-left text-[11px] transition-all flex items-center gap-2 ${
                         isSelected
-                          ? 'bg-purple-500/15 border-purple-500/50 text-purple-700 dark:text-purple-300 font-semibold'
-                          : 'ts-card-subtle border ts-border ts-text-muted'
+                          ? 'bg-purple-500/12 border-purple-500/45 text-purple-700 dark:text-purple-300 font-semibold'
+                          : 'ts-card-subtle border ts-border ts-text-muted hover:border-purple-500/30'
                       }`}
                     >
-                      <span className="truncate flex items-center gap-1">
-                        <span>{cond.icon}</span>
-                        <span className="truncate">{cond.label}</span>
-                      </span>
-                      {isSelected && <span className="text-purple-500 text-[10px]">✓</span>}
+                      <Icon className={`w-3.5 h-3.5 shrink-0 ${
+                        isSelected ? 'text-purple-500' : 'ts-text-subtle'
+                      }`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold truncate">{cond.label}</div>
+                        <div className="text-[9.5px] ts-text-subtle leading-none mt-0.5">{cond.sublabel}</div>
+                      </div>
+                      {isSelected && <span className="text-purple-500 text-[10px] shrink-0">✓</span>}
                     </button>
                   );
                 })}
+              </div>
+
+              {/* Free-text informational note — not scored */}
+              <div className="mt-2">
+                <label className="text-[10.5px] ts-text-subtle font-semibold flex items-center gap-1 mb-1">
+                  <MessageSquare className="w-3 h-3" />
+                  Other heat-sensitive condition (informational only, not scored)
+                </label>
+                <textarea
+                  value={otherConditionNote}
+                  onChange={(e) => setOtherConditionNote(e.target.value)}
+                  placeholder="e.g. lupus, multiple sclerosis…"
+                  rows={2}
+                  className="w-full text-[11px] ts-input ts-text-primary rounded-lg p-1.5 resize-none focus:outline-none border ts-border"
+                />
+                <p className="text-[10px] ts-text-subtle mt-0.5 flex items-start gap-1">
+                  <Info className="w-3 h-3 shrink-0 mt-0.5 text-cyan-500" />
+                  This note is not used in scoring. If you have a heat-sensitive condition not listed above, discuss heat precautions with your doctor.
+                </p>
               </div>
             </div>
           </div>
@@ -752,8 +831,8 @@ export const PersonalRisk: React.FC = () => {
           {/* GROUP 2: ACTIVITY & EXPOSURE */}
           <div className="space-y-4">
             <div className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 font-mono flex items-center gap-1.5">
-              <span>🏃</span>
-              <span>2. Activity & Exposure</span>
+              <Activity className="w-3.5 h-3.5" />
+              <span>2. Activity &amp; Exposure</span>
             </div>
 
             {/* Physical Activity Level */}
@@ -833,8 +912,8 @@ export const PersonalRisk: React.FC = () => {
           {/* GROUP 3: PROTECTION & SENSITIVITY */}
           <div className="space-y-4">
             <div className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-mono flex items-center gap-1.5">
-              <span>🛡️</span>
-              <span>3. Protection & Acclimatization</span>
+              <Shield className="w-3.5 h-3.5" />
+              <span>3. Protection &amp; Heat Readiness</span>
             </div>
 
             {/* Hydration Habit */}
@@ -873,11 +952,14 @@ export const PersonalRisk: React.FC = () => {
               </div>
             </div>
 
-            {/* Acclimatization Toggle */}
+            {/* Heat Adaptation / Acclimatization Toggle */}
             <div>
-              <label className="block text-xs font-medium ts-text-muted mb-1.5">
-                Climate Acclimatization
+              <label className="block text-xs font-medium ts-text-muted mb-1">
+                Used to hot weather?
               </label>
+              <p className="text-[10px] ts-text-subtle mb-1.5 leading-snug">
+                People who've spent time in the heat (≥ 2 weeks) gradually sweat more efficiently and feel less strain. This can reduce estimated heat burden by ~10–15%.
+              </p>
               <button
                 type="button"
                 onClick={() => {
@@ -892,12 +974,12 @@ export const PersonalRisk: React.FC = () => {
               >
                 <div>
                   <span className="font-bold block">
-                    {isAcclimatized ? 'Acclimatized' : 'Unacclimatized'}
+                    {isAcclimatized ? 'Yes — Used to this level of heat' : 'No — New to hot climate / unusual heat'}
                   </span>
                   <span className="text-[10px] ts-text-subtle">
                     {isAcclimatized
-                      ? 'Lived in hot weather > 2 weeks'
-                      : 'Recently arrived or early-season heat'}
+                      ? 'Body has adjusted — sweat rate and circulation adapted'
+                      : 'Recently arrived, start of season, or usually indoors in AC'}
                   </span>
                 </div>
                 <span className="text-xs">{isAcclimatized ? '✓' : '⚠️'}</span>

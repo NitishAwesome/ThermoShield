@@ -14,6 +14,13 @@ import {
   PersonalRiskRequest,
   PersonalRiskResult,
   AreasRiskOverviewResponse,
+  AlertDeliveryStatusResponse,
+  SendTestSMSRequest,
+  SendTestSMSResponse,
+  HeatActionPlanResponse,
+  HeatActionDecisionUpdateRequest,
+  HealthImpactForecastResponse,
+  WardsForecastSummaryResponse,
 } from '../types';
 
 const API_BASE_URL =
@@ -46,6 +53,14 @@ export const api = {
     const res = await apiClient.get<LocationSearchResult>('/location/search', {
       params: { q: query },
       signal,
+    });
+    return res.data;
+  },
+
+  // Reverse Geocoding: coordinates → human-friendly place name
+  reverseGeocode: async (lat: number, lon: number): Promise<{ name: string; latitude: number; longitude: number }> => {
+    const res = await apiClient.get('/location/reverse', {
+      params: { lat, lon },
     });
     return res.data;
   },
@@ -171,6 +186,11 @@ export const api = {
     return res.data;
   },
 
+  updateMe: async (data: Partial<User>): Promise<User> => {
+    const res = await apiClient.patch<User>('/auth/me', data);
+    return res.data;
+  },
+
   // Personal Risk Calculation (Individual Strain Engine)
   calculatePersonalRisk: async (data: PersonalRiskRequest): Promise<PersonalRiskResult> => {
     const res = await apiClient.post<PersonalRiskResult>('/personal-risk/calculate', data);
@@ -245,6 +265,18 @@ export const api = {
     return res.data;
   },
 
+  // Multi-Channel Delivery Gateway Status
+  getAlertDeliveryStatus: async (): Promise<AlertDeliveryStatusResponse> => {
+    const res = await apiClient.get<AlertDeliveryStatusResponse>('/alerts/delivery-status');
+    return res.data;
+  },
+
+  // Dispatch Test SMS Alert (Live Twilio or Honest Demo Simulation)
+  sendTestSMS: async (data: SendTestSMSRequest): Promise<SendTestSMSResponse> => {
+    const res = await apiClient.post<SendTestSMSResponse>('/alerts/send-test-sms', data);
+    return res.data;
+  },
+
   // Heatwave AI Copilot (Dr. ThermoShield)
   chatWithCopilot: async (data: {
     message: string;
@@ -302,6 +334,65 @@ export const api = {
       rag_sources?: string[];
       grounded_authority?: string;
     }>('/copilot/chat', data);
+    return res.data;
+  },
+
+  // Heat Action Plan (HAP) Decision Engine (Prompt 21)
+  getHeatActionPlan: async (
+    areaId: string,
+    tempOverride?: number,
+    riskOverride?: string
+  ): Promise<HeatActionPlanResponse> => {
+    const params = new URLSearchParams();
+    if (tempOverride !== undefined) params.append('temp_override', tempOverride.toString());
+    if (riskOverride) params.append('risk_override', riskOverride);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const res = await apiClient.get<HeatActionPlanResponse>(`/api/action-plan/${encodeURIComponent(areaId)}${qs}`);
+    return res.data;
+  },
+
+  getAllHeatActionPlans: async (): Promise<{ count: number; plans: HeatActionPlanResponse[] }> => {
+    const res = await apiClient.get<{ count: number; plans: HeatActionPlanResponse[] }>('/api/action-plan/all');
+    return res.data;
+  },
+
+  evaluateHeatActionPlan: async (data: any): Promise<HeatActionPlanResponse> => {
+    const res = await apiClient.post<HeatActionPlanResponse>('/api/action-plan/evaluate', data);
+    return res.data;
+  },
+
+  updateActionDecision: async (
+    data: HeatActionDecisionUpdateRequest
+  ): Promise<{ status: string; message: string; decision: any }> => {
+    const res = await apiClient.post<{ status: string; message: string; decision: any }>('/api/action-plan/decision', data);
+    return res.data;
+  },
+
+  getActionDecisions: async (): Promise<{ count: number; decisions: any[] }> => {
+    const res = await apiClient.get<{ count: number; decisions: any[] }>('/api/action-plan/decisions');
+    return res.data;
+  },
+
+  // 3–5 Day Human Health Impact Forecast (Prompt 22)
+  getHealthImpactForecast: async (params: {
+    lat?: number;
+    lon?: number;
+    area_id?: string;
+    area_name?: string;
+    vulnerability_score?: number;
+  }): Promise<HealthImpactForecastResponse> => {
+    const q = new URLSearchParams();
+    if (params.lat !== undefined) q.append('lat', params.lat.toString());
+    if (params.lon !== undefined) q.append('lon', params.lon.toString());
+    if (params.area_id) q.append('area_id', params.area_id);
+    if (params.area_name) q.append('area_name', params.area_name);
+    if (params.vulnerability_score !== undefined) q.append('vulnerability_score', params.vulnerability_score.toString());
+    const res = await apiClient.get<HealthImpactForecastResponse>(`/api/forecast/health-impact?${q.toString()}`);
+    return res.data;
+  },
+
+  getWardsForecastSummary: async (): Promise<WardsForecastSummaryResponse> => {
+    const res = await apiClient.get<WardsForecastSummaryResponse>('/api/forecast/wards-summary');
     return res.data;
   },
 };

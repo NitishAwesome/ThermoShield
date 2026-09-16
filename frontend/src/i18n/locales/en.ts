@@ -1034,7 +1034,7 @@ export const en: TranslationDictionary = {
   'outdoorWindow.hourlyTimeline': '24-Hour Thermal Trajectory',
   'outdoorWindow.saferHours': 'Safer Hours',
   'outdoorWindow.peakHours': 'Peak Heat',
-  'outdoorWindow.ctaForecast': 'View 5-Day Synoptic Outlook',
+  'outdoorWindow.ctaForecast': 'View 5-Day Heat Outlook',
   'outdoorWindow.notifyMe': 'Notify me when safer window begins',
   'outdoorWindow.notificationActive': 'Window Alert Scheduled',
   'outdoorWindow.disclaimer': 'ThermoShield evaluates relative thermal easing compared to surrounding hours. It does not guarantee zero health risk. Always listen to your body and avoid strenuous physical exertion.',

@@ -24,41 +24,53 @@ export const PersonalSafetyChecklist: React.FC<PersonalSafetyChecklistProps> = (
 }) => {
   const { t } = useTranslation();
 
-  // Generate personalized items based on context
+  // Generate personalized items based on context (7-8 items per category)
   const getItems = (): ChecklistItem[] => {
     const items: ChecklistItem[] = [];
 
     if (isOutdoorWorker) {
       items.push(
-        { id: 'w1', text: t('checklist.workerWater', 'Carry insulated bottle with at least 1.5L drinking water'), category: 'Worker' },
-        { id: 'w2', text: t('checklist.workerShade', 'Verify designated shade/cool canopy area before shift start'), category: 'Worker' },
-        { id: 'w3', text: t('checklist.workerPacing', 'Rotate strenuous tasks away from 12:00 PM – 4:00 PM peak sun'), category: 'Worker' },
-        { id: 'w4', text: t('checklist.workerBuddy', 'Agree on buddy check with coworker for dizziness or slurred speech'), category: 'Worker' },
-        { id: 'w5', text: t('checklist.workerHat', 'Wear wide-brim hat or UV neck flap with light cotton shirt'), category: 'Worker' }
+        { id: 'w1', text: t('checklist.workerWater', 'Carry insulated bottle with at least 2L drinking water mixed with ORS or electrolytes'), category: 'Worker' },
+        { id: 'w2', text: t('checklist.workerShade', 'Verify designated shade canopy or cool rest area before starting work shift'), category: 'Worker' },
+        { id: 'w3', text: t('checklist.workerPacing', 'Reschedule heaviest manual tasks away from 11:30 AM – 4:30 PM peak sun'), category: 'Worker' },
+        { id: 'w4', text: t('checklist.workerRestCycles', 'Enforce 15-minute shaded rest break for every 45 minutes of heavy physical labor'), category: 'Worker' },
+        { id: 'w5', text: t('checklist.workerHat', 'Wear wide-brim hat or UV neck flap with loose, light-colored cotton shirt'), category: 'Worker' },
+        { id: 'w6', text: t('checklist.workerBuddy', 'Agree on buddy check with a coworker to spot dizziness, confusion, or speech slurring'), category: 'Worker' },
+        { id: 'w7', text: t('checklist.workerNeckCloth', 'Keep a damp bandana or wet towel on your neck for evaporative skin cooling'), category: 'Worker' },
+        { id: 'w8', text: t('checklist.workerFirstAid', 'Know the location of the nearest ORS first-aid station and emergency medical contact'), category: 'Worker' }
       );
     } else if (age >= 60) {
       items.push(
-        { id: 's1', text: t('checklist.seniorRoom', 'Stay in the coolest room with ceiling fan or cross-ventilation'), category: 'Senior' },
-        { id: 's2', text: t('checklist.seniorSips', 'Drink water or electrolyte fluids every 30 minutes even if not thirsty'), category: 'Senior' },
-        { id: 's3', text: t('checklist.seniorIndoors', 'Avoid stepping outdoors between 11:30 AM and 4:30 PM'), category: 'Senior' },
-        { id: 's4', text: t('checklist.seniorPhone', 'Keep mobile phone and emergency contact list within arm’s reach'), category: 'Senior' },
-        { id: 's5', text: t('checklist.seniorCheckIn', 'Ask a family member or neighbor for a twice-daily wellness check'), category: 'Senior' }
+        { id: 's1', text: t('checklist.seniorRoom', 'Stay in the coolest room with a ceiling fan, cooler, or good cross-ventilation'), category: 'Senior' },
+        { id: 's2', text: t('checklist.seniorSips', 'Drink water or electrolyte fluids every 30–45 minutes even without feeling thirsty'), category: 'Senior' },
+        { id: 's3', text: t('checklist.seniorIndoors', 'Avoid stepping outdoors between 11:30 AM and 4:30 PM unless strictly necessary'), category: 'Senior' },
+        { id: 's4', text: t('checklist.seniorPhone', 'Keep mobile phone, emergency contact list, and medications within arm’s reach'), category: 'Senior' },
+        { id: 's5', text: t('checklist.seniorCheckIn', 'Arrange a twice-daily wellness check-in with a family member or neighbor'), category: 'Senior' },
+        { id: 's6', text: t('checklist.seniorSponge', 'Use a damp sponge or lukewarm foot bath if feeling warm or flushed'), category: 'Senior' },
+        { id: 's7', text: t('checklist.seniorMedsReview', 'Check with your doctor or pharmacist about how heat affects your blood pressure pills'), category: 'Senior' },
+        { id: 's8', text: t('checklist.seniorWarningSigns', 'Watch for warning signs: sudden confusion, dry mouth, dizziness, or nausea'), category: 'Senior' }
       );
     } else if (hasHealthConditions) {
       items.push(
-        { id: 'h1', text: t('checklist.healthMeds', 'Review heat sensitivity of current medications (BP/diuretics)'), category: 'Health' },
-        { id: 'h2', text: t('checklist.healthVitals', 'Track blood pressure and heart rate if feeling lightheaded'), category: 'Health' },
-        { id: 'h3', text: t('checklist.healthFluids', 'Maintain steady fluid intake without excessive caffeine or sugar'), category: 'Health' },
-        { id: 'h4', text: t('checklist.healthPacing', 'Cease all physical exertion immediately upon onset of headache'), category: 'Health' },
-        { id: 'h5', text: t('checklist.healthCooling', 'Keep damp towels or ice packs accessible in the refrigerator'), category: 'Health' }
+        { id: 'h1', text: t('checklist.healthMeds', 'Review heat sensitivity of current medications (diuretics, BP, or heart medications)'), category: 'Health' },
+        { id: 'h2', text: t('checklist.healthStorage', 'Store all insulin, inhalers, and essential medicines in a cool area below 30°C'), category: 'Health' },
+        { id: 'h3', text: t('checklist.healthVitals', 'Track blood pressure and heart rate if feeling unusually fatigued or lightheaded'), category: 'Health' },
+        { id: 'h4', text: t('checklist.healthFluids', 'Maintain steady fluid intake (water, coconut water, buttermilk); limit heavy caffeine'), category: 'Health' },
+        { id: 'h5', text: t('checklist.healthPacing', 'Stop physical activities immediately upon noticing headache, nausea, or rapid pulse'), category: 'Health' },
+        { id: 'h6', text: t('checklist.healthCooling', 'Keep damp towels or cold compresses accessible in the refrigerator for active relief'), category: 'Health' },
+        { id: 'h7', text: t('checklist.healthThermalShock', 'Avoid sudden transitions between freezing air-conditioned rooms and scorching outdoor heat'), category: 'Health' },
+        { id: 'h8', text: t('checklist.healthEmergency', 'Have emergency ambulance contact (108) ready if chest tightness or fainting occurs'), category: 'Health' }
       );
     } else {
       items.push(
-        { id: 'g1', text: t('checklist.genWater', 'Keep a filled reusable water bottle within sight all day'), category: 'General' },
-        { id: 'g2', text: t('checklist.genDirectSun', 'Limit direct sunlight exposure during midday peak hours'), category: 'General' },
-        { id: 'g3', text: t('checklist.genClothing', 'Wear light-colored, loose, breathable cotton or linen clothing'), category: 'General' },
-        { id: 'g4', text: t('checklist.genShadeBreaks', 'Take 10-minute rest breaks in shade when walking outdoors'), category: 'General' },
-        { id: 'g5', text: t('checklist.genFamily', 'Check in on elderly relatives or pets during afternoon heat peak'), category: 'General' }
+        { id: 'g1', text: t('checklist.genWater', 'Keep a filled reusable water bottle within sight all day and sip ~250 mL every hour'), category: 'General' },
+        { id: 'g2', text: t('checklist.genDirectSun', 'Avoid unshaded outdoor areas and direct solar radiation between 12:00 PM and 4:00 PM'), category: 'General' },
+        { id: 'g3', text: t('checklist.genClothing', 'Wear light-colored, loose, breathable cotton or linen clothing that allows sweat evaporation'), category: 'General' },
+        { id: 'g4', text: t('checklist.genUmbrella', 'Carry an umbrella, wide-brim hat, and sunglasses whenever walking outdoors'), category: 'General' },
+        { id: 'g5', text: t('checklist.genShadeBreaks', 'Take 5–10 minute rest breaks in shaded spots or bus shelters when commuting on foot'), category: 'General' },
+        { id: 'g6', text: t('checklist.genFamily', 'Check in on elderly relatives, infants, and pets during the peak afternoon heat hours'), category: 'General' },
+        { id: 'g7', text: t('checklist.genHomeCooling', 'Draw curtains on sun-facing windows to block radiant heat and maintain indoor coolness'), category: 'General' },
+        { id: 'g8', text: t('checklist.genStrokeSigns', 'Recognize heat stroke signs (confusion, stopped sweating, vomiting) and call 108 immediately'), category: 'General' }
       );
     }
 

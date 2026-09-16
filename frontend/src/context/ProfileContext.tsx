@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import {
   UserProfile,
+  User,
   UserHealthProfile,
   UserExposureProfile,
   UserEmergencyPreparedness,
@@ -13,6 +14,7 @@ import {
   VulnerableCategory,
 } from '../types';
 import { useAuth } from './AuthContext';
+import { api } from '../services/api';
 import { db } from '../firebase/config';
 import { doc, setDoc } from 'firebase/firestore';
 import { getDefaultNotificationPreferences, applyModeToPreferences } from '../utils/notifications';
@@ -203,7 +205,7 @@ const getInitialProfile = (user: any): UserProfile => {
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 
 export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, token, updateUser } = useAuth();
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
@@ -283,8 +285,27 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updatedAt: new Date().toISOString(),
       };
       await persistProfile(updated);
+
+      // Immediately propagate identity changes to AuthContext and backend
+      if (changes.fullName !== undefined || changes.phoneNumber !== undefined) {
+        const authUpdates: Partial<User> = {};
+        if (changes.fullName && changes.fullName.trim()) {
+          authUpdates.name = changes.fullName.trim();
+        }
+        if (changes.phoneNumber && changes.phoneNumber.trim()) {
+          authUpdates.phone_number = changes.phoneNumber.trim();
+        }
+        if (Object.keys(authUpdates).length > 0) {
+          updateUser(authUpdates);
+          if (token && token !== 'mock-demo-token') {
+            api.updateMe(authUpdates).catch((err) => {
+              console.debug('Backend user profile update skipped or failed:', err?.message || err);
+            });
+          }
+        }
+      }
     },
-    [profile, persistProfile]
+    [profile, persistProfile, updateUser, token]
   );
 
   const updateHealthProfile = useCallback(

@@ -1,19 +1,90 @@
 import { RiskLevel } from '../types';
 
-export const getRiskColor = (level: RiskLevel | string | undefined): string => {
-  switch (level?.toUpperCase()) {
+export interface RiskStyle {
+  level: RiskLevel;
+  fill: string;
+  stroke: string;
+  fillOpacity: number;
+  selectedFillOpacity: number;
+  strokeWidth: number;
+  selectedStrokeWidth: number;
+  badge: string;
+  badgeBg: string;
+  text: string;
+  textLabel: string;
+  emoji: string;
+}
+
+export const getRiskStyle = (level: RiskLevel | string | undefined): RiskStyle => {
+  const norm = level?.toUpperCase() || 'LOW';
+  switch (norm) {
     case 'LOW':
-      return '#10B981'; // Emerald 500
+      return {
+        level: 'LOW',
+        fill: '#059669', // High-contrast Emerald/Teal
+        stroke: '#047857',
+        fillOpacity: 0.38,
+        selectedFillOpacity: 0.70,
+        strokeWidth: 1.8,
+        selectedStrokeWidth: 3.2,
+        badge: 'bg-emerald-600 text-white font-bold',
+        badgeBg: 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-700 dark:text-emerald-400',
+        text: 'text-emerald-700 dark:text-emerald-400',
+        textLabel: 'LOW',
+        emoji: '🟢',
+      };
     case 'MODERATE':
-      return '#F59E0B'; // Amber 500
+      return {
+        level: 'MODERATE',
+        fill: '#D97706', // Rich Golden Amber / Warm Ochre (never washed-out pale yellow)
+        stroke: '#78350F', // Dark contrast boundary for clear map legibility
+        fillOpacity: 0.42,
+        selectedFillOpacity: 0.72,
+        strokeWidth: 2.0,
+        selectedStrokeWidth: 3.5,
+        badge: 'bg-amber-600 text-white font-bold',
+        badgeBg: 'bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-400',
+        text: 'text-amber-700 dark:text-amber-400',
+        textLabel: 'MODERATE',
+        emoji: '🟡',
+      };
     case 'HIGH':
-      return '#F97316'; // Orange 500
+      return {
+        level: 'HIGH',
+        fill: '#EA580C', // Vibrant Deep Orange
+        stroke: '#7C2D12',
+        fillOpacity: 0.50,
+        selectedFillOpacity: 0.78,
+        strokeWidth: 2.2,
+        selectedStrokeWidth: 3.8,
+        badge: 'bg-orange-600 text-white font-bold',
+        badgeBg: 'bg-orange-500/15 border border-orange-500/40 text-orange-700 dark:text-orange-400',
+        text: 'text-orange-700 dark:text-orange-400',
+        textLabel: 'HIGH',
+        emoji: '🟠',
+      };
     case 'EXTREME':
     case 'CRITICAL':
-      return '#EF4444'; // Red 500
     default:
-      return '#6B7280'; // Gray 500
+      return {
+        level: 'EXTREME',
+        fill: '#DC2626', // Crimson Red
+        stroke: '#450A0A',
+        fillOpacity: 0.58,
+        selectedFillOpacity: 0.85,
+        strokeWidth: 2.5,
+        selectedStrokeWidth: 4.0,
+        badge: 'bg-red-600 text-white font-bold animate-pulse',
+        badgeBg: 'bg-red-500/15 border border-red-500/40 text-red-700 dark:text-red-400',
+        text: 'text-red-700 dark:text-red-400',
+        textLabel: 'EXTREME',
+        emoji: '🔴',
+      };
   }
+};
+
+export const getRiskColor = (level: RiskLevel | string | undefined): string => {
+  return getRiskStyle(level).fill;
 };
 
 export const getRiskBgColor = (level: RiskLevel | string | undefined): string => {

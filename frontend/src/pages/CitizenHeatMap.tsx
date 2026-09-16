@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   MapPin,
@@ -9,16 +9,16 @@ import {
   ShieldAlert,
   Info,
   ArrowRight,
-  RefreshCw,
   Home,
   CheckCircle2,
   AlertTriangle,
   HeartPulse,
   Compass,
+  MousePointerClick,
 } from 'lucide-react';
 import { RiskMap } from '../components/RiskMap';
 import { LocationSearch } from '../components/LocationSearch';
-import { Card, CardHeader, CardContent, Badge, Button } from '../components/ui';
+import { Badge, Button } from '../components/ui';
 import { DataRealityBadge } from '../components/provenance';
 import { useLocation } from '../context/LocationContext';
 import { useProfile } from '../context/ProfileContext';
@@ -34,7 +34,6 @@ const REGIONAL_PRESETS = [
   { name: 'Ahmedabad (Dry Heat)', lat: 23.0225, lon: 72.5714 },
   { name: 'Kolkata (Humid Delta)', lat: 22.5726, lon: 88.3639 },
   { name: 'Chennai (Coastal Heat)', lat: 13.0827, lon: 80.2707 },
-  { name: 'Jaipur (Desert Border)', lat: 26.9124, lon: 75.7873 },
 ];
 
 export const CitizenHeatMap: React.FC = () => {
@@ -45,6 +44,7 @@ export const CitizenHeatMap: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedZone, setSelectedZone] = useState<ThermalZone | null>(null);
+  const [isReverseGeocoding, setIsReverseGeocoding] = useState<boolean>(false);
 
   // Check if active session location differs from permanent profile home
   const isDifferentFromHome = Boolean(
@@ -82,6 +82,30 @@ export const CitizenHeatMap: React.FC = () => {
     }
   };
 
+  // ---------------------------------------------------------------
+  // Tap-to-place: citizen clicks map → reverse geocode → setLocation
+  // ---------------------------------------------------------------
+  const handleMapClick = useCallback(async (lat: number, lon: number) => {
+    setIsReverseGeocoding(true);
+    try {
+      const result = await api.reverseGeocode(lat, lon);
+      setLocation({
+        name: result.name,
+        latitude: lat,
+        longitude: lon,
+      });
+    } catch {
+      // Fallback: use raw coordinates as the name
+      setLocation({
+        name: `${lat.toFixed(3)}°N, ${lon.toFixed(3)}°E`,
+        latitude: lat,
+        longitude: lon,
+      });
+    } finally {
+      setIsReverseGeocoding(false);
+    }
+  }, [setLocation]);
+
   // Weather and thermal readings with safe fallbacks
   const tempC = thermalData?.weather?.temperature ?? 33.5;
   const humidity = thermalData?.weather?.humidity ?? 65;
@@ -101,14 +125,16 @@ export const CitizenHeatMap: React.FC = () => {
         action: 'Stay indoors in cool or shaded environments. Avoid outdoor exercise and manual exertion.',
         color: 'text-rose-500',
         bg: 'bg-rose-500/10 border-rose-500/30',
+        icon: <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5 text-rose-500" />,
       };
     }
     if (wbgt >= 30) {
       return {
         headline: 'High Physiological Heat Burden',
-        action: 'Drink water with electrolytes frequently. Rest in shade every 20-30 minutes if working outside.',
+        action: 'Drink water with electrolytes frequently. Rest in shade every 20–30 minutes if working outside.',
         color: 'text-orange-500',
         bg: 'bg-orange-500/10 border-orange-500/30',
+        icon: <ShieldAlert className="w-5 h-5 flex-shrink-0 mt-0.5 text-orange-500" />,
       };
     }
     if (wbgt >= 28) {
@@ -117,6 +143,7 @@ export const CitizenHeatMap: React.FC = () => {
         action: 'Moderate heat stress outdoors. Ensure adequate hydration and check on children and elderly relatives.',
         color: 'text-amber-500',
         bg: 'bg-amber-500/10 border-amber-500/30',
+        icon: <ShieldAlert className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-500" />,
       };
     }
     return {
@@ -124,6 +151,7 @@ export const CitizenHeatMap: React.FC = () => {
       action: 'Conditions are within normal physiological tolerance. Standard hydration is sufficient.',
       color: 'text-emerald-500',
       bg: 'bg-emerald-500/10 border-emerald-500/30',
+      icon: <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5 text-emerald-500" />,
     };
   };
 
@@ -154,14 +182,19 @@ export const CitizenHeatMap: React.FC = () => {
                 <MapPin className="w-4 h-4" />
                 <span>Citizen Heat Safety Portal</span>
               </span>
-              <DataRealityBadge tier="CALCULATED" size="xs" customLabel="Biometeorological Model" />
+              <DataRealityBadge tier="CALCULATED" size="xs" customLabel="Heat Stress Model" />
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-black ts-text-primary tracking-tight font-sans mt-2">
               Local Heat Map
             </h1>
             <p className="text-xs sm:text-sm ts-text-muted mt-1 max-w-2xl leading-relaxed">
-              See estimated thermal stress and heat conditions around your monitored location.
+              Estimated thermal stress and heat conditions around your monitored location.
+              {' '}
+              <span className="inline-flex items-center gap-1 text-orange-400 font-semibold">
+                <MousePointerClick className="w-3.5 h-3.5" />
+                Tap the map to explore any area.
+              </span>
             </p>
           </div>
 
@@ -227,6 +260,14 @@ export const CitizenHeatMap: React.FC = () => {
             <Home className="w-3.5 h-3.5" />
             <span>Return to Home ({profile.city})</span>
           </button>
+        </div>
+      )}
+
+      {/* Reverse geocoding spinner notice */}
+      {isReverseGeocoding && (
+        <div className="p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs flex items-center gap-2">
+          <span className="animate-spin w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full" />
+          <span>Identifying tapped location…</span>
         </div>
       )}
 
@@ -297,7 +338,7 @@ export const CitizenHeatMap: React.FC = () => {
 
       {/* Human Advice Banner */}
       <div className={`p-4 rounded-2xl border ${advice.bg} flex items-start space-x-3`}>
-        <ShieldAlert className={`w-5 h-5 flex-shrink-0 mt-0.5 ${advice.color}`} />
+        {advice.icon}
         <div className="text-xs">
           <h3 className={`font-bold text-sm ${advice.color}`}>{advice.headline}</h3>
           <p className="ts-text-primary mt-0.5 leading-relaxed">{advice.action}</p>
@@ -319,11 +360,12 @@ export const CitizenHeatMap: React.FC = () => {
         thermalZones={MUMBAI_PROTOTYPE_ZONES}
         selectedZoneId={selectedZone?.id}
         onSelectZone={(zone) => setSelectedZone(zone)}
+        onMapClick={handleMapClick}
         isLoadingMap={isLoading}
         mapError={error}
         isCitizenView={true}
         title="Local Heat Stress Map"
-        subtitle={`Displaying conditions around ${locationName}`}
+        subtitle={`Displaying conditions around ${locationName} — tap the map to explore`}
       />
 
       {/* Selected Prototype Zone Details (if user selects a zone on map) */}
@@ -371,18 +413,18 @@ export const CitizenHeatMap: React.FC = () => {
 
           <div className="space-y-3 text-xs ts-text-muted leading-relaxed">
             <div className="p-3 rounded-xl ts-card-subtle border ts-border">
-              <strong className="ts-text-primary block mb-0.5">Monitoring Reference Point:</strong>
-              Data reflects your regional numerical weather station feed (Open-Meteo & IMD baselines), not a private IoT sensor on your street corner.
+              <strong className="ts-text-primary block mb-0.5">Tap-to-Explore:</strong>
+              Click or tap anywhere on the map to move your monitoring point. The location is resolved via reverse geocoding and thermal data is refreshed automatically.
             </div>
 
             <div className="p-3 rounded-xl ts-card-subtle border ts-border">
               <strong className="ts-text-primary block mb-0.5">Live vs Calculated Metrics:</strong>
-              Air temperature, humidity, and wind are atmospheric readings. WBGT and Heat Index are biometeorologically modeled using Liljegren equations.
+              Air temperature, humidity, and wind are atmospheric readings. WBGT and Heat Index are calculated using the Liljegren equations from weather and humidity models.
             </div>
 
             <div className="p-3 rounded-xl ts-card-subtle border ts-border">
               <strong className="ts-text-primary block mb-0.5">Prototype Urban Zones:</strong>
-              The demonstration polygons in Greater Mumbai illustrate how building density, corrugated roofing, and sea breezes alter localized thermal stress.
+              The demonstration polygons in Greater Mumbai illustrate how building density, corrugated roofing, and sea breezes alter localized thermal stress — not live sensor data.
             </div>
           </div>
         </div>
@@ -398,29 +440,37 @@ export const CitizenHeatMap: React.FC = () => {
 
           <div className="space-y-2.5 text-xs">
             <div className="flex items-start space-x-2 p-2.5 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
-              <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0 text-[11px]">
-                1
-              </span>
+              <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0 text-[11px]">1</span>
               <p className="ts-text-muted">
-                <strong className="ts-text-primary">Drink Water Regularly:</strong> Ingest 250ml of water or ORS every 20-30 minutes during midday, even if not thirsty.
+                <strong className="ts-text-primary">Hydrate Hourly:</strong> Ingest ~250–500 mL water or ORS every 20–30 minutes during midday, even before feeling thirsty.
               </p>
             </div>
 
             <div className="flex items-start space-x-2 p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/20">
-              <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold flex items-center justify-center shrink-0 text-[11px]">
-                2
-              </span>
+              <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold flex items-center justify-center shrink-0 text-[11px]">2</span>
               <p className="ts-text-muted">
-                <strong className="ts-text-primary">Limit Peak Sun (12 PM – 4 PM):</strong> Reschedule heavy outdoor tasks or strenuous exercise away from the solar apex.
+                <strong className="ts-text-primary">Limit Midday Sun (12 PM – 4 PM):</strong> Reschedule heavy outdoor tasks or strenuous workouts away from the solar apex.
+              </p>
+            </div>
+
+            <div className="flex items-start space-x-2 p-2.5 rounded-xl bg-purple-500/5 border border-purple-500/20">
+              <span className="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 font-bold flex items-center justify-center shrink-0 text-[11px]">3</span>
+              <p className="ts-text-muted">
+                <strong className="ts-text-primary">Light & Loose Attire:</strong> Wear light-colored, breathable cotton and carry an umbrella or wide-brim hat.
+              </p>
+            </div>
+
+            <div className="flex items-start space-x-2 p-2.5 rounded-xl bg-blue-500/5 border border-blue-500/20">
+              <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 font-bold flex items-center justify-center shrink-0 text-[11px]">4</span>
+              <p className="ts-text-muted">
+                <strong className="ts-text-primary">Protect Vulnerable Family:</strong> Check on elderly relatives, pregnant women, and infants who cannot regulate body heat as rapidly.
               </p>
             </div>
 
             <div className="flex items-start space-x-2 p-2.5 rounded-xl bg-rose-500/5 border border-rose-500/20">
-              <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-400 font-bold flex items-center justify-center shrink-0 text-[11px]">
-                3
-              </span>
+              <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-400 font-bold flex items-center justify-center shrink-0 text-[11px]">5</span>
               <p className="ts-text-muted">
-                <strong className="ts-text-primary">Protect Vulnerable Family:</strong> Check on elderly family members, pregnant women, and young infants who cannot regulate body heat as rapidly.
+                <strong className="ts-text-primary">Emergency Escalation (Call 108):</strong> If anyone exhibits confusion, stopped sweating, or fainting, move to shade and call 108 immediately.
               </p>
             </div>
 

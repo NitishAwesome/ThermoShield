@@ -1,13 +1,25 @@
-import React, { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, Polygon, useMap, useMapEvents } from 'react-leaflet';
-import { Navigation, AlertCircle, Loader2, Info, Layers, ShieldAlert } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Circle,
+  Polygon,
+  GeoJSON,
+  useMap,
+  useMapEvents,
+} from 'react-leaflet';
+import { AlertCircle, Info, FlaskConical } from 'lucide-react';
 import L from 'leaflet';
-import { RiskLevel, MapLocationRisk, ThermalZone } from '../types';
-import { getRiskColor } from '../utils/risk';
+import { RiskLevel, MapLocationRisk, ThermalZone, HeatRiskArea } from '../types';
+import { getRiskColor, getRiskStyle } from '../utils/risk';
 import { Card, CardHeader, CardContent, Badge } from './ui';
 import { useTranslation } from '../context/LanguageContext';
 
+// ─────────────────────────────────────────────
 // Fix leaflet default marker icon in React
+// ─────────────────────────────────────────────
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
@@ -26,6 +38,9 @@ interface RiskMapProps {
   riskScore?: number;
   mapLocations?: MapLocationRisk[];
   thermalZones?: ThermalZone[];
+  adminWards?: HeatRiskArea[];
+  selectedWardId?: string;
+  onSelectWard?: (ward: HeatRiskArea) => void;
   selectedZoneId?: string;
   onSelectZone?: (zone: ThermalZone) => void;
   isLoadingMap?: boolean;
@@ -37,7 +52,9 @@ interface RiskMapProps {
   isCitizenView?: boolean;
 }
 
-// Helper to recenter map when center prop changes
+// ─────────────────────────────────────────────
+// MapRecenter: smoothly fly to new center
+// ─────────────────────────────────────────────
 const MapRecenter: React.FC<{ center: [number, number] }> = ({ center }) => {
   const map = useMap();
   useEffect(() => {
@@ -46,8 +63,12 @@ const MapRecenter: React.FC<{ center: [number, number] }> = ({ center }) => {
   return null;
 };
 
-// Map click listener component
-const MapClickHandler: React.FC<{ onMapClick?: (lat: number, lon: number) => void }> = ({ onMapClick }) => {
+// ─────────────────────────────────────────────
+// MapClickHandler: captures map taps
+// ─────────────────────────────────────────────
+const MapClickHandler: React.FC<{
+  onMapClick?: (lat: number, lon: number) => void;
+}> = ({ onMapClick }) => {
   useMapEvents({
     click(e) {
       if (onMapClick) {
@@ -56,6 +77,121 @@ const MapClickHandler: React.FC<{ onMapClick?: (lat: number, lon: number) => voi
     },
   });
   return null;
+};
+
+// ─────────────────────────────────────────────
+// ZoomWatcher: reports current zoom level up
+// ─────────────────────────────────────────────
+const ZoomWatcher: React.FC<{ onChange: (z: number) => void }> = ({ onChange }) => {
+  const map = useMap();
+  useEffect(() => {
+    onChange(map.getZoom());
+    const handler = () => onChange(map.getZoom());
+    map.on('zoomend', handler);
+    return () => { map.off('zoomend', handler); };
+  }, [map, onChange]);
+  return null;
+};
+
+// ─────────────────────────────────────────────
+// ZOOM THRESHOLD: below this → dot markers, above → badge markers
+// ─────────────────────────────────────────────
+const BADGE_ZOOM_THRESHOLD = 10;
+
+// ─────────────────────────────────────────────
+// Centroid Badge Marker — full-detail label chip
+// ─────────────────────────────────────────────
+const createCentroidBadgeIcon = (label: string, level: RiskLevel, isSelected: boolean) => {
+  const style = getRiskStyle(level);
+  return L.divIcon({
+    className: 'custom-ward-centroid-badge',
+    html: `
+      <div style="
+        background: rgba(15, 23, 42, 0.93);
+        color: #fff;
+        border: 2px solid ${isSelected ? '#ea580c' : style.fill};
+        border-radius: 7px;
+        padding: 2px 7px;
+        font-size: 10.5px;
+        font-weight: 700;
+        white-space: nowrap;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.55);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        transform: translate(-50%, -50%);
+        pointer-events: auto;
+        cursor: pointer;
+      ">
+        <span style="letter-spacing: -0.2px;">${label}</span>
+        <span style="color: ${style.fill}; font-weight: 800; font-size: 9.5px; letter-spacing: 0.3px;">
+          ${style.emoji} ${level}
+        </span>
+      </div>
+    `,
+    iconSize: [0, 0],
+  });
+};
+
+// ─────────────────────────────────────────────
+// Compact Dot Marker — for low-zoom declutter
+// ─────────────────────────────────────────────
+const createCentroidDotIcon = (level: RiskLevel, isSelected: boolean) => {
+  const style = getRiskStyle(level);
+  const color = isSelected ? '#ea580c' : style.fill;
+  return L.divIcon({
+    className: 'custom-dot-marker',
+    html: `
+      <div style="
+        width: 11px;
+        height: 11px;
+        background: ${color};
+        border: 2px solid rgba(255,255,255,0.75);
+        border-radius: 50%;
+        box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        transform: translate(-50%, -50%);
+      "></div>
+    `,
+    iconSize: [0, 0],
+  });
+};
+
+// ─────────────────────────────────────────────
+// Custom selected-location pin (orange teardrop)
+// ─────────────────────────────────────────────
+const createSelectedPinIcon = (riskLevel: RiskLevel) => {
+  const riskColor = getRiskColor(riskLevel);
+  return L.divIcon({
+    className: 'custom-selected-pin',
+    html: `
+      <div style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        transform: translate(-50%, -100%);
+        cursor: pointer;
+        filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5));
+      ">
+        <div style="
+          width: 26px;
+          height: 26px;
+          background: ${riskColor};
+          border: 3px solid #fff;
+          border-radius: 50% 50% 50% 0;
+          transform: rotate(-45deg);
+          box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+        "></div>
+        <div style="
+          width: 4px;
+          height: 6px;
+          background: ${riskColor};
+          border-radius: 0 0 2px 2px;
+          margin-top: -2px;
+        "></div>
+      </div>
+    `,
+    iconSize: [0, 0],
+  });
 };
 
 export const RiskMap: React.FC<RiskMapProps> = ({
@@ -69,6 +205,9 @@ export const RiskMap: React.FC<RiskMapProps> = ({
   riskScore,
   mapLocations = [],
   thermalZones = [],
+  adminWards = [],
+  selectedWardId,
+  onSelectWard,
   selectedZoneId,
   onSelectZone,
   isLoadingMap = false,
@@ -81,19 +220,25 @@ export const RiskMap: React.FC<RiskMapProps> = ({
 }) => {
   const { t } = useTranslation();
   const currentRiskColor = getRiskColor(riskLevel);
+  const [currentZoom, setCurrentZoom] = useState(zoom);
+  const showBadges = currentZoom >= BADGE_ZOOM_THRESHOLD;
 
-  const getZoneColor = (zone: ThermalZone) => {
-    if (zone.vulnerabilityIndex >= 0.8) return '#EF4444'; // Extreme
-    if (zone.vulnerabilityIndex >= 0.65 || zone.baselineTempOffsetC >= 1.0) return '#F97316'; // High
-    if (zone.vulnerabilityIndex >= 0.5) return '#F59E0B'; // Moderate
-    return '#10B981'; // Low
-  };
+  const getZoneLevel = (zone: ThermalZone): RiskLevel =>
+    zone.vulnerabilityIndex >= 0.8
+      ? 'EXTREME'
+      : zone.vulnerabilityIndex >= 0.65 || zone.baselineTempOffsetC >= 1.0
+      ? 'HIGH'
+      : zone.vulnerabilityIndex >= 0.5
+      ? 'MODERATE'
+      : 'LOW';
 
   return (
     <Card className={`overflow-hidden ${className}`}>
       <CardHeader
         title={title || (isCitizenView ? 'Local Heat Map' : 'Local Area Heat Risk')}
-        subtitle={subtitle || (isCitizenView ? 'Estimated thermal conditions and risk around your monitored area' : 'Thermal risk evaluated around curated urban monitoring reference locations')}
+        subtitle={subtitle || (isCitizenView
+          ? 'Estimated thermal conditions and risk around your monitored area'
+          : 'Thermal risk evaluated around curated urban monitoring reference locations')}
         badge={
           <Badge variant={isCitizenView ? 'default' : 'brand'} size="sm">
             {isCitizenView ? 'Community Heat View' : 'Spatial Risk Intelligence'}
@@ -121,7 +266,18 @@ export const RiskMap: React.FC<RiskMapProps> = ({
         }
       />
       <CardContent className="space-y-3">
-        {/* Map Error Banner if /map/risk fails */}
+        {/* Prototype zones data notice (citizen view only) */}
+        {isCitizenView && thermalZones.length > 0 && adminWards.length === 0 && (
+          <div className="p-2.5 rounded-xl bg-amber-500/8 border border-amber-500/25 text-amber-300 text-[11px] flex items-start gap-2">
+            <FlaskConical className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-400" />
+            <span>
+              <strong className="font-bold">Prototype demonstration zones</strong> — polygons show modelled thermal patterns for Greater Mumbai.
+              {' '}They are <em>not</em> live sensor readings. Tap the map to analyse any real coordinate.
+            </span>
+          </div>
+        )}
+
+        {/* Map Error Banner */}
         {mapError && (
           <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center space-x-2">
             <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
@@ -130,7 +286,16 @@ export const RiskMap: React.FC<RiskMapProps> = ({
         )}
 
         {/* Map Canvas */}
-        <div className="relative h-[340px] sm:h-[430px] w-full rounded-xl overflow-hidden border ts-border shadow-inner">
+        <div
+          className="relative w-full rounded-xl overflow-hidden border ts-border shadow-inner"
+          style={{ height: isCitizenView ? '400px' : '430px' }}
+        >
+          {onMapClick && (
+            <div className="absolute top-2 left-2 z-[500] px-2 py-1 rounded-full bg-slate-900/80 border border-orange-500/30 text-[10.5px] text-orange-300 font-semibold flex items-center gap-1.5 pointer-events-none">
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
+              Tap map to move pin
+            </div>
+          )}
           <MapContainer
             center={center}
             zoom={zoom}
@@ -139,6 +304,7 @@ export const RiskMap: React.FC<RiskMapProps> = ({
           >
             <MapRecenter center={center} />
             <MapClickHandler onMapClick={onMapClick} />
+            <ZoomWatcher onChange={setCurrentZoom} />
 
             {/* Tile layer */}
             <TileLayer
@@ -146,37 +312,108 @@ export const RiskMap: React.FC<RiskMapProps> = ({
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
 
-            {/* Prototype Urban Thermal Zones (Greater Mumbai Demonstration) */}
-            {thermalZones.map((zone) => {
-              const zColor = getZoneColor(zone);
+            {/* ── Official BMC Administrative Wards Layer ── */}
+            {adminWards && adminWards.length > 0 && adminWards.map((ward) => {
+              const rStyle = getRiskStyle(ward.risk.level);
+              const isSelected = selectedWardId === ward.id;
+              return (
+                <React.Fragment key={ward.id}>
+                  {ward.geometry && (
+                    <GeoJSON
+                      key={`geom_${ward.id}_${ward.risk.level}_${isSelected ? 'sel' : 'norm'}`}
+                      data={{
+                        type: 'Feature',
+                        properties: { id: ward.id, name: ward.name, code: ward.wardCode },
+                        geometry: ward.geometry,
+                      } as any}
+                      style={() => ({
+                        color: isSelected ? '#ea580c' : rStyle.stroke,
+                        fillColor: rStyle.fill,
+                        fillOpacity: isSelected ? rStyle.selectedFillOpacity : rStyle.fillOpacity,
+                        weight: isSelected ? rStyle.selectedStrokeWidth : rStyle.strokeWidth,
+                      })}
+                      eventHandlers={{ click: () => onSelectWard?.(ward) }}
+                    />
+                  )}
+
+                  {/* Centroid badge / dot based on zoom */}
+                  <Marker
+                    position={[ward.centroid.latitude, ward.centroid.longitude]}
+                    icon={showBadges
+                      ? createCentroidBadgeIcon(ward.wardCode || ward.name, ward.risk.level, isSelected)
+                      : createCentroidDotIcon(ward.risk.level, isSelected)}
+                    eventHandlers={{ click: () => onSelectWard?.(ward) }}
+                  >
+                    <Popup className="custom-popup">
+                      <div className="p-1 min-w-[240px] space-y-2 text-xs">
+                        <div className="flex items-center justify-between border-b ts-border pb-1.5">
+                          <div>
+                            <div className="font-bold ts-text-primary text-sm">{ward.name}</div>
+                            <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider">
+                              Official Administrative Ward (MCGM Open Data)
+                            </div>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded text-[10.5px] font-extrabold ${rStyle.badge}`}>
+                            {rStyle.emoji} {ward.risk.level}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5 text-xs ts-text-muted">
+                          <div><strong>Temp:</strong> {ward.weather.temperatureC.toFixed(1)}°C</div>
+                          <div><strong>Humidity:</strong> {ward.weather.humidityPercent}%</div>
+                          <div><strong>Wind:</strong> {ward.weather.windSpeedMps.toFixed(1)} m/s</div>
+                          <div><strong>Est. WBGT:</strong> {ward.thermal.estimatedWbgtC.toFixed(1)}°C</div>
+                          <div><strong>Heat Index:</strong> {ward.thermal.heatIndexC.toFixed(1)}°C</div>
+                          <div><strong>UHI Offset:</strong> +{ward.microclimateOffsetC ?? 0}°C</div>
+                        </div>
+                        {ward.attentionReason && (
+                          <div className="p-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-[11px] text-orange-800 dark:text-orange-200">
+                            <strong>Why this area needs attention: </strong>
+                            {ward.attentionReason}
+                          </div>
+                        )}
+                        {onSelectWard && (
+                          <button
+                            type="button"
+                            onClick={() => onSelectWard(ward)}
+                            className="w-full mt-1 px-2.5 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold cursor-pointer transition-colors"
+                          >
+                            Inspect Ward Telemetry →
+                          </button>
+                        )}
+                      </div>
+                    </Popup>
+                  </Marker>
+                </React.Fragment>
+              );
+            })}
+
+            {/* ── Prototype Urban Thermal Zones (citizen demo polygons) ── */}
+            {adminWards.length === 0 && thermalZones.map((zone) => {
+              const zoneLevel = getZoneLevel(zone);
+              const zStyle = getRiskStyle(zoneLevel);
               const isSelected = selectedZoneId === zone.id;
               return (
                 <React.Fragment key={zone.id}>
                   <Polygon
                     positions={zone.polygon}
                     pathOptions={{
-                      color: isSelected ? '#ea580c' : zColor,
-                      fillColor: zColor,
-                      fillOpacity: isSelected ? 0.55 : 0.28,
-                      weight: isSelected ? 3 : 1.5,
+                      color: isSelected ? '#ea580c' : zStyle.stroke,
+                      fillColor: zStyle.fill,
+                      fillOpacity: isSelected ? zStyle.selectedFillOpacity : zStyle.fillOpacity,
+                      weight: isSelected ? zStyle.selectedStrokeWidth : zStyle.strokeWidth,
                     }}
-                    eventHandlers={{
-                      click: () => onSelectZone?.(zone),
-                    }}
+                    eventHandlers={{ click: () => onSelectZone?.(zone) }}
                   >
                     <Popup className="custom-popup">
                       <div className="p-1 min-w-[220px] space-y-1.5 text-xs">
                         <div className="flex items-center justify-between border-b ts-border pb-1">
                           <span className="font-bold ts-text-primary text-sm">{zone.name}</span>
-                          <span
-                            className="px-1.5 py-0.2 rounded text-[10px] font-bold text-white uppercase"
-                            style={{ backgroundColor: zColor }}
-                          >
-                            {zone.vulnerabilityIndex >= 0.8 ? 'EXTREME' : zone.vulnerabilityIndex >= 0.65 ? 'HIGH' : 'MODERATE'}
+                          <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${zStyle.badge}`}>
+                            {zStyle.emoji} {zoneLevel}
                           </span>
                         </div>
                         <div className="text-[10px] text-amber-500 font-bold uppercase tracking-wider">
-                          Prototype Urban Thermal Zone
+                          ⚗ Prototype Urban Thermal Zone
                         </div>
                         <div className="text-xs ts-text-muted space-y-0.5">
                           <div><strong>District:</strong> {zone.district}</div>
@@ -199,16 +436,18 @@ export const RiskMap: React.FC<RiskMapProps> = ({
                     </Popup>
                   </Polygon>
 
+                  {/* Centroid: badge at high zoom, dot at low zoom */}
                   <Marker
                     position={zone.representativeCoords}
-                    eventHandlers={{
-                      click: () => onSelectZone?.(zone),
-                    }}
+                    icon={showBadges
+                      ? createCentroidBadgeIcon(zone.shortName, zoneLevel, isSelected)
+                      : createCentroidDotIcon(zoneLevel, isSelected)}
+                    eventHandlers={{ click: () => onSelectZone?.(zone) }}
                   >
                     <Popup className="custom-popup">
                       <div className="p-1 text-xs">
                         <div className="font-bold ts-text-primary">{zone.shortName}</div>
-                        <div className="text-[10px] text-orange-400 font-mono">Representative Coordinate</div>
+                        <div className="text-[10px] text-amber-400 font-mono">⚗ Prototype Zone</div>
                       </div>
                     </Popup>
                   </Marker>
@@ -216,26 +455,26 @@ export const RiskMap: React.FC<RiskMapProps> = ({
               );
             })}
 
-            {/* Primary selected location heat risk radius circle (shown when not viewing thermal zones polygon view) */}
-            {thermalZones.length === 0 && (
+            {/* Fallback risk radius circle (no zones/wards) */}
+            {adminWards.length === 0 && thermalZones.length === 0 && (
               <Circle
                 center={center}
                 radius={25000}
                 pathOptions={{
                   color: currentRiskColor,
                   fillColor: currentRiskColor,
-                  fillOpacity: 0.35,
+                  fillOpacity: 0.28,
                   weight: 2,
                 }}
               />
             )}
 
-            {/* Selected Location Marker */}
-            <Marker position={center}>
+            {/* ── Selected Location Marker (custom orange teardrop pin) ── */}
+            <Marker position={center} icon={createSelectedPinIcon(riskLevel)}>
               <Popup className="custom-popup">
                 <div className="p-1 min-w-[220px]">
                   <div className="text-[10px] uppercase font-bold tracking-wider text-orange-500 mb-0.5">
-                    Monitoring Reference Location
+                    {isCitizenView ? 'Tapped Location' : 'Monitoring Reference Location'}
                   </div>
                   <div className="flex items-center justify-between border-b ts-border pb-1 mb-2">
                     <span className="font-bold ts-text-primary text-sm">{locationName}</span>
@@ -277,9 +516,11 @@ export const RiskMap: React.FC<RiskMapProps> = ({
                         ? t('riskMap.actionHigh')
                         : t('riskMap.actionRoutine')}
                     </div>
-                    <div className="pt-1 text-[10px] ts-text-subtle leading-tight">
-                      📍 25km analytical risk zone around this urban reference coordinate.
-                    </div>
+                    {isCitizenView && (
+                      <div className="pt-1 text-[10px] ts-text-subtle leading-tight">
+                        📍 Tap anywhere on the map to move this pin and refresh thermal data.
+                      </div>
+                    )}
                   </div>
                 </div>
               </Popup>
@@ -296,7 +537,7 @@ export const RiskMap: React.FC<RiskMapProps> = ({
                     pathOptions={{
                       color: locColor,
                       fillColor: locColor,
-                      fillOpacity: 0.25,
+                      fillOpacity: 0.22,
                       weight: 1.5,
                     }}
                   />
@@ -331,52 +572,78 @@ export const RiskMap: React.FC<RiskMapProps> = ({
           </MapContainer>
         </div>
 
-        {/* Dual Map Legend & Spatial Methodology */}
+        {/* ── Legend & Methodology ── */}
         <div className="space-y-2 pt-2 border-t ts-border">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
             {/* Legend Part 1: Risk Severity */}
             <div className="p-3 rounded-xl ts-card-subtle border ts-border">
               <div className="font-bold ts-text-primary text-[11px] uppercase tracking-wider mb-2">
-                1. Thermal Risk Severity
+                Heat Risk Classification & Operational Meaning
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-                <div className="flex items-center space-x-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                  <span className="ts-text-muted">Low Baseline</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div className="flex items-start space-x-2">
+                  <span className="text-base leading-none">🟢</span>
+                  <div>
+                    <div className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">LOW</div>
+                    <div className="text-[11px] ts-text-subtle">Conditions currently within lower-risk range</div>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-                  <span className="ts-text-muted">Moderate Burden</span>
+                <div className="flex items-start space-x-2">
+                  <span className="text-base leading-none">🟡</span>
+                  <div>
+                    <div className="font-bold text-amber-600 dark:text-amber-400 text-xs">MODERATE</div>
+                    <div className="text-[11px] ts-text-subtle">Increased caution recommended</div>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-orange-500 shrink-0" />
-                  <span className="ts-text-muted">High Strain</span>
+                <div className="flex items-start space-x-2">
+                  <span className="text-base leading-none">🟠</span>
+                  <div>
+                    <div className="font-bold text-orange-600 dark:text-orange-400 text-xs">HIGH</div>
+                    <div className="text-[11px] ts-text-subtle">Significant physiological heat stress</div>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
-                  <span className="text-red-400 font-bold">Extreme Threat</span>
+                <div className="flex items-start space-x-2">
+                  <span className="text-base leading-none">🔴</span>
+                  <div>
+                    <div className="font-bold text-red-600 dark:text-red-400 text-xs">EXTREME</div>
+                    <div className="text-[11px] ts-text-subtle">Severe thermal conditions — emergency actions</div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Legend Part 2: Monitoring Methodology */}
+            {/* Legend Part 2: Methodology */}
             <div className="p-3 rounded-xl ts-card-subtle border ts-border">
               <div className="font-bold ts-text-primary text-[11px] uppercase tracking-wider mb-2">
-                2. Monitoring Pipeline
+                {isCitizenView ? 'How Zones Are Calculated' : 'Hyperlocal GIS Intelligence Pipeline'}
               </div>
-              <div className="flex flex-wrap items-center gap-2 text-[11px] ts-text-muted">
-                <span className="px-2 py-0.5 rounded bg-slate-500/10 font-mono">
-                  Live Meteorological Input
-                </span>
-                <span>→</span>
-                <span className="px-2 py-0.5 rounded bg-slate-500/10 font-mono">
-                  Calculated WBGT & HI
-                </span>
-                <span>→</span>
-                <span className="px-2 py-0.5 rounded bg-slate-500/10 font-mono">
-                  Modelled Composite Risk
-                </span>
-              </div>
+              {isCitizenView ? (
+                <div className="text-[11px] ts-text-muted leading-relaxed space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 rounded bg-slate-500/10 font-mono text-[10px]">Open-Meteo Weather</span>
+                    <span>→</span>
+                    <span className="px-1.5 py-0.5 rounded bg-slate-500/10 font-mono text-[10px]">WBGT Model</span>
+                    <span>→</span>
+                    <span className="px-1.5 py-0.5 rounded bg-slate-500/10 font-mono text-[10px]">Risk Level</span>
+                  </div>
+                  <div className="text-[10px] ts-text-subtle leading-tight">
+                    Labels appear at zoom ≥ {BADGE_ZOOM_THRESHOLD}. Zoom out for dot view to reduce clutter.
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] ts-text-muted">
+                    <span className="px-2 py-0.5 rounded bg-slate-500/10 font-mono">Official BMC Administrative Wards</span>
+                    <span>→</span>
+                    <span className="px-2 py-0.5 rounded bg-slate-500/10 font-mono">Calculated WBGT & UHI Offset</span>
+                    <span>→</span>
+                    <span className="px-2 py-0.5 rounded bg-slate-500/10 font-mono">4-Tier Distinct Risk Mapping</span>
+                  </div>
+                  <div className="mt-2 text-[10.5px] ts-text-subtle leading-tight">
+                    Ward geometries sourced from verified MCGM open civic GIS datasets with census-grounded socio-demographic vulnerability weighting.
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -384,7 +651,9 @@ export const RiskMap: React.FC<RiskMapProps> = ({
           <div className="p-2.5 rounded-xl bg-slate-500/5 border ts-border text-[11px] ts-text-muted flex items-start space-x-2">
             <Info className="w-3.5 h-3.5 text-orange-400 shrink-0 mt-0.5" />
             <div className="leading-snug">
-              Colored regions visualize calculated thermal risk around each monitoring reference location. They are analytical regional risk estimates, not satellite thermal imagery or physical sensor coverage maps.
+              {isCitizenView
+                ? 'Prototype thermal polygons are demonstration models for Greater Mumbai, not real-time IoT sensor data. Tap anywhere on the map to get live atmospheric readings for that exact coordinate.'
+                : 'Official ward boundaries and prototype thermal polygons represent spatial heat-health risk envelopes. They reflect localized wet-bulb temperatures, urban heat island offsets, and vulnerability indices.'}
             </div>
           </div>
         </div>
