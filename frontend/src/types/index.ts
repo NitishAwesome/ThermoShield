@@ -34,6 +34,8 @@ export interface HourlyForecast {
   temperature: number[];
   humidity: number[];
   apparent_temperature: number[];
+  wind_speed?: number[];
+  shortwave_radiation?: number[];
   uv_index: number[];
   is_day: number[];
 }
@@ -343,6 +345,10 @@ export interface HeatRiskArea {
     boundaryLevel: string;
     retrievedAt: string;
     license: string;
+    geographyVersion?: string;
+    sourceUrl?: string;
+    datasetId?: string;
+    provenanceStatus?: string;
   };
 
   microclimateOffsetC?: number;
@@ -599,6 +605,13 @@ export interface HealthImpactForecastDay {
   trigger_state: HeatActionTriggerState;
 }
 
+export interface ForecastSourceClassification {
+  weather_classification: 'REAL_FORECAST' | 'SYNTHETIC_FALLBACK';
+  thermal_classification: 'CALCULATED_FROM_FORECAST' | 'CALCULATED_FROM_MODELLED_INPUTS';
+  health_classification: 'MODELLED_PROTOTYPE';
+  fallback_active: boolean;
+}
+
 export interface HealthImpactForecastResponse {
   area_id: string;
   area_name: string;
@@ -619,6 +632,8 @@ export interface HealthImpactForecastResponse {
     summary_directive: string;
   };
   ml_transparency_disclaimer: string;
+  prototype_seed_note?: string;
+  forecast_source_classification?: ForecastSourceClassification;
   source_status?: string;
   source_name?: string;
 }
@@ -636,15 +651,27 @@ export interface WardForecastSummaryItem {
 
 export interface WardForecastSummary {
   ward_id: string;
+  area_id?: string;
+  ward_code?: string;
   ward_name: string;
+  area_name?: string;
   district: string;
   latitude: number;
   longitude: number;
   vulnerability_score: number;
   forecast_days: WardForecastSummaryItem[];
+  forecast_status?: string;
+  fallback_active?: boolean;
+  forecast_source_classification?: ForecastSourceClassification;
+  source_status?: string;
+  source_name?: string;
 }
 
 export interface WardsForecastSummaryResponse {
+  total_wards?: number;
+  real_forecast_wards?: number;
+  fallback_wards?: number;
+  unavailable_wards?: number;
   count: number;
   wards: WardForecastSummary[];
 }

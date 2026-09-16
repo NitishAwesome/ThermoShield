@@ -550,11 +550,15 @@ for feat in geojson_data['features']:
         },
         'trend': meta['trend'],
         'provenance': {
-            'sourceName': 'Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries',
-            'sourceType': 'Official Civic GIS Open Data',
+            'sourceName': 'Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)',
+            'sourceType': 'Curated Municipal Administrative Ward Geometry',
             'boundaryLevel': 'Administrative Ward (24 Wards: A to T)',
+            'geographyVersion': 'Current BMC administrative ward configuration',
             'retrievedAt': '2026-09-15',
-            'license': 'Open Data Commons / Civic Open Data'
+            'sourceUrl': 'NOT VERIFIED — no official dataset URL on record',
+            'datasetId': 'NOT VERIFIED',
+            'license': 'NOT VERIFIED — open-data license not confirmed',
+            'provenanceStatus': 'CURATED_NOT_VERIFIED'
         },
         'microclimateOffsetC': meta['uhi'],
         'demographicsNote': meta['demographics'],
@@ -567,12 +571,30 @@ print(f'Generated data for {len(wards_data)} wards.')
 ts_content = '''import { HeatRiskArea } from '../types';
 import mumbaiAdminWardsGeoJson from './mumbai_admin_wards.json';
 
+/**
+ * SIH-23 PROVENANCE AUDIT — 2026-09-16
+ *
+ * Ward geometry (24 polygons: A–T, MultiPolygon, CRS84) matches the standard
+ * BMC/MCGM administrative ward layout used in municipal literature.
+ * However, the original download URL, dataset identifier, and license cannot
+ * be independently verified from internal metadata alone.
+ *
+ * Classification: CURATED — geometry is consistent with known BMC ward boundaries
+ * but provenance is NOT VERIFIED against an official open-data receipt.
+ *
+ * Do NOT upgrade this to 'Official' until a source URL, dataset ID, and
+ * license are confirmed and recorded here.
+ */
 export const BMC_WARD_PROVENANCE = {
-  sourceName: 'Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries',
-  sourceType: 'Official Civic GIS Open Data',
+  sourceName: 'Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)',
+  sourceType: 'Curated Municipal Administrative Ward Geometry',
   boundaryLevel: 'Administrative Ward (24 Wards: A to T)',
+  geographyVersion: 'Current BMC administrative ward configuration',
   retrievedAt: '2026-09-15',
-  license: 'Open Data Commons / Civic Open Data',
+  sourceUrl: 'NOT VERIFIED — no official dataset URL on record',
+  datasetId: 'NOT VERIFIED',
+  license: 'NOT VERIFIED — open-data license not confirmed',
+  provenanceStatus: 'CURATED_NOT_VERIFIED',
 } as const;
 
 export const MUMBAI_ADMIN_WARDS_GEOJSON = mumbaiAdminWardsGeoJson;

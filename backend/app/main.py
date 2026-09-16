@@ -1960,13 +1960,36 @@ async def get_health_impact_forecast_api(
 
 
 @app.get("/api/forecast/wards-summary")
-def get_wards_forecast_summary_api():
+async def get_wards_forecast_summary_api():
     """
-    Returns 5-day risk level projections across all official administrative wards for dynamic GIS recoloring.
+    Returns 5-day risk level projections across all 24 Mumbai administrative ward references for dynamic GIS recoloring
+    with top-level failure accounting and source classification metadata.
+    Ward coordinates are representative coordinates derived from the current administrative ward geometry dataset.
     """
-    summaries = get_all_wards_forecast_summary()
+    summaries = await get_all_wards_forecast_summary()
+
+    total_wards = len(summaries)
+    real_forecast_wards = sum(
+        1 for w in summaries
+        if not w.get("forecast_source_classification", {}).get("fallback_active", False)
+        and w.get("source_status") != "UNAVAILABLE"
+    )
+    fallback_wards = sum(
+        1 for w in summaries
+        if w.get("forecast_source_classification", {}).get("fallback_active", False)
+        and w.get("source_status") != "UNAVAILABLE"
+    )
+    unavailable_wards = sum(
+        1 for w in summaries
+        if w.get("source_status") == "UNAVAILABLE"
+    )
+
     return {
-        "count": len(summaries),
-        "wards": summaries
+        "total_wards": total_wards,
+        "real_forecast_wards": real_forecast_wards,
+        "fallback_wards": fallback_wards,
+        "unavailable_wards": unavailable_wards,
+        "count": total_wards,  # preserved for backwards compatibility
+        "wards": summaries,
     }
 

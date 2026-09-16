@@ -54,7 +54,7 @@ def test_generate_health_impact_forecast_structure():
 
 def test_get_all_wards_forecast_summary():
     """Verify multi-day forecast risk summary across all administrative wards for GIS recoloring."""
-    wards = get_all_wards_forecast_summary()
+    wards = asyncio.run(get_all_wards_forecast_summary())
     assert len(wards) >= 5
 
     for ward in wards:

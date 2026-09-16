@@ -74,22 +74,67 @@ class HeatActionPlanResult:
         }
 
 
-# Curated Administrative Ward Profiles for BMC Wards & Major Indian Municipalities
+# Curated Administrative Ward Profiles for All 24 BMC Administrative Wards (A to T)
 MUNICIPAL_WARD_REGISTRY: Dict[str, Dict[str, Any]] = {
-    # Key BMC Administrative Wards
-    "ward_g_north": {
-        "name": "Ward G/North (Dharavi, Dadar West, Mahim)",
-        "district": "Mumbai City",
-        "latitude": 19.0434,
-        "longitude": 72.8526,
-        "vulnerability_score": 88.0,
-        "population_density": "Very High (Dense settlements & cottage industries)",
-        "baseline_temp": 35.5,
-        "wbgt_offset": 1.2,
+    "ward_a": {
+        "name": "Ward A (Colaba, Fort, Nariman Point)",
+        "ward_code": "A",
+        "district": "South Mumbai",
+        "latitude": 18.9220,
+        "longitude": 72.8346,
+        "vulnerability_score": 25.0,
+        "population_density": "Moderate (Commercial administrative center)",
+        "baseline_temp": 32.5,
+        "wbgt_offset": 0.0,
+    },
+    "ward_b": {
+        "name": "Ward B (Sandhurst Road, Dongri, Masjid Bunder)",
+        "ward_code": "B",
+        "district": "South Mumbai",
+        "latitude": 18.9569,
+        "longitude": 72.8397,
+        "vulnerability_score": 68.0,
+        "population_density": "Dense historic wholesale market district",
+        "baseline_temp": 34.6,
+        "wbgt_offset": 1.4,
+    },
+    "ward_c": {
+        "name": "Ward C (Chandanwadi, Bhuleshwar, Kalbadevi)",
+        "ward_code": "C",
+        "district": "South Mumbai",
+        "latitude": 18.9515,
+        "longitude": 72.8258,
+        "vulnerability_score": 72.0,
+        "population_density": "Extreme (Wholesale trading markets)",
+        "baseline_temp": 34.4,
+        "wbgt_offset": 0.6,
+    },
+    "ward_d": {
+        "name": "Ward D (Malabar Hill, Grant Road, Tardeo)",
+        "ward_code": "D",
+        "district": "South Mumbai",
+        "latitude": 18.9552,
+        "longitude": 72.8083,
+        "vulnerability_score": 30.0,
+        "population_density": "Coastal ridge zone with tree canopy cover",
+        "baseline_temp": 32.5,
+        "wbgt_offset": 0.3,
+    },
+    "ward_e": {
+        "name": "Ward E (Byculla, Mazgaon, Kamathipura)",
+        "ward_code": "E",
+        "district": "South Mumbai",
+        "latitude": 18.9734,
+        "longitude": 72.8340,
+        "vulnerability_score": 78.0,
+        "population_density": "Very High (Old tenements & narrow corridors)",
+        "baseline_temp": 34.6,
+        "wbgt_offset": 0.7,
     },
     "ward_f_south": {
         "name": "Ward F/South (Parel, Sewri, Naigaon)",
-        "district": "Mumbai City",
+        "ward_code": "F/S",
+        "district": "South Central Mumbai",
         "latitude": 19.0048,
         "longitude": 72.8428,
         "vulnerability_score": 75.0,
@@ -97,18 +142,64 @@ MUNICIPAL_WARD_REGISTRY: Dict[str, Dict[str, Any]] = {
         "baseline_temp": 34.8,
         "wbgt_offset": 0.8,
     },
-    "ward_m_east": {
-        "name": "Ward M/East (Govandi, Mankhurd, Deonar)",
-        "district": "Eastern Suburbs",
-        "latitude": 19.0558,
-        "longitude": 72.9312,
-        "vulnerability_score": 85.0,
-        "population_density": "Very High (Informal labor concentration)",
-        "baseline_temp": 35.8,
-        "wbgt_offset": 1.4,
+    "ward_f_north": {
+        "name": "Ward F/North (Matunga, Wadala, Sion)",
+        "ward_code": "F/N",
+        "district": "South Central Mumbai",
+        "latitude": 19.0319,
+        "longitude": 72.8707,
+        "vulnerability_score": 65.0,
+        "population_density": "High (Educational institutions and Wadala freight yards)",
+        "baseline_temp": 34.5,
+        "wbgt_offset": 1.3,
+    },
+    "ward_g_south": {
+        "name": "Ward G/South (Worli, Prabhadevi, Lower Parel)",
+        "ward_code": "G/S",
+        "district": "South Central Mumbai",
+        "latitude": 19.0042,
+        "longitude": 72.8201,
+        "vulnerability_score": 48.0,
+        "population_density": "Moderate (Commercial high-rises and coastal fishing settlements)",
+        "baseline_temp": 33.6,
+        "wbgt_offset": 1.0,
+    },
+    "ward_g_north": {
+        "name": "Ward G/North (Dharavi, Dadar West, Mahim)",
+        "ward_code": "G/N",
+        "district": "Central Mumbai",
+        "latitude": 19.0434,
+        "longitude": 72.8526,
+        "vulnerability_score": 88.0,
+        "population_density": "Very High (Dense settlements & cottage industries)",
+        "baseline_temp": 35.5,
+        "wbgt_offset": 1.2,
+    },
+    "ward_h_west": {
+        "name": "Ward H/West (Bandra West, Khar, Santacruz)",
+        "ward_code": "H/W",
+        "district": "Western Suburbs",
+        "latitude": 19.0622,
+        "longitude": 72.8285,
+        "vulnerability_score": 38.0,
+        "population_density": "Moderate (Coastal residential and commercial avenues)",
+        "baseline_temp": 33.2,
+        "wbgt_offset": 0.6,
+    },
+    "ward_h_east": {
+        "name": "Ward H/East (Bandra East, Khar East, Santacruz East)",
+        "ward_code": "H/E",
+        "district": "Western Suburbs",
+        "latitude": 19.0700,
+        "longitude": 72.8450,
+        "vulnerability_score": 62.0,
+        "population_density": "High (BKC commercial outskirts & transit links)",
+        "baseline_temp": 34.5,
+        "wbgt_offset": 0.6,
     },
     "ward_k_west": {
         "name": "Ward K/West (Andheri West, Juhu, Versova)",
+        "ward_code": "K/W",
         "district": "Western Suburbs",
         "latitude": 19.1205,
         "longitude": 72.8347,
@@ -119,6 +210,7 @@ MUNICIPAL_WARD_REGISTRY: Dict[str, Dict[str, Any]] = {
     },
     "ward_k_east": {
         "name": "Ward K/East (Andheri East, Jogeshwari East)",
+        "ward_code": "K/E",
         "district": "Western Suburbs",
         "latitude": 19.1172,
         "longitude": 72.8682,
@@ -127,28 +219,64 @@ MUNICIPAL_WARD_REGISTRY: Dict[str, Dict[str, Any]] = {
         "baseline_temp": 35.0,
         "wbgt_offset": 0.9,
     },
-    "ward_a": {
-        "name": "Ward A (Colaba, Fort, Nariman Point)",
-        "district": "South Mumbai",
-        "latitude": 18.9220,
-        "longitude": 72.8346,
-        "vulnerability_score": 25.0,
-        "population_density": "Moderate (Commercial administrative center)",
-        "baseline_temp": 32.5,
-        "wbgt_offset": 0.0,
+    "ward_p_south": {
+        "name": "Ward P/South (Goregaon)",
+        "ward_code": "P/S",
+        "district": "Western Suburbs",
+        "latitude": 19.1575,
+        "longitude": 72.8584,
+        "vulnerability_score": 55.0,
+        "population_density": "Moderate-High (Commercial IT parks and residential developments)",
+        "baseline_temp": 33.9,
+        "wbgt_offset": 1.0,
     },
-    "ward_e": {
-        "name": "Ward E (Byculla, Mazgaon, Kamathipura)",
-        "district": "South Mumbai",
-        "latitude": 18.9734,
-        "longitude": 72.8340,
-        "vulnerability_score": 78.0,
-        "population_density": "Very High (Old tenements & narrow corridors)",
-        "baseline_temp": 34.6,
-        "wbgt_offset": 0.7,
+    "ward_p_north": {
+        "name": "Ward P/North (Malad, Marve, Manori)",
+        "ward_code": "P/N",
+        "district": "Western Suburbs",
+        "latitude": 19.1877,
+        "longitude": 72.8339,
+        "vulnerability_score": 64.0,
+        "population_density": "High (Retail commercial hubs and hillside informal settlements)",
+        "baseline_temp": 34.4,
+        "wbgt_offset": 1.2,
+    },
+    "ward_r_south": {
+        "name": "Ward R/South (Kandivali, Charkop)",
+        "ward_code": "R/S",
+        "district": "Western Suburbs",
+        "latitude": 19.1996,
+        "longitude": 72.8562,
+        "vulnerability_score": 58.0,
+        "population_density": "Moderate (Organized MHADA layouts and industrial units)",
+        "baseline_temp": 34.1,
+        "wbgt_offset": 1.1,
+    },
+    "ward_r_central": {
+        "name": "Ward R/Central (Borivali, Gorai, SGNP Fringe)",
+        "ward_code": "R/C",
+        "district": "Western Suburbs",
+        "latitude": 19.2337,
+        "longitude": 72.8297,
+        "vulnerability_score": 40.0,
+        "population_density": "Moderate (Residential hub bordering national park canopy)",
+        "baseline_temp": 32.9,
+        "wbgt_offset": 0.5,
+    },
+    "ward_r_north": {
+        "name": "Ward R/North (Dahisar)",
+        "ward_code": "R/N",
+        "district": "Western Suburbs",
+        "latitude": 19.2553,
+        "longitude": 72.8663,
+        "vulnerability_score": 50.0,
+        "population_density": "Moderate (Northern municipal boundary and river basin)",
+        "baseline_temp": 33.6,
+        "wbgt_offset": 0.8,
     },
     "ward_l": {
         "name": "Ward L (Kurla, Chunabhatti, Sakinaka)",
+        "ward_code": "L",
         "district": "Eastern Suburbs",
         "latitude": 19.0688,
         "longitude": 72.8856,
@@ -157,27 +285,93 @@ MUNICIPAL_WARD_REGISTRY: Dict[str, Dict[str, Any]] = {
         "baseline_temp": 35.4,
         "wbgt_offset": 1.1,
     },
-    "ward_c": {
-        "name": "Ward C (Chandanwadi, Bhuleshwar, Kalbadevi)",
-        "district": "South Mumbai",
-        "latitude": 18.9515,
-        "longitude": 72.8258,
-        "vulnerability_score": 72.0,
-        "population_density": "Extreme (Wholesale trading markets)",
-        "baseline_temp": 34.4,
-        "wbgt_offset": 0.6,
+    "ward_m_east": {
+        "name": "Ward M/East (Govandi, Mankhurd, Deonar)",
+        "ward_code": "M/E",
+        "district": "Eastern Suburbs",
+        "latitude": 19.0558,
+        "longitude": 72.9312,
+        "vulnerability_score": 85.0,
+        "population_density": "Very High (Informal labor concentration)",
+        "baseline_temp": 35.8,
+        "wbgt_offset": 1.4,
     },
-    "ward_h_east": {
-        "name": "Ward H/East (Bandra East, Khar East, Santacruz East)",
-        "district": "Western Suburbs",
-        "latitude": 19.0700,
-        "longitude": 72.8450,
+    "ward_m_west": {
+        "name": "Ward M/West (Chembur West, Mahul)",
+        "ward_code": "M/W",
+        "district": "Eastern Suburbs",
+        "latitude": 19.0378,
+        "longitude": 72.8893,
         "vulnerability_score": 62.0,
-        "population_density": "High (BKC commercial outskirts & transit links)",
-        "baseline_temp": 34.5,
-        "wbgt_offset": 0.6,
+        "population_density": "High (Suburban residential and chemical industrial periphery)",
+        "baseline_temp": 34.4,
+        "wbgt_offset": 1.3,
+    },
+    "ward_n": {
+        "name": "Ward N (Ghatkopar, Vidyavihar)",
+        "ward_code": "N",
+        "district": "Eastern Suburbs",
+        "latitude": 19.0867,
+        "longitude": 72.9202,
+        "vulnerability_score": 60.0,
+        "population_density": "High (Transit junctions and dense residential societies)",
+        "baseline_temp": 34.2,
+        "wbgt_offset": 1.2,
+    },
+    "ward_s": {
+        "name": "Ward S (Bhandup, Powai, Kanjurmarg, Vikhroli)",
+        "ward_code": "S",
+        "district": "Eastern Suburbs",
+        "latitude": 19.1336,
+        "longitude": 72.9219,
+        "vulnerability_score": 54.0,
+        "population_density": "Moderate-High (Powai lake buffer, institutional canopy, and hillside settlements)",
+        "baseline_temp": 33.7,
+        "wbgt_offset": 0.9,
+    },
+    "ward_t": {
+        "name": "Ward T (Mulund)",
+        "ward_code": "T",
+        "district": "Eastern Suburbs",
+        "latitude": 19.1675,
+        "longitude": 72.9376,
+        "vulnerability_score": 42.0,
+        "population_density": "Moderate (Planned residential suburb and hill slope canopy)",
+        "baseline_temp": 33.1,
+        "wbgt_offset": 0.7,
     },
 }
+
+MUNICIPAL_WARD_ALIASES: Dict[str, str] = {
+    "ward_f_s": "ward_f_south",
+    "ward_f_n": "ward_f_north",
+    "ward_g_s": "ward_g_south",
+    "ward_g_n": "ward_g_north",
+    "ward_h_w": "ward_h_west",
+    "ward_h_e": "ward_h_east",
+    "ward_k_w": "ward_k_west",
+    "ward_k_e": "ward_k_east",
+    "ward_p_s": "ward_p_south",
+    "ward_p_n": "ward_p_north",
+    "ward_r_s": "ward_r_south",
+    "ward_r_c": "ward_r_central",
+    "ward_r_n": "ward_r_north",
+    "ward_m_e": "ward_m_east",
+    "ward_m_w": "ward_m_west",
+}
+
+
+def get_ward_profile(ward_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Resolves a municipal administrative ward profile by canonical ID or alias.
+    """
+    clean = (ward_id or "").strip().lower()
+    if clean in MUNICIPAL_WARD_REGISTRY:
+        return MUNICIPAL_WARD_REGISTRY[clean]
+    alias = MUNICIPAL_WARD_ALIASES.get(clean)
+    if alias and alias in MUNICIPAL_WARD_REGISTRY:
+        return MUNICIPAL_WARD_REGISTRY[alias]
+    return None
 
 
 def evaluate_heat_action_plan(
@@ -202,7 +396,7 @@ def evaluate_heat_action_plan(
     rule-transparent Heat Action Plan recommendations for civic disaster managers.
     """
     clean_area_id = (area_id or "general_area").strip().lower()
-    reg_entry = MUNICIPAL_WARD_REGISTRY.get(clean_area_id, {})
+    reg_entry = get_ward_profile(clean_area_id) or {}
 
     effective_name = area_name or reg_entry.get("name") or clean_area_id.replace("_", " ").title()
     effective_vuln = (
@@ -451,8 +645,9 @@ def evaluate_heat_action_plan(
 
 def get_all_wards_heat_action_overview() -> List[Dict[str, Any]]:
     """
-    Returns pre-computed Heat Action Plan trigger statuses across all official administrative wards
+    Returns pre-computed Heat Action Plan trigger statuses across all 24 Mumbai administrative ward references
     for municipal command dashboards and GIS overview layers.
+    Ward coordinates are representative coordinates derived from the current administrative ward geometry dataset.
     """
     results = []
     for ward_id, profile in MUNICIPAL_WARD_REGISTRY.items():
