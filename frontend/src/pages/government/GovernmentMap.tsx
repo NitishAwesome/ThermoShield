@@ -453,14 +453,14 @@ export const GovernmentMap: React.FC = () => {
           mapError={mapError}
           title={
             gisLayerMode === 'official_wards'
-              ? 'Greater Mumbai Official Ward Boundaries (MCGM/BMC GIS)'
+              ? 'Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)'
               : gisLayerMode === 'mumbai_zones'
               ? 'Greater Mumbai Urban Thermal Zones (Prototype GIS Layer)'
               : 'National Heat Risk Reference Centroids'
           }
           subtitle={
             gisLayerMode === 'official_wards'
-              ? 'High-precision administrative ward polygons with socio-demographic vulnerability and localized wet-bulb heat stress'
+              ? 'Curated administrative ward polygons — weather sampled at ward representative coordinate via Open-Meteo; vulnerability is modelled'
               : gisLayerMode === 'mumbai_zones'
               ? 'Coarse prototype polygons with thermal microclimate demonstration offsets'
               : 'Regional heat risk evaluated at curated municipal monitoring reference points'
@@ -477,7 +477,11 @@ export const GovernmentMap: React.FC = () => {
             <strong className="ts-text-primary">Data Reality & Provenance Notice: </strong>
             {gisLayerMode === 'official_wards' ? (
               <span>
-                Administrative ward geometries are sourced from <strong>{BMC_WARD_PROVENANCE.sourceName}</strong> ({BMC_WARD_PROVENANCE.sourceType}). Boundary level: <strong>{BMC_WARD_PROVENANCE.boundaryLevel}</strong>. Vulnerability scores reflect census-grounded socio-demographic indicators and microclimate Urban Heat Island (UHI) amplification.
+                Administrative ward geometry is consistent with <strong>{BMC_WARD_PROVENANCE.sourceName}</strong>.
+                Classification: <strong>{BMC_WARD_PROVENANCE.sourceType}</strong> — provenance not independently verified (no source URL or license on record).
+                Boundary level: <strong>{BMC_WARD_PROVENANCE.boundaryLevel}</strong>.
+                Weather at each ward is sampled at a single representative coordinate via Open-Meteo.
+                Vulnerability scores are modelled estimates based on urban density and land-use context — not Census-derived.
               </span>
             ) : gisLayerMode === 'mumbai_zones' ? (
               <span>
@@ -660,7 +664,7 @@ export const GovernmentMap: React.FC = () => {
                 : '62%'}
             </div>
             <div className="text-[11px] ts-text-muted mt-0.5">
-              {gisLayerMode === 'official_wards' ? 'Census-informed vulnerability' : 'Modelled demographic risk'}
+              {gisLayerMode === 'official_wards' ? 'Modelled vulnerability estimate' : 'Modelled demographic risk'}
             </div>
           </div>
         </div>

@@ -9,6 +9,7 @@ export type DataRealityTier =
   | 'MODELLED'
   | 'SIMULATED'
   | 'PLANNED'
+  | 'CANDIDATE_CHANNEL'
   | 'OFFLINE_FALLBACK';
 
 export interface DataRealityMeta {
@@ -42,7 +43,7 @@ export const DATA_REALITY_METADATA: Record<DataRealityTier, DataRealityMeta> = {
     label: 'Scientifically Calculated',
     badgeLabel: 'Calculated',
     shortDesc: 'Derived using validated biometeorological & physiological formulas.',
-    detailedDesc: 'Mathematically computed from live inputs using peer-reviewed formulations, including Stull wet-bulb estimation, Rothfusz heat index regression, and Liljegren analytical WBGT approximation.',
+    detailedDesc: 'Mathematically computed from live inputs using peer-reviewed formulations, including Stull wet-bulb estimation, Rothfusz heat index regression, and Estimated WBGT (Stull wet-bulb & radiative globe approximation).',
     colorClass: 'cyan',
     borderClass: 'border-cyan-500/30 dark:border-cyan-500/30',
     bgClass: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400',
@@ -83,6 +84,18 @@ export const DATA_REALITY_METADATA: Record<DataRealityTier, DataRealityMeta> = {
     borderClass: 'border-purple-500/30 dark:border-purple-500/30',
     bgClass: 'bg-purple-500/10 text-purple-700 dark:text-purple-400',
     textClass: 'text-purple-700 dark:text-purple-400',
+    iconName: 'clock',
+  },
+  CANDIDATE_CHANNEL: {
+    tier: 'CANDIDATE_CHANNEL',
+    label: 'Candidate Channel',
+    badgeLabel: 'Candidate Channel',
+    shortDesc: 'Delivery channel wired in architecture; not yet connected to a live provider.',
+    detailedDesc: 'This notification channel is fully implemented in the codebase but operates in simulation/demo mode. Live delivery requires connecting a real provider (e.g. Twilio for SMS, WhatsApp Business API). No real messages reach recipients.',
+    colorClass: 'sky',
+    borderClass: 'border-sky-500/30 dark:border-sky-500/30',
+    bgClass: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
+    textClass: 'text-sky-700 dark:text-sky-400',
     iconName: 'clock',
   },
   OFFLINE_FALLBACK: {

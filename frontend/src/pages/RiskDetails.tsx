@@ -583,9 +583,9 @@ export const RiskDetails: React.FC = () => {
               <CardContent className="border-t ts-border pt-5 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs ts-text-muted leading-relaxed">
                   <div className="p-4 rounded-xl ts-card-subtle border ts-border">
-                    <h4 className="font-bold ts-text-primary mb-1.5">Wet-Bulb Globe Temperature (ISO 7243)</h4>
+                    <h4 className="font-bold ts-text-primary mb-1.5">Estimated WBGT (ISO 7243 Work-Rest Thresholds)</h4>
                     <p>
-                      ThermoShield evaluates WBGT using the Liljegren outdoor physical equilibrium algorithm, accounting for cosine solar zenith angle, atmospheric turbidity, air density, and wind convective heat transfer.
+                      ThermoShield evaluates Estimated WBGT using Stull’s empirical natural wet-bulb formulation and radiative black-globe approximations from ambient temperature, humidity, shortwave solar radiation, and convective wind cooling.
                     </p>
                   </div>
                   <div className="p-4 rounded-xl ts-card-subtle border ts-border">

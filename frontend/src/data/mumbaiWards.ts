@@ -1,12 +1,30 @@
 import { HeatRiskArea } from '../types';
 import mumbaiAdminWardsGeoJson from './mumbai_admin_wards.json';
 
+/**
+ * SIH-23 PROVENANCE AUDIT — 2026-09-16
+ *
+ * Ward geometry (24 polygons: A–T, MultiPolygon, CRS84) matches the standard
+ * BMC/MCGM administrative ward layout used in municipal literature.
+ * However, the original download URL, dataset identifier, and license cannot
+ * be independently verified from internal metadata alone.
+ *
+ * Classification: CURATED — geometry is consistent with known BMC ward boundaries
+ * but provenance is NOT VERIFIED against an official open-data receipt.
+ *
+ * Do NOT upgrade this to 'Official' until a source URL, dataset ID, and
+ * license are confirmed and recorded here.
+ */
 export const BMC_WARD_PROVENANCE = {
-  sourceName: 'Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries',
-  sourceType: 'Official Civic GIS Open Data',
+  sourceName: 'Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)',
+  sourceType: 'Curated Municipal Administrative Ward Geometry',
   boundaryLevel: 'Administrative Ward (24 Wards: A to T)',
+  geographyVersion: 'Current BMC administrative ward configuration',
   retrievedAt: '2026-09-15',
-  license: 'Open Data Commons / Civic Open Data',
+  sourceUrl: 'NOT VERIFIED — no official dataset URL on record',
+  datasetId: 'NOT VERIFIED',
+  license: 'NOT VERIFIED — open-data license not confirmed',
+  provenanceStatus: 'CURATED_NOT_VERIFIED',
 } as const;
 
 export const MUMBAI_ADMIN_WARDS_GEOJSON = mumbaiAdminWardsGeoJson;
@@ -7526,11 +7544,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "STABLE",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 0.4,
     "demographicsNote": "Coastal commercial district and planned residential zone with strong sea breeze dispersion.",
@@ -9461,11 +9483,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "RISING",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 1.4,
     "demographicsNote": "Dense historic wholesale market district with narrow streets, low ventilation, and high daytime pedestrian footfall.",
@@ -11701,11 +11727,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "STABLE",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 1.2,
     "demographicsNote": "High-density commercial-residential fabric with elderly demographic clusters in older tenements.",
@@ -15097,11 +15127,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "STABLE",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 0.3,
     "demographicsNote": "Affluent ridge zone with extensive tree canopy cover and immediate Arabian Sea coastal exposure.",
@@ -18613,11 +18647,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "RISING",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 1.6,
     "demographicsNote": "Very high population density, transit hubs, and older multi-storey tenements with limited internal cooling.",
@@ -21321,11 +21359,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "RISING",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 1.5,
     "demographicsNote": "Major hospital cluster (KEM, Tata Memorial, Wadia) alongside high-density redevelopment complexes.",
@@ -23821,11 +23863,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "STABLE",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 1.0,
     "demographicsNote": "Commercial high-rises and sea-facing promenade with fishing village settlements at Worli Koliwada.",
@@ -28685,11 +28731,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "STABLE",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 1.3,
     "demographicsNote": "Educational institutions, truck terminal zone at Wadala, and mixed residential developments.",
@@ -30865,11 +30915,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "RISING",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 1.9,
     "demographicsNote": "Asia largest informal settlement complex (Dharavi), sheet-metal roofing, minimal cross-ventilation, and high outdoor labor density.",
@@ -34644,11 +34698,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "STABLE",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 1.2,
     "demographicsNote": "Major transit junction (Metro 1 / Central Railway) with busy commercial streets and dense residential societies.",
@@ -38804,11 +38862,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "IMPROVING",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 0.5,
     "demographicsNote": "Residential hub bordering Sanjay Gandhi National Park, high tree density and Gorai creek breezes.",
@@ -42976,11 +43038,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "STABLE",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 0.9,
     "demographicsNote": "Mix of Powai lake buffer, IIT campus canopy, Godrej mangrove buffer at Vikhroli, and dense Bhandup hillside informal settlements.",
@@ -47478,11 +47544,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "STABLE",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 0.7,
     "demographicsNote": "Planned residential node along the Thane border with broad tree-lined avenues and proximity to Yeoor hills.",
@@ -50990,11 +51060,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "STABLE",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 0.9,
     "demographicsNote": "Mixed commercial, media hub, beachside zones (Juhu/Versova), and coastal fishing communities.",
@@ -53605,11 +53679,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "STABLE",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 0.8,
     "demographicsNote": "Northern city boundary, mixed river valley basin (Dahisar River) and hill boundary.",
@@ -56653,11 +56731,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "RISING",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 2.0,
     "demographicsNote": "Lowest Human Development Index in Mumbai, Deonar dumping ground vicinity, vulnerable informal housing, low access to potable water.",
@@ -61529,11 +61611,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "STABLE",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 1.3,
     "demographicsNote": "Garden suburb core contrasting with chemical industrial periphery and rehabilitation tenements at Mahul.",
@@ -63976,11 +64062,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "RISING",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 1.4,
     "demographicsNote": "Major financial hub (BKC) juxtaposed with dense residential clusters along the Western Express Highway.",
@@ -68160,11 +68250,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "RISING",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 1.6,
     "demographicsNote": "Industrial estates (MIDC, SEEPZ), heavy transit corridors, and elevated metro infrastructure.",
@@ -72191,11 +72285,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "STABLE",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 1.0,
     "demographicsNote": "Rapidly densifying commercial IT parks alongside film studios and green fringe of Aarey.",
@@ -80019,11 +80117,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "STABLE",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 1.2,
     "demographicsNote": "Large retail malls on Link Road, dense hillside informal settlements in Kurar / Malad East.",
@@ -84991,11 +85093,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "STABLE",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 1.1,
     "demographicsNote": "Organized MHADA residential layouts in Charkop with industrial units in Poisar/Akurli.",
@@ -87762,11 +87868,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "STABLE",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 0.6,
     "demographicsNote": "Coastal residential and boutique commercial district with good tree canopy cover along avenues.",
@@ -91902,11 +92012,15 @@ export const MUMBAI_ADMIN_WARDS: HeatRiskArea[] = [
     },
     "trend": "RISING",
     "provenance": {
-      "sourceName": "Municipal Corporation of Greater Mumbai (MCGM / BMC) Administrative Ward Boundaries",
-      "sourceType": "Official Civic GIS Open Data",
+      "sourceName": "Greater Mumbai Administrative Ward Boundaries (MCGM/BMC Reference)",
+      "sourceType": "Curated Municipal Administrative Ward Geometry",
       "boundaryLevel": "Administrative Ward (24 Wards: A to T)",
+      "geographyVersion": "Current BMC administrative ward configuration",
       "retrievedAt": "2026-09-15",
-      "license": "Open Data Commons / Civic Open Data"
+      "sourceUrl": "NOT VERIFIED \u2014 no official dataset URL on record",
+      "datasetId": "NOT VERIFIED",
+      "license": "NOT VERIFIED \u2014 open-data license not confirmed",
+      "provenanceStatus": "CURATED_NOT_VERIFIED"
     },
     "microclimateOffsetC": 1.8,
     "demographicsNote": "Extremely dense informal housing on Mithi River flood basin, tin-roof density, scrap markets, and heavy transit congestion.",

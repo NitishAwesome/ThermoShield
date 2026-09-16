@@ -28,7 +28,7 @@ const METRIC_DEFAULTS: Record<CalculationMetricType, {
   wbgt: {
     title: 'Estimated WBGT (Wet Bulb Globe Temperature)',
     explanation: 'Estimated from meteorological ambient temperature, relative humidity, solar radiation, and wind conditions using ThermoShield’s biometeorological calculation pipeline. This is an analytical WBGT estimate derived from meteorological modeling, and not a physical in-situ black-globe sensor measurement.',
-    formula: 'WBGT ≈ 0.7·Twb + 0.2·Tg(est) + 0.1·Ta (Stull & Liljegren approximation)',
+    formula: 'WBGT ≈ 0.7·Twb + 0.2·Tg(est) + 0.1·Ta (Stull wet-bulb & radiative globe approximation)',
     caveat: 'Provides regional environmental thermal strain approximation for active populations.'
   },
   heat_index: {

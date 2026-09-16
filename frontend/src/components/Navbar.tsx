@@ -244,7 +244,7 @@ export const Navbar: React.FC = () => {
       {
         to: '/notification-settings',
         label: t('notif.title', 'Alert Preferences'),
-        description: 'SMS, WhatsApp, audio alarms & threshold configuration',
+        description: 'In-app alerts, email & device notifications. SMS candidate; WhatsApp planned.',
         icon: Sliders,
       },
       {

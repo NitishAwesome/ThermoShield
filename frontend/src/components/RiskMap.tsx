@@ -312,7 +312,7 @@ export const RiskMap: React.FC<RiskMapProps> = ({
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
 
-            {/* ── Official BMC Administrative Wards Layer ── */}
+            {/* ── Mumbai Administrative Ward References Layer ── */}
             {adminWards && adminWards.length > 0 && adminWards.map((ward) => {
               const rStyle = getRiskStyle(ward.risk.level);
               const isSelected = selectedWardId === ward.id;
@@ -633,14 +633,14 @@ export const RiskMap: React.FC<RiskMapProps> = ({
               ) : (
                 <>
                   <div className="flex flex-wrap items-center gap-2 text-[11px] ts-text-muted">
-                    <span className="px-2 py-0.5 rounded bg-slate-500/10 font-mono">Official BMC Administrative Wards</span>
+                    <span className="px-2 py-0.5 rounded bg-slate-500/10 font-mono">Mumbai Administrative Ward References</span>
                     <span>→</span>
                     <span className="px-2 py-0.5 rounded bg-slate-500/10 font-mono">Calculated WBGT & UHI Offset</span>
                     <span>→</span>
                     <span className="px-2 py-0.5 rounded bg-slate-500/10 font-mono">4-Tier Distinct Risk Mapping</span>
                   </div>
                   <div className="mt-2 text-[10.5px] ts-text-subtle leading-tight">
-                    Ward geometries sourced from verified MCGM open civic GIS datasets with census-grounded socio-demographic vulnerability weighting.
+                    Ward geometry is consistent with the MCGM/BMC administrative ward configuration (24 wards). Vulnerability weighting is modelled — not independently census-verified.
                   </div>
                 </>
               )}
@@ -653,7 +653,7 @@ export const RiskMap: React.FC<RiskMapProps> = ({
             <div className="leading-snug">
               {isCitizenView
                 ? 'Prototype thermal polygons are demonstration models for Greater Mumbai, not real-time IoT sensor data. Tap anywhere on the map to get live atmospheric readings for that exact coordinate.'
-                : 'Official ward boundaries and prototype thermal polygons represent spatial heat-health risk envelopes. They reflect localized wet-bulb temperatures, urban heat island offsets, and vulnerability indices.'}
+                : 'Curated ward geometry and prototype thermal polygons represent spatial heat-health risk envelopes. They reflect localized wet-bulb temperatures, urban heat island offsets, and modelled vulnerability indices.'}
             </div>
           </div>
         </div>

@@ -19,7 +19,7 @@ import {
 import { RiskMap } from '../components/RiskMap';
 import { LocationSearch } from '../components/LocationSearch';
 import { Badge, Button } from '../components/ui';
-import { DataRealityBadge } from '../components/provenance';
+import { DataRealityBadge, FallbackModeBanner } from '../components/provenance';
 import { useLocation } from '../context/LocationContext';
 import { useProfile } from '../context/ProfileContext';
 import { api } from '../services/api';
@@ -117,6 +117,11 @@ export const CitizenHeatMap: React.FC = () => {
     ? rawRiskLevel
     : 'MODERATE') as RiskLevel;
 
+  const isFallback = Boolean(
+    thermalData?.weather?.is_fallback ||
+    thermalData?.weather?.source_status === 'OFFLINE_FALLBACK'
+  );
+
   // Derive human-friendly advice based on WBGT
   const getHumanAdvice = (wbgt: number) => {
     if (wbgt >= 32) {
@@ -171,6 +176,14 @@ export const CitizenHeatMap: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12 animate-fadeIn max-w-7xl mx-auto px-2 sm:px-4">
+      {/* Fallback weather mode disclosure */}
+      {isFallback && (
+        <FallbackModeBanner
+          compact
+          sourceName={thermalData?.weather?.source_name || 'Regional Baseline Dataset'}
+          onRetry={() => fetchThermalData(coords.lat, coords.lon)}
+        />
+      )}
       {/* ========================================================================= */}
       {/* 1. HEADER SECTION                                                         */}
       {/* ========================================================================= */}
@@ -320,7 +333,7 @@ export const CitizenHeatMap: React.FC = () => {
           <div className="mt-2 font-mono font-black text-2xl text-rose-400">
             {wbgtC.toFixed(1)}°C
           </div>
-          <div className="text-[10.5px] ts-text-muted mt-0.5">Liljegren solar-shade metric</div>
+          <div className="text-[10.5px] ts-text-muted mt-0.5">Estimated WBGT thermal metric</div>
         </div>
 
         {/* Wind Speed */}
@@ -419,7 +432,7 @@ export const CitizenHeatMap: React.FC = () => {
 
             <div className="p-3 rounded-xl ts-card-subtle border ts-border">
               <strong className="ts-text-primary block mb-0.5">Live vs Calculated Metrics:</strong>
-              Air temperature, humidity, and wind are atmospheric readings. WBGT and Heat Index are calculated using the Liljegren equations from weather and humidity models.
+              Air temperature, humidity, and wind are atmospheric readings. WBGT and Heat Index are calculated using peer-reviewed biometeorological equations (Stull wet-bulb and Rothfusz polynomial) from weather data.
             </div>
 
             <div className="p-3 rounded-xl ts-card-subtle border ts-border">
