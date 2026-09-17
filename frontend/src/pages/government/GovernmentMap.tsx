@@ -23,7 +23,7 @@ import { translateRiskLevel } from '../../utils/translationHelpers';
 import { MUMBAI_PROTOTYPE_ZONES } from '../../data/thermalZones';
 import { MUMBAI_ADMIN_WARDS, BMC_WARD_PROVENANCE } from '../../data/mumbaiWards';
 import { GLOBAL_REGIONS, GLOBAL_HEAT_STATIONS, getStationsByRegion } from '../../data/globalHeatHotspots';
-import { getCityMunicipalAuthority, getOrGenerateCityWards, calculateWetBulb, calculateHeatIndex } from '../../utils/cityWardsGenerator';
+import { getCityMunicipalAuthority, getOrGenerateCityWards, calculateWetBulb, calculateHeatIndex, findNearestMetroHub } from '../../utils/cityWardsGenerator';
 import { getRiskStyle } from '../../utils/risk';
 import { CityHeatActionPlanning } from '../../components/government/CityHeatActionPlanning';
 import {
@@ -46,17 +46,22 @@ import {
   Sparkles,
   Globe,
   Flame,
+  Landmark,
 } from 'lucide-react';
 
 const QUICK_GOV_CITIES = [
-  { name: 'Mumbai', state: 'Maharashtra', lat: 19.0760, lon: 72.8777, zone: 'Western Coastal' },
-  { name: 'Pune', state: 'Maharashtra', lat: 18.5204, lon: 73.8567, zone: 'Deccan Plateau' },
-  { name: 'New Delhi', state: 'Delhi NCR', lat: 28.6139, lon: 77.2090, zone: 'Northern Plains' },
-  { name: 'Ahmedabad', state: 'Gujarat', lat: 23.0225, lon: 72.5714, zone: 'Western Arid' },
-  { name: 'Nagpur', state: 'Maharashtra', lat: 21.1458, lon: 79.0882, zone: 'Central Plateau' },
-  { name: 'Chennai', state: 'Tamil Nadu', lat: 13.0827, lon: 80.2707, zone: 'Southern Coastal' },
-  { name: 'Kolkata', state: 'West Bengal', lat: 22.5726, lon: 88.3639, zone: 'Eastern Delta' },
-  { name: 'Jaipur', state: 'Rajasthan', lat: 26.9124, lon: 75.7873, zone: 'North-Western' },
+  { name: 'Mumbai', authority: 'BMC', state: 'Maharashtra', lat: 19.0760, lon: 72.8777, zone: 'Western Coastal' },
+  { name: 'Pune', authority: 'PMC', state: 'Maharashtra', lat: 18.5204, lon: 73.8567, zone: 'Deccan Plateau' },
+  { name: 'New Delhi', authority: 'MCD', state: 'Delhi NCR', lat: 28.6139, lon: 77.2090, zone: 'Northern Plains' },
+  { name: 'Bengaluru', authority: 'BBMP', state: 'Karnataka', lat: 12.9716, lon: 77.5946, zone: 'Southern Plateau' },
+  { name: 'Hyderabad', authority: 'GHMC', state: 'Telangana', lat: 17.3850, lon: 78.4867, zone: 'Deccan Central' },
+  { name: 'Ahmedabad', authority: 'AMC', state: 'Gujarat', lat: 23.0225, lon: 72.5714, zone: 'Western Arid' },
+  { name: 'Jaipur', authority: 'JMC', state: 'Rajasthan', lat: 26.9124, lon: 75.7873, zone: 'North-Western' },
+  { name: 'Chennai', authority: 'GCC', state: 'Tamil Nadu', lat: 13.0827, lon: 80.2707, zone: 'Southern Coastal' },
+  { name: 'Kolkata', authority: 'KMC', state: 'West Bengal', lat: 22.5726, lon: 88.3639, zone: 'Eastern Delta' },
+  { name: 'Nagpur', authority: 'NMC', state: 'Maharashtra', lat: 21.1458, lon: 79.0882, zone: 'Central Plateau' },
+  { name: 'Lucknow', authority: 'LMC', state: 'Uttar Pradesh', lat: 26.8467, lon: 80.9462, zone: 'Gangetic Plains' },
+  { name: 'Surat', authority: 'SMC', state: 'Gujarat', lat: 21.1702, lon: 72.8311, zone: 'Western Coastal' },
 ];
 
 export const GovernmentMap: React.FC = () => {
@@ -82,8 +87,8 @@ export const GovernmentMap: React.FC = () => {
 
   // Active City Municipal Authority Metadata
   const municipalAuthority = useMemo(() => {
-    return getCityMunicipalAuthority(locationName);
-  }, [locationName]);
+    return getCityMunicipalAuthority(locationName, coords.lat, coords.lon);
+  }, [locationName, coords.lat, coords.lon]);
 
   // Dynamically generate or load official wards for current monitored city
   const activeCityWards = useMemo(() => {
@@ -305,6 +310,7 @@ export const GovernmentMap: React.FC = () => {
   const handleCitySelect = (city: typeof QUICK_GOV_CITIES[0]) => {
     setCoordsAndName({ lat: city.lat, lon: city.lon }, `${city.name}, ${city.state}`);
     setGisLayerMode('official_wards');
+    setSelectedDistrictFilter('ALL');
   };
 
   const handlePriorityClick = (area: AreaRiskItem) => {
@@ -478,7 +484,39 @@ export const GovernmentMap: React.FC = () => {
 
         {/* Row 3: Mode-Specific Quick Jump Tracks */}
         {gisLayerMode === 'official_wards' && (
-          <div className="pt-2 border-t ts-border space-y-2">
+          <div className="pt-2 border-t ts-border space-y-2.5">
+            {/* Municipal Corporation / Authority Quick Switcher */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+              <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap flex items-center gap-1 shrink-0 mr-0.5">
+                <Landmark className="w-3.5 h-3.5 text-orange-500" />
+                <span>Authority:</span>
+              </span>
+              {QUICK_GOV_CITIES.map((c) => {
+                const isSelected =
+                  locationName.toLowerCase().includes(c.name.toLowerCase()) ||
+                  municipalAuthority.shortCode === c.authority;
+                return (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() => handleCitySelect(c)}
+                    className={`px-2.5 py-1 rounded-xl border text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white border-orange-500 shadow-sm font-bold'
+                        : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary hover:bg-slate-500/10'
+                    }`}
+                  >
+                    <span>{c.name}</span>
+                    <span className={`px-1 py-0.2 text-[9.5px] rounded font-mono font-bold ${
+                      isSelected ? 'bg-black/25 text-white' : 'bg-slate-500/20 text-slate-400'
+                    }`}>
+                      {c.authority}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
             {/* District Filter Selector */}
             {availableDistricts.length > 2 && (
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
@@ -863,8 +901,23 @@ export const GovernmentMap: React.FC = () => {
               ? 'Coarse prototype polygons with thermal microclimate demonstration offsets'
               : 'Regional heat risk evaluated at curated municipal monitoring reference points'
           }
-          onMapClick={(lat, lon) => {
-            setCoordsAndName({ lat, lon }, `Custom Point (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`);
+          onMapClick={async (lat, lon) => {
+            const hub = findNearestMetroHub(lat, lon);
+            if (hub) {
+              setCoordsAndName({ lat: hub.lat, lon: hub.lon }, `${hub.name}, India`);
+              setSelectedDistrictFilter('ALL');
+              return;
+            }
+            try {
+              const res = await api.reverseGeocode(lat, lon);
+              if (res && res.name) {
+                setCoordsAndName({ lat, lon }, res.name);
+                setSelectedDistrictFilter('ALL');
+                return;
+              }
+            } catch {}
+            setCoordsAndName({ lat, lon }, `Regional Urban Division (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`);
+            setSelectedDistrictFilter('ALL');
           }}
         />
 

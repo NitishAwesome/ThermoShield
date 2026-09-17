@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   MapContainer,
   TileLayer,
@@ -77,9 +77,13 @@ const MapRecenter: React.FC<{ center: [number, number]; zoom?: number }> = ({ ce
 // ─────────────────────────────────────────────
 const MapClickHandler: React.FC<{
   onMapClick?: (lat: number, lon: number) => void;
-}> = ({ onMapClick }) => {
+  lastFeatureClickRef?: React.MutableRefObject<number>;
+}> = ({ onMapClick, lastFeatureClickRef }) => {
   useMapEvents({
     click(e) {
+      if (lastFeatureClickRef && Date.now() - lastFeatureClickRef.current < 400) {
+        return;
+      }
       if (onMapClick) {
         onMapClick(e.latlng.lat, e.latlng.lng);
       }
@@ -454,6 +458,21 @@ export const RiskMap: React.FC<RiskMapProps> = ({
   const [heatmapVisible, setHeatmapVisible] = useState<boolean>(showHeatmapOverlay);
   const [stationsVisible, setStationsVisible] = useState<boolean>(true);
   const showBadges = currentZoom >= BADGE_ZOOM_THRESHOLD;
+  const lastFeatureClickRef = useRef<number>(0);
+
+  const handleFeatureClick = (e: any, cb?: () => void) => {
+    try {
+      lastFeatureClickRef.current = Date.now();
+      if (e?.originalEvent) {
+        e.originalEvent.stopPropagation?.();
+        e.originalEvent._stopped = true;
+      }
+      if (e?.domEvent) {
+        e.domEvent.stopPropagation?.();
+      }
+    } catch {}
+    cb?.();
+  };
 
   useEffect(() => {
     if (showHeatmapOverlay !== undefined) {
@@ -580,7 +599,7 @@ export const RiskMap: React.FC<RiskMapProps> = ({
             style={{ height: '100%', width: '100%' }}
           >
             <MapRecenter center={center} zoom={zoom} />
-            <MapClickHandler onMapClick={onMapClick} />
+            <MapClickHandler onMapClick={onMapClick} lastFeatureClickRef={lastFeatureClickRef} />
             <ZoomWatcher onChange={setCurrentZoom} />
 
             {/* Tile layer */}
@@ -617,7 +636,7 @@ export const RiskMap: React.FC<RiskMapProps> = ({
                         fillOpacity: isSelected ? rStyle.selectedFillOpacity : rStyle.fillOpacity,
                         weight: isSelected ? rStyle.selectedStrokeWidth : rStyle.strokeWidth,
                       })}
-                      eventHandlers={{ click: () => onSelectWard?.(ward) }}
+                      eventHandlers={{ click: (e: any) => handleFeatureClick(e, () => onSelectWard?.(ward)) }}
                     />
                   )}
 
@@ -627,7 +646,7 @@ export const RiskMap: React.FC<RiskMapProps> = ({
                     icon={showBadges
                       ? createCentroidBadgeIcon(ward.wardCode || ward.name, ward.risk.level, isSelected)
                       : createCentroidDotIcon(ward.risk.level, isSelected)}
-                    eventHandlers={{ click: () => onSelectWard?.(ward) }}
+                    eventHandlers={{ click: (e: any) => handleFeatureClick(e, () => onSelectWard?.(ward)) }}
                   >
                     <Popup className="custom-popup">
                       <div className="p-1 min-w-[240px] space-y-2 text-xs">
@@ -687,7 +706,7 @@ export const RiskMap: React.FC<RiskMapProps> = ({
                       fillOpacity: isSelected ? zStyle.selectedFillOpacity : zStyle.fillOpacity,
                       weight: isSelected ? zStyle.selectedStrokeWidth : zStyle.strokeWidth,
                     }}
-                    eventHandlers={{ click: () => onSelectZone?.(zone) }}
+                    eventHandlers={{ click: (e: any) => handleFeatureClick(e, () => onSelectZone?.(zone)) }}
                   >
                     <Popup className="custom-popup">
                       <div className="p-1 min-w-[220px] space-y-1.5 text-xs">
@@ -727,7 +746,7 @@ export const RiskMap: React.FC<RiskMapProps> = ({
                     icon={showBadges
                       ? createCentroidBadgeIcon(zone.shortName, zoneLevel, isSelected)
                       : createCentroidDotIcon(zoneLevel, isSelected)}
-                    eventHandlers={{ click: () => onSelectZone?.(zone) }}
+                    eventHandlers={{ click: (e: any) => handleFeatureClick(e, () => onSelectZone?.(zone)) }}
                   >
                     <Popup className="custom-popup">
                       <div className="p-1 text-xs">
@@ -752,7 +771,7 @@ export const RiskMap: React.FC<RiskMapProps> = ({
                   icon={showStationBadges
                     ? createGlobalStationBadgeIcon(station.name, station.country, station.riskLevel, isSelected, station.baselineTemp)
                     : createGlobalStationDotIcon(station.riskLevel, isSelected)}
-                  eventHandlers={{ click: () => onSelectGlobalStation?.(station) }}
+                  eventHandlers={{ click: (e: any) => handleFeatureClick(e, () => onSelectGlobalStation?.(station)) }}
                 >
                   <Popup className="custom-popup">
                     <div className="p-1 min-w-[240px] space-y-2 text-xs">
