@@ -20,6 +20,8 @@ Citizens can opt into SMS/WhatsApp for supported wards under Profile → Alert P
 
 Use Python 3.11+ and Node.js:
 
+For the local demo with the frontend on port 3000, run `powershell -ExecutionPolicy Bypass -File scripts/run_demo_backend.ps1` from the repository root. Keep that terminal open. This uses the isolated `.venv/preview.db` and simulates all delivery channels.
+
 ```powershell
 python -m venv .venv
 .venv\Scripts\python -m pip install -r backend/requirements-dev.txt
