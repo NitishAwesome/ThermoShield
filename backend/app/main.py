@@ -74,7 +74,7 @@ from app.services.global_areas import (
 from app.services.intervention import generate_interventions
 from app.services.simulator import simulate_intervention
 from app.services.sms import send_sms, get_sms_delivery_status
-from app.services.email import send_notification_email, is_smtp_configured
+from app.services.email import send_notification_email, is_smtp_configured, get_email_delivery_status
 from app.services.email_templates import generate_action_first_alert_html
 from app.services.alert_engine import dispatch_automatic_early_warning, get_engine_status_summary, init_cooldown_registry_from_db
 from app.services.monitor import monitor_daemon
@@ -368,8 +368,18 @@ async def on_startup():
         finally:
             db.close()
         # Start proactive autonomous background monitoring daemon
-        monitor_daemon.start()
-        logger.info("ThermoShield autonomous monitoring daemon initialized on startup.")
+        env = (os.getenv("ENVIRONMENT") or "").strip().lower()
+        is_test = (
+            env in ("test", "testing")
+            or os.getenv("DISABLE_BACKGROUND_MONITOR", "").strip().lower() in ("true", "1", "yes")
+            or "PYTEST_CURRENT_TEST" in os.environ
+            or "pytest" in sys.modules
+        )
+        if not is_test:
+            monitor_daemon.start()
+            logger.info("ThermoShield autonomous monitoring daemon initialized on startup.")
+        else:
+            logger.info("ThermoShield background monitoring daemon startup suppressed in TEST environment.")
     except Exception as e:
         logger.warning(f"Database initialization warning: {e}")
 
@@ -914,19 +924,11 @@ def get_alerts_delivery_status():
     Preserves truthfulness across SMS, Email, and WhatsApp channels.
     """
     sms_status = get_sms_delivery_status()
-    smtp_ok = is_smtp_configured()
-    sender_email = (os.getenv("MAIL_USERNAME") or "").strip()
+    email_status = get_email_delivery_status()
 
     return {
         "sms": sms_status,
-        "email": {
-            "status": "OPERATIONAL" if smtp_ok else "NOT_CONFIGURED",
-            "display_status": "Operational (SMTP Direct)" if smtp_ok else "Not Configured (Simulation Mode)",
-            "configured": smtp_ok,
-            "sender": sender_email if smtp_ok else "Not Configured",
-            "can_deliver": smtp_ok,
-            "channel": "Email Dispatch (SMTP)"
-        },
+        "email": email_status,
         "whatsapp": {
             "status": "PLANNED",
             "display_status": "Planned Integration",
@@ -1150,12 +1152,12 @@ def send_alert_email_direct_api(
         html_body=html_body
     )
 
-    if res.get("status") == "error":
+    if res.get("status") in ("error", "FAILED"):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to dispatch email alert: {res.get('message')}"
         )
-    elif res.get("status") == "skipped":
+    elif res.get("status") in ("skipped", "DISABLED") and res.get("provider") != "TEST_ADAPTER":
         raise HTTPException(
             status_code=400,
             detail=(
@@ -1859,7 +1861,15 @@ async def risk(
 
         if alert is not None:
             try:
-                alert.status = "SENT"
+                report_status = dispatch_report.get("status")
+                if report_status == "SIMULATED":
+                    alert.status = "SIMULATED"
+                elif dispatch_report.get("dispatched_count", 0) > 0:
+                    alert.status = "SENT"
+                elif report_status == "DISABLED":
+                    alert.status = "DISABLED"
+                else:
+                    alert.status = "PENDING"
                 db.commit()
             except Exception as err:
                 logger.warning(f"Failed to update alert status: {err}")

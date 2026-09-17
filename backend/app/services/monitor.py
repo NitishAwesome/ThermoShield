@@ -164,7 +164,19 @@ class BackgroundMonitorDaemon:
         logger.info("ThermoShield Proactive Monitoring Daemon stopped.")
         self.is_running = False
 
-    def start(self, interval_seconds: int = DEFAULT_MONITOR_INTERVAL_SECONDS):
+    def start(self, interval_seconds: int = DEFAULT_MONITOR_INTERVAL_SECONDS, force: bool = False):
+        if not force:
+            env = (os.getenv("ENVIRONMENT") or "").strip().lower()
+            is_test = (
+                env in ("test", "testing")
+                or os.getenv("DISABLE_BACKGROUND_MONITOR", "").strip().lower() in ("true", "1", "yes")
+                or "PYTEST_CURRENT_TEST" in os.environ
+                or "pytest" in sys.modules
+            )
+            if is_test:
+                logger.info("ThermoShield background monitoring daemon startup suppressed in TEST environment.")
+                return
+
         if self._task and not self._task.done():
             logger.info("Monitoring daemon already running.")
             return
