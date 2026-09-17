@@ -27,10 +27,16 @@ from app.services.heat_action_plan import (
     TRIGGER_ACTION_NOW,
     TRIGGER_PREPARE_24H,
     TRIGGER_PREPARE_3D,
+    TRIGGER_PREPARE_5D,
     TRIGGER_BASELINE,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _finite_at(values, index, default):
+    value = values[index] if isinstance(values, list) and index < len(values) else None
+    return value if isinstance(value, (int, float)) and math.isfinite(value) else default
 
 PROTOTYPE_SEED_NOTE = (
     "Historical (18) and lag (15) health events are fixed prototype baseline seeds in this version "
@@ -126,7 +132,7 @@ def _extract_daily_peak_from_hourly(
         prefix = target_date[:10]
         matching_indices = [i for i, t_str in enumerate(times) if str(t_str).startswith(prefix)]
 
-    if not matching_indices:
+    if not matching_indices and not target_date:
         start_i = day_idx * 24
         end_i = min(len(times), (day_idx + 1) * 24)
         if start_i < len(times):
@@ -144,6 +150,18 @@ def _extract_daily_peak_from_hourly(
             "peak_time": None,
         }
 
+    # Only claim real hourly grounding when all four inputs exist and are finite.
+    complete_hourly = len(matching_indices) == 24 and not hourly.get("is_modelled", False) and all(
+        i < len(values) and isinstance(values[i], (int, float)) and math.isfinite(values[i])
+        for i in matching_indices for values in (temps, rhs, winds, solars, is_days)
+    )
+    matching_indices = [i for i in matching_indices if all(
+        i < len(values) and isinstance(values[i], (int, float)) and math.isfinite(values[i])
+        for values in (temps, rhs, winds, solars, is_days)
+    )]
+    if not matching_indices:
+        return _extract_daily_peak_from_hourly(None, day_idx, target_date, t_max_fallback, t_min_fallback, uv_max_fallback)
+
     # Find the hour with peak thermal stress
     # Evaluates biometeorological Estimated WBGT for each eligible hourly record and selects the peak thermal strain hour
     def _peak_thermal_stress_key(idx: int) -> Tuple[float, float, float]:
@@ -152,7 +170,7 @@ def _extract_daily_peak_from_hourly(
         rh = float(rhs[idx]) if idx < len(rhs) else 50.0
         w = float(winds[idx]) if idx < len(winds) else 2.5
         sol = float(solars[idx]) if (idx < len(solars) and is_d == 1) else (uv_max_fallback * 85.0 if is_d == 1 else 0.0)
-        at = float(app_temps[idx]) if idx < len(app_temps) else t + 2.0
+        at = _finite_at(app_temps, idx, t + 2.0)
 
         thermal = calculate_thermal_stress(
             temperature=t,
@@ -169,7 +187,7 @@ def _extract_daily_peak_from_hourly(
     is_d_best = is_days[best_idx] if best_idx < len(is_days) else 1
     eff_temp = float(temps[best_idx]) if best_idx < len(temps) else t_max_fallback
     eff_rh = float(rhs[best_idx]) if best_idx < len(rhs) else 50.0
-    eff_at = float(app_temps[best_idx]) if best_idx < len(app_temps) else eff_temp + 3.0
+    eff_at = _finite_at(app_temps, best_idx, eff_temp + 3.0)
     eff_wind = float(winds[best_idx]) if best_idx < len(winds) else 2.5
     eff_solar = float(solars[best_idx]) if (best_idx < len(solars) and is_d_best == 1) else (max(400.0, uv_max_fallback * 85.0) if is_d_best == 1 else 0.0)
 
@@ -179,7 +197,7 @@ def _extract_daily_peak_from_hourly(
         "wind_speed": round(eff_wind, 2),
         "solar_radiation": round(eff_solar, 1),
         "apparent_temperature": round(eff_at, 1),
-        "is_real_hourly": True,
+        "is_real_hourly": complete_hourly,
         "peak_time": times[best_idx] if best_idx < len(times) else None,
     }
 
@@ -234,6 +252,7 @@ async def generate_health_impact_forecast(
     area_name: Optional[str] = None,
     area_id: Optional[str] = None,
     vulnerability_score: Optional[float] = None,
+    include_day_five: bool = False,
 ) -> Dict[str, Any]:
     """
     Generates a scientifically grounded 5-day human health impact forecast.
@@ -278,13 +297,13 @@ async def generate_health_impact_forecast(
     peak_day_label = ""
     peak_date = ""
 
-    day_labels = ["Today", "Tomorrow (+1d)", "Day 2 (+2d)", "Day 3 (+3d)", "Day 4 (+4d)"]
+    day_labels = ["Today", "Tomorrow (+1d)", "Day 2 (+2d)", "Day 3 (+3d)", "Day 4 (+4d)", "Day 5 (+5d)"]
 
-    for idx in range(min(5, len(dates))):
-        t_max = max_temps[idx] if idx < len(max_temps) else 34.0
-        t_min = min_temps[idx] if idx < len(min_temps) else 26.0
-        app_t = app_max[idx] if idx < len(app_max) else t_max + 4.0
-        uv = uv_max[idx] if idx < len(uv_max) else 8.0
+    for idx in range(min(6 if include_day_five else 5, len(dates))):
+        t_max = _finite_at(max_temps, idx, 34.0)
+        t_min = _finite_at(min_temps, idx, 26.0)
+        app_t = _finite_at(app_max, idx, t_max + 4.0)
+        uv = _finite_at(uv_max, idx, 8.0)
         d_str = dates[idx]
 
         # Extract peak thermal-stress hour from real hourly forecast data
@@ -311,7 +330,8 @@ async def generate_health_impact_forecast(
         )
         indices = thermal_res.get("indices", {})
         wbgt = round(indices.get("wbgt_c", eff_temp * 0.7 + (eff_rh / 100.0) * 10.0 + 3.5), 1)
-        heat_index = round(indices.get("heat_index_c", app_t), 1)
+        hi_value = indices.get("heat_index_c")
+        heat_index = round(hi_value, 1) if hi_value is not None else None
         thermal_score = round(thermal_res.get("risk_assessment", {}).get("score", 0.6) * 100.0, 1)
 
         # Predict ML health proxy (historical=18, lag=15 prototype baseline seeds)
@@ -354,7 +374,7 @@ async def generate_health_impact_forecast(
         elif idx in [2, 3]:
             trig_state = TRIGGER_PREPARE_3D if risk_level in ["HIGH", "EXTREME"] else TRIGGER_BASELINE
         else:
-            trig_state = TRIGGER_BASELINE
+            trig_state = TRIGGER_PREPARE_5D if risk_level in ["HIGH", "EXTREME"] else TRIGGER_BASELINE
 
         daily_outlooks.append({
             "day_index": idx,
@@ -371,6 +391,7 @@ async def generate_health_impact_forecast(
             "heat_index_c": heat_index,
             "uv_index_max": round(uv, 1),
             "thermal_risk_level": risk_level,
+            "biometeorological_risk_level": thermal_res.get("risk_assessment", {}).get("level", "LOW"),
             "thermal_risk_score": round(risk_score, 1),
             "vulnerability_score": round(eff_vuln, 1),
             "projected_health_impact_proxy": round(civic_health_index, 1),
@@ -380,6 +401,10 @@ async def generate_health_impact_forecast(
             "civic_health_color": concern_meta["color"],
             "trigger_state": trig_state,
             "is_real_hourly": peak.get("is_real_hourly", False),
+            "is_real_daily": all(
+                isinstance(raw_forecast.get(key), list) and idx < len(raw_forecast[key]) and isinstance(raw_forecast[key][idx], (int, float))
+                and math.isfinite(raw_forecast[key][idx]) for key in ("max_temperature", "min_temperature")
+            ),
         })
 
     # Find expected relief day (first day after peak where risk drops)

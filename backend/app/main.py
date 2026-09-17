@@ -24,10 +24,13 @@ from app.auth.router import (
     get_current_user,
     get_current_user_optional,
     require_admin_or_official,
+    require_permission,
     hash_password,
 )
 from app.routers.personal_risk import router as personal_risk_router
 from app.routers.copilot import router as copilot_router
+from app.routers.health_data import router as health_data_router
+from app.routers.regional_alerts import router as regional_alerts_router
 from app.services.firebase_service import update_live_risk
 
 from fastapi import FastAPI, Query, Depends, HTTPException, BackgroundTasks, status
@@ -74,6 +77,7 @@ from app.services.global_areas import (
 from app.services.intervention import generate_interventions
 from app.services.simulator import simulate_intervention
 from app.services.sms import send_sms, get_sms_delivery_status
+from app.services.regional_alerts import channel_status
 from app.services.email import send_notification_email, is_smtp_configured, get_email_delivery_status
 from app.services.email_templates import generate_action_first_alert_html
 from app.services.alert_engine import dispatch_automatic_early_warning, get_engine_status_summary, init_cooldown_registry_from_db
@@ -393,6 +397,8 @@ async def on_shutdown():
         logger.warning(f"Shutdown notice: {e}")
 
 app.include_router(personal_risk_router)
+app.include_router(health_data_router)
+app.include_router(regional_alerts_router)
 app.include_router(copilot_router, prefix="/copilot", tags=["AI Copilot"])
 # ==================================================
 # CORS CONFIGURATION
@@ -903,12 +909,13 @@ def get_alert_engine_status_api():
 
 
 @app.post("/alerts/engine-trigger")
-async def trigger_alert_engine_cycle_api():
+async def trigger_alert_engine_cycle_api(current_user: User = Depends(require_permission("ANALYZE_RISK"))):
     """
     Manually triggers an immediate proactive thermal evaluation cycle
     across all monitored areas without waiting for the 15-minute scheduled timer.
     """
-    results = await monitor_daemon.run_evaluation_cycle()
+    # Manual national telemetry is read-only; regional sends use jurisdiction-scoped endpoints.
+    results = await monitor_daemon.run_evaluation_cycle(allow_dispatch=False)
     return {
         "status": "success",
         "message": f"Evaluated {len(results)} monitored regions proactively.",
@@ -929,14 +936,7 @@ def get_alerts_delivery_status():
     return {
         "sms": sms_status,
         "email": email_status,
-        "whatsapp": {
-            "status": "PLANNED",
-            "display_status": "Planned Integration",
-            "configured": False,
-            "can_deliver": False,
-            "channel": "WhatsApp Business API",
-            "note": "Planned for subsequent regional deployment under SIH26083."
-        }
+        "whatsapp": channel_status("whatsapp")
     }
 
 
@@ -958,6 +958,12 @@ async def send_test_sms_api(
             status_code=400,
             detail="A valid phone number with at least 7 digits is required."
         )
+
+    if get_sms_delivery_status().get("can_deliver"):
+        if current_user is None:
+            raise HTTPException(401, "Sign in to send a live test message.")
+        if current_user.account_status != "APPROVED" or clean_phone != (current_user.phone_number or "").strip():
+            raise HTTPException(403, "Live tests may only target your own approved profile phone number.")
 
     loc = payload.location_name or "Monitored Region"
     test_msg = payload.message or (
@@ -1844,18 +1850,10 @@ async def risk(
         loc_id = location.id if location else None
         loc_name = weather_data['location'].get('name', f'Location ({lat:.2f}, {lon:.2f})')
 
-        dispatch_report = dispatch_automatic_early_warning(
-            db=db,
-            location_name=loc_name,
-            location_id=loc_id,
-            risk_level=current_risk_level,
-            risk_score=risk_result["risk_score"],
-            temperature_c=weather["temperature"],
-            wbgt_c=wbgt,
-            heat_index_c=heat_index,
-            interventions=intervention_texts if intervention_texts else None,
-            force_test_recipient=email if (email and "@" in email) else None
-        )
+        # Reading a risk card must never broadcast to accounts or arbitrary query-string recipients.
+        # Consented regional delivery is evaluated by the background worker / authenticated dispatch API.
+        dispatch_report = {"status": "DISABLED", "transition": "Regional subscription dispatch is separate",
+                           "dispatched_count": 0, "skipped_count": 0}
 
         email_status = f"Engine: {dispatch_report.get('transition')} ({dispatch_report.get('dispatched_count', 0)} sent, {dispatch_report.get('skipped_count', 0)} cooldown-guarded)"
 

@@ -24,6 +24,7 @@ CATEGORY_INFRASTRUCTURE = "INFRASTRUCTURE"
 TRIGGER_ACTION_NOW = "ACTION_REVIEW_REQUIRED_NOW"
 TRIGGER_PREPARE_24H = "PREPARE_WITHIN_24_HOURS"
 TRIGGER_PREPARE_3D = "PREPARE_WITHIN_3_DAYS"
+TRIGGER_PREPARE_5D = "PREPARE_WITHIN_5_DAYS"
 TRIGGER_BASELINE = "MONITOR_NORMAL_BASELINE"
 
 
@@ -981,6 +982,7 @@ def evaluate_heat_action_plan(
     is_severe_now = norm_risk in ["HIGH", "EXTREME"] or effective_wbgt >= 30.0 or effective_heat_index >= 41.0
     is_severe_24h = norm_fc_risk in ["HIGH", "EXTREME"] and (forecast_lead_time_hours is not None and forecast_lead_time_hours <= 24)
     is_severe_3d = norm_fc_risk in ["HIGH", "EXTREME"] and (forecast_lead_time_hours is not None and 24 < forecast_lead_time_hours <= 72)
+    is_severe_5d = norm_fc_risk in ["HIGH", "EXTREME"] and (forecast_lead_time_hours is not None and 72 < forecast_lead_time_hours <= 120)
 
     if is_severe_now:
         trigger_state = TRIGGER_ACTION_NOW
@@ -1000,9 +1002,12 @@ def evaluate_heat_action_plan(
         trigger_state = TRIGGER_PREPARE_3D
         trigger_reasons.append(f"Early-warning forecast models project rising thermal stress reaching {norm_fc_risk} within 48 to 72 hours.")
         trigger_reasons.append("City departments should initiate inter-agency coordination and review power grid reserves.")
+    elif is_severe_5d:
+        trigger_state = TRIGGER_PREPARE_5D
+        trigger_reasons.append(f"Severe heat is forecast within {forecast_lead_time_hours} hours. Review cooling capacity, staffing and utility readiness.")
     else:
         trigger_state = TRIGGER_BASELINE
-        trigger_reasons.append("Current and 72-hour forecast conditions remain within manageable seasonal baseline limits.")
+        trigger_reasons.append("No severe heat trigger was identified in the supplied current and forecast conditions.")
         trigger_reasons.append("Routine civic monitoring and public health observation remain active.")
 
     # -------------------------------------------------------------
@@ -1029,7 +1034,7 @@ def evaluate_heat_action_plan(
             priority="HIGH",
             justification=f"Solar radiation load ({solar_radiation or 550:.0f} W/m²) combined with high ambient heat creates acute surface thermal islanding in open pedestrian zones."
         ))
-    elif trigger_state in [TRIGGER_PREPARE_24H, TRIGGER_PREPARE_3D]:
+    elif trigger_state in [TRIGGER_PREPARE_24H, TRIGGER_PREPARE_3D, TRIGGER_PREPARE_5D]:
         actions.append(HeatActionItem(
             category=CATEGORY_COOLING,
             action="review_cooling_center_readiness",
@@ -1087,7 +1092,7 @@ def evaluate_heat_action_plan(
                 priority="HIGH",
                 justification=f"High vulnerability sector ({effective_vuln:.0f}/100) exhibits limited indoor piped storage. Uninterrupted community water access is vital for home cooling and hydration."
             ))
-    elif trigger_state in [TRIGGER_PREPARE_24H, TRIGGER_PREPARE_3D]:
+    elif trigger_state in [TRIGGER_PREPARE_24H, TRIGGER_PREPARE_3D, TRIGGER_PREPARE_5D]:
         actions.append(HeatActionItem(
             category=CATEGORY_HYDRATION,
             action="review_hydration_station_deployment",
@@ -1116,7 +1121,7 @@ def evaluate_heat_action_plan(
             priority="HIGH",
             justification=f"Socio-demographic vulnerability analysis indicates heightened risk of unobserved domestic heat stress among homebound elderly and young children."
         ))
-    elif trigger_state in [TRIGGER_PREPARE_24H, TRIGGER_PREPARE_3D]:
+    elif trigger_state in [TRIGGER_PREPARE_24H, TRIGGER_PREPARE_3D, TRIGGER_PREPARE_5D]:
         actions.append(HeatActionItem(
             category=CATEGORY_HEALTH,
             action="review_health_facility_readiness",
@@ -1144,7 +1149,7 @@ def evaluate_heat_action_plan(
             priority="HIGH",
             justification="Guarantees uninterrupted patient cooling and municipal water delivery even under grid strain."
         ))
-    elif trigger_state in [TRIGGER_PREPARE_24H, TRIGGER_PREPARE_3D]:
+    elif trigger_state in [TRIGGER_PREPARE_24H, TRIGGER_PREPARE_3D, TRIGGER_PREPARE_5D]:
         actions.append(HeatActionItem(
             category=CATEGORY_INFRASTRUCTURE,
             action="review_peak_electricity_demand_preparedness",

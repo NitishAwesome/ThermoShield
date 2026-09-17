@@ -617,10 +617,10 @@ export const GovernmentDashboard: React.FC = () => {
               Active Heat Advisories
             </div>
             <div className="text-xl font-black text-purple-600 dark:text-purple-400 mt-1 font-mono">
-              High Heat Advisory
+              {engineTelemetry?.last_cycle_results?.some((r: any) => ['HIGH', 'EXTREME'].includes(r.risk_level)) ? 'Severe heat detected' : engineTelemetry?.last_cycle_timestamp ? 'No severe heat detected' : 'Awaiting evaluation'}
             </div>
             <div className="text-[11px] ts-text-muted mt-1">
-              Public broadcast active
+              View ward dispatch history for delivery confirmation
             </div>
           </div>
 
@@ -629,7 +629,7 @@ export const GovernmentDashboard: React.FC = () => {
               Affected Priority Sectors
             </div>
             <div className="text-xl font-black ts-text-primary mt-1 font-mono">
-              3 Monitored Locations
+              {engineTelemetry?.monitored_areas_count ?? '—'} Monitored Locations
             </div>
             <div className="text-[11px] ts-text-muted mt-1">
               Curated Reference Points: Dadar, Thane, Navi Mumbai
@@ -642,10 +642,10 @@ export const GovernmentDashboard: React.FC = () => {
             </div>
             <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-1 flex items-center space-x-1.5 font-mono">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-              <span>Active</span>
+              <span>{engineTelemetry?.daemon_running ? 'Running' : engineTelemetry ? 'Stopped' : 'Unavailable'}</span>
             </div>
             <div className="text-[11px] ts-text-muted mt-1">
-              Continuous 15m evaluation cycle
+              {engineTelemetry?.daemon_running ? '15-minute evaluation cycle' : 'Automatic monitoring is not running'}
             </div>
           </div>
         </div>

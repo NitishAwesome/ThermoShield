@@ -225,11 +225,12 @@ def test_timestamp_day_alignment():
     }
 
     peak_day1 = _extract_daily_peak_from_hourly(hourly, day_idx=0, target_date="2026-09-16")
-    assert peak_day1["is_real_hourly"] is True
+    # Four supplied hours can identify a sample peak, but cannot claim a complete daily peak.
+    assert peak_day1["is_real_hourly"] is False
     assert peak_day1["peak_time"].startswith("2026-09-16")
 
     peak_day2 = _extract_daily_peak_from_hourly(hourly, day_idx=1, target_date="2026-09-17")
-    assert peak_day2["is_real_hourly"] is True
+    assert peak_day2["is_real_hourly"] is False
     assert peak_day2["peak_time"].startswith("2026-09-17")
 
 

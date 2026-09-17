@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { RegionalAlertsPanel } from '../components/RegionalAlertsPanel';
 import {
   User,
   HeartPulse,
@@ -1322,6 +1323,7 @@ export const Profile: React.FC<ProfileProps> = ({ initialTab }) => {
           <div className="space-y-6">
             {/* CHANNEL DELIVERY REALITY — shown first so preferences are contextualized */}
             <NotificationChannelLegend />
+            <RegionalAlertsPanel />
 
             {/* DEVICE NOTIFICATIONS DELIVERY CONTROLS */}
             <Card variant="elevated">

@@ -67,7 +67,12 @@ class TestDatabaseFoundation(unittest.TestCase):
         with engine.connect() as conn:
             rev = conn.execute(text("SELECT version_num FROM alembic_version LIMIT 1")).scalar()
         self.assertIsNotNone(rev)
-        self.assertEqual(rev, "7c129e4a7d15")
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+        from pathlib import Path
+        config = Config()
+        config.set_main_option("script_location", str(Path(__file__).resolve().parents[1] / "backend" / "alembic"))
+        self.assertEqual(rev, ScriptDirectory.from_config(config).get_current_head())
 
     # 6. Risk Persistence
     def test_06_risk_persistence(self):

@@ -153,7 +153,7 @@ export const MethodologyDisclosureModal: React.FC<MethodologyDisclosureModalProp
               {selectedTier === 'PLANNED' && (
                 <ul className="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300">
                   <li><strong>Dense Ward Sensor Networks:</strong> Hardware LoRaWAN integration planned for future civic pilots.</li>
-                  <li><strong>WhatsApp Business Gateway:</strong> Scheduled pending production BSP credentials.</li>
+                  <li><strong>WhatsApp Live Activation:</strong> The implemented template gateway requires production credentials and an approved template.</li>
                   <li><strong>Hospital EHR Telemetry:</strong> Planned future phase for clinical admission ingestion.</li>
                 </ul>
               )}

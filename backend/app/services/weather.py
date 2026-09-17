@@ -322,7 +322,7 @@ async def _fetch_from_open_meteo(latitude: float, longitude: float) -> Dict[str,
             "precipitation_probability_max,"
             "weather_code"
         ),
-        "forecast_days": 5,
+        "forecast_days": 6,
         "wind_speed_unit": "ms",
         "timezone": "auto"
     }
@@ -398,6 +398,10 @@ async def _fetch_from_open_meteo(latitude: float, longitude: float) -> Dict[str,
                         raw_solar = [max(0.0, round(float(u) * 85.0, 1)) if d == 1 else 0.0 for u, d in zip(raw_uv, raw_day)]
 
                     forecast_dict["hourly"] = {
+                        "is_modelled": not all(
+                            len(hourly.get(key, [])) == len(raw_times) and all(v is not None for v in hourly[key])
+                            for key in ("temperature_2m", "relative_humidity_2m", "wind_speed_10m", "shortwave_radiation", "is_day")
+                        ),
                         "time": raw_times,
                         "temperature": raw_temps,
                         "humidity": raw_rh,
@@ -411,6 +415,7 @@ async def _fetch_from_open_meteo(latitude: float, longitude: float) -> Dict[str,
                     max_t = forecast_dict["max_temperature"][0] if forecast_dict["max_temperature"] else 34.0
                     min_t = forecast_dict["min_temperature"][0] if forecast_dict["min_temperature"] else 26.0
                     forecast_dict["hourly"] = _generate_synthetic_hourly(max_t, min_t)
+                    forecast_dict["hourly"]["is_modelled"] = True
 
                 return {
                     "location": {

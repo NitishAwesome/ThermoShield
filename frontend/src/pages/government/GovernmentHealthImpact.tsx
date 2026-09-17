@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { HealthSurveillancePanel } from '../../components/government/HealthSurveillancePanel';
 import { Link } from 'react-router-dom';
 import { Card, CardHeader, CardContent, Badge, Button } from '../../components/ui';
 import { DataRealityBadge, ModelTransparencyNote } from '../../components/provenance';
@@ -131,6 +132,7 @@ export const GovernmentHealthImpact: React.FC = () => {
       </div>
 
       {/* SECTION 2 — OVERALL HEALTH CONCERN */}
+      <HealthSurveillancePanel />
       <div className="rounded-3xl ts-card p-6 sm:p-8 border ts-border shadow-xl">
         <div className="flex items-center space-x-2 mb-3">
           <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />

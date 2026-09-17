@@ -14,3 +14,4 @@ alembic
 pyjwt
 bcrypt
 firebase-admin
+twilio>=9.0,<10

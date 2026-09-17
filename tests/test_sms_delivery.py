@@ -42,8 +42,8 @@ def test_alerts_delivery_status_endpoint():
     assert "whatsapp" in data
 
     assert data["sms"]["mode"] in ["DEMO", "LIVE"]
-    assert data["whatsapp"]["status"] == "PLANNED"
-    assert data["whatsapp"]["display_status"] == "Planned Integration"
+    assert data["whatsapp"]["status"] == "SIMULATED"
+    assert data["whatsapp"]["can_deliver"] is False
 
 
 def test_send_test_sms_endpoint_demo():
@@ -70,3 +70,17 @@ def test_send_test_sms_endpoint_invalid_phone():
         json={"phone_number": "123"}
     )
     assert response.status_code == 400
+
+
+def test_live_test_sms_requires_signed_in_owner(monkeypatch):
+    from app import main
+    from types import SimpleNamespace
+    monkeypatch.setattr(main, "get_sms_delivery_status", lambda: {"can_deliver": True})
+    payload = {"phone_number": "+919811223344"}
+    assert client.post("/alerts/send-test-sms", json=payload).status_code == 401
+    app.dependency_overrides[main.get_current_user_optional] = lambda: SimpleNamespace(
+        account_status="APPROVED", phone_number="+919899998888")
+    try:
+        assert client.post("/alerts/send-test-sms", json=payload).status_code == 403
+    finally:
+        app.dependency_overrides.pop(main.get_current_user_optional)

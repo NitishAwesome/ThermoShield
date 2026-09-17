@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { RegionalAlertsPanel } from '../../components/RegionalAlertsPanel';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useLocation } from '../../context/LocationContext';
@@ -206,6 +207,7 @@ export const GovernmentDispatch: React.FC = () => {
       </div>
 
       {/* SECTION 1 — CURRENT ALERT SITUATION */}
+      <RegionalAlertsPanel authority />
       <div className="rounded-3xl ts-card p-6 sm:p-8 border ts-border shadow-xl">
         <div className="flex items-center justify-between pb-4 border-b ts-border">
           <div className="flex items-center space-x-2">
@@ -215,7 +217,7 @@ export const GovernmentDispatch: React.FC = () => {
             </h2>
           </div>
           <Badge riskLevel="HIGH" size="md" showDot showIcon>
-            Active Advisory
+            {lastCycleResults.some((r: any) => ['HIGH', 'EXTREME'].includes(r.risk_level)) ? 'Severe conditions detected' : 'Monitoring status'}
           </Badge>
         </div>
 
@@ -225,10 +227,10 @@ export const GovernmentDispatch: React.FC = () => {
               Active Advisory
             </div>
             <div className="text-xl font-black text-purple-600 dark:text-purple-400 mt-1 font-mono">
-              High Heat Warning
+              {lastCycleResults.some((r: any) => ['HIGH', 'EXTREME'].includes(r.risk_level)) ? 'Severe heat detected' : engineTelemetry?.last_cycle_timestamp ? 'No severe heat detected' : 'Awaiting evaluation'}
             </div>
             <div className="text-[11px] ts-text-muted mt-0.5">
-              Public advisory broadcast active
+              Delivery confirmation is shown in ward dispatch history
             </div>
           </div>
 
@@ -237,7 +239,7 @@ export const GovernmentDispatch: React.FC = () => {
               Affected Sectors
             </div>
             <div className="text-2xl font-black ts-text-primary mt-1 font-mono">
-              {engineTelemetry?.monitored_areas_count || 3} Reference Sectors
+              {engineTelemetry?.monitored_areas_count ?? '—'} Reference Sectors
             </div>
             <div className="text-[11px] ts-text-muted mt-0.5">
               Priority regional clusters
@@ -250,10 +252,10 @@ export const GovernmentDispatch: React.FC = () => {
             </div>
             <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1 font-mono flex items-center space-x-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Active</span>
+              <span>{engineTelemetry?.daemon_running ? 'Running' : engineTelemetry ? 'Stopped' : 'Unavailable'}</span>
             </div>
             <div className="text-[11px] ts-text-muted mt-0.5">
-              Stage 2 Heat Action Plan
+              Background monitoring status
             </div>
           </div>
 
@@ -284,7 +286,7 @@ export const GovernmentDispatch: React.FC = () => {
           </div>
           <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 flex items-center space-x-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-            <span>Monitoring Active</span>
+            <span>{engineTelemetry?.daemon_running ? 'Monitoring running' : 'Monitoring stopped'}</span>
           </span>
         </div>
 
@@ -306,10 +308,10 @@ export const GovernmentDispatch: React.FC = () => {
               Last Evaluation Status
             </div>
             <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
-              Completed
+              {engineTelemetry?.last_cycle_timestamp ? 'Completed' : 'Not evaluated yet'}
             </div>
             <div className="text-[11px] ts-text-muted mt-0.5">
-              Cycle #{engineTelemetry?.total_cycles_completed || 1}
+              Cycle #{engineTelemetry?.total_cycles_completed ?? 0}
             </div>
           </div>
 
@@ -318,7 +320,7 @@ export const GovernmentDispatch: React.FC = () => {
               Monitored Jurisdictions
             </div>
             <div className="text-2xl font-black ts-text-primary mt-1 font-mono">
-              {engineTelemetry?.monitored_areas_count || 5} Sectors
+              {engineTelemetry?.monitored_areas_count ?? '—'} Sectors
             </div>
             <div className="text-[11px] ts-text-muted mt-0.5">
               Live telemetry tracking
@@ -363,9 +365,9 @@ export const GovernmentDispatch: React.FC = () => {
                       <span className="text-xs font-black text-slate-400 font-mono">
                         Sector #{idx + 1}
                       </span>
-                      <Badge riskLevel={res.risk_level || 'HIGH'} size="sm">
-                        {translateRiskLevel(res.risk_level || 'HIGH', t)}
-                      </Badge>
+                      {res.risk_level ? <Badge riskLevel={res.risk_level} size="sm">
+                        {translateRiskLevel(res.risk_level, t)}
+                      </Badge> : <span className="text-xs ts-text-muted">Unavailable</span>}
                     </div>
                     <h3 className="text-base font-black ts-text-primary mt-2">
                       {res.location}
@@ -380,46 +382,7 @@ export const GovernmentDispatch: React.FC = () => {
               );
             })
           ) : (
-            <>
-              <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-slate-400 font-mono">Sector #1</span>
-                    <Badge riskLevel="HIGH" size="sm">HIGH ALERT</Badge>
-                  </div>
-                  <h3 className="text-base font-black ts-text-primary mt-2">Mumbai Urban Core</h3>
-                </div>
-                <div className="mt-4 pt-3 border-t ts-border text-xs text-red-500 font-bold">
-                  High afternoon heat stress
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-slate-400 font-mono">Sector #2</span>
-                    <Badge riskLevel="MODERATE" size="sm">MODERATE ALERT</Badge>
-                  </div>
-                  <h3 className="text-base font-black ts-text-primary mt-2">Thane Industrial Belt</h3>
-                </div>
-                <div className="mt-4 pt-3 border-t ts-border text-xs text-amber-500 font-bold">
-                  Elevated solar radiation
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl ts-card-subtle border ts-border flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-slate-400 font-mono">Sector #3</span>
-                    <Badge riskLevel="LOW" size="sm">WATCH</Badge>
-                  </div>
-                  <h3 className="text-base font-black ts-text-primary mt-2">Navi Mumbai East</h3>
-                </div>
-                <div className="mt-4 pt-3 border-t ts-border text-xs ts-text-muted font-medium">
-                  Routine baseline monitoring
-                </div>
-              </div>
-            </>
+            <p className="text-sm ts-text-muted sm:col-span-3">No monitoring results yet. Refresh telemetry to evaluate current conditions.</p>
           )}
         </div>
       </div>
@@ -439,16 +402,12 @@ export const GovernmentDispatch: React.FC = () => {
           <div className="p-4 rounded-2xl ts-card-subtle border ts-border">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold ts-text-primary">Email Dispatch</span>
-              {deliveryStatus?.email?.configured || Boolean(engineTelemetry?.email_dispatch_configured) ? (
-                <DataRealityBadge tier="LIVE" size="xs" customLabel="Emergency Email: Operational" />
-              ) : (
-                <DataRealityBadge tier="SIMULATED" size="xs" customLabel="Emergency Email: Not Configured" />
-              )}
+              <DataRealityBadge tier={deliveryStatus?.email?.status === 'OPERATIONAL' ? 'LIVE' : 'SIMULATED'} size="xs" customLabel={deliveryStatus?.email?.display_status || 'Email status unavailable'} />
             </div>
             <p className="text-xs ts-text-muted mt-2 leading-relaxed">
-              {deliveryStatus?.email?.configured || Boolean(engineTelemetry?.email_dispatch_configured)
-                ? `Automated situation reports and advisory emails dispatched via configured SMTP server (${deliveryStatus?.email?.sender || 'Live SMTP'}).`
-                : 'SMTP credentials are not configured in environment. Test and automatic dispatches are safely simulated.'}
+              {deliveryStatus?.email?.status === 'OPERATIONAL'
+                ? 'SMTP is configured for live email. A configured gateway does not confirm delivery.'
+                : 'Live email delivery is not active. Test and development modes simulate delivery.'}
             </p>
           </div>
 
@@ -471,10 +430,10 @@ export const GovernmentDispatch: React.FC = () => {
           <div className="p-4 rounded-2xl ts-card-subtle border ts-border">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold ts-text-primary">WhatsApp Alert Bot</span>
-              <DataRealityBadge tier="PLANNED" size="xs" customLabel="Planned Integration" />
+              <DataRealityBadge tier={deliveryStatus?.whatsapp?.can_deliver ? 'LIVE' : 'SIMULATED'} size="xs" customLabel={deliveryStatus?.whatsapp?.display_status || 'Status unavailable'} />
             </div>
             <p className="text-xs ts-text-muted mt-2 leading-relaxed">
-              Citizen notification bot connector planned for regional civic messaging deployment under SIH26083 once WhatsApp Business API is connected.
+              Ward subscriptions use an approved WhatsApp template. Provider receipts confirm delivery; demo mode sends no messages.
             </p>
           </div>
         </div>
@@ -515,7 +474,7 @@ export const GovernmentDispatch: React.FC = () => {
               Evaluate Current Conditions
             </h3>
             <p className="text-xs ts-text-muted mt-1 leading-relaxed max-w-2xl">
-              Run an immediate alert evaluation using the latest available weather and thermal stress conditions across monitored municipal clusters.
+              Refresh weather and thermal-stress telemetry across monitored clusters without sending messages. Use Regional alert dispatch above for jurisdiction-scoped subscriber warnings.
             </p>
           </div>
 
@@ -534,7 +493,7 @@ export const GovernmentDispatch: React.FC = () => {
             }
             className="bg-orange-500 hover:bg-orange-600 text-white font-bold whitespace-nowrap cursor-pointer shadow-md"
           >
-            {isTriggeringCycle ? 'Evaluating Clusters...' : '⚡ Trigger Autonomous Cycle Now'}
+            {isTriggeringCycle ? 'Evaluating Clusters...' : 'Refresh Monitoring Telemetry'}
           </Button>
         </div>
 
@@ -583,7 +542,7 @@ export const GovernmentDispatch: React.FC = () => {
               </div>
               <div className="p-3 rounded-xl ts-card-subtle border ts-border">
                 <div className="text-[10px] uppercase font-bold ts-text-subtle">Cycles Completed</div>
-                <div className="text-xs font-bold text-orange-500 mt-0.5 font-mono">#{engineTelemetry?.total_cycles_completed || 1}</div>
+                <div className="text-xs font-bold text-orange-500 mt-0.5 font-mono">#{engineTelemetry?.total_cycles_completed ?? 0}</div>
               </div>
               <div className="p-3 rounded-xl ts-card-subtle border ts-border">
                 <div className="text-[10px] uppercase font-bold ts-text-subtle">Anti-Spam Cooldown</div>
