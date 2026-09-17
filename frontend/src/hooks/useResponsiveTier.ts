@@ -5,7 +5,7 @@ export function useResponsiveTier(): ResponsiveTier {
   const [tier, setTier] = useState<ResponsiveTier>(() => {
     if (typeof window === 'undefined') return 'STANDARD';
     const width = window.innerWidth;
-    if (width >= 1536) return 'WIDE';
+    if (width >= 1600) return 'WIDE';
     if (width >= 1200) return 'STANDARD';
     return 'COMPACT';
   });
@@ -13,7 +13,7 @@ export function useResponsiveTier(): ResponsiveTier {
   useEffect(() => {
     const evaluateTier = () => {
       const width = window.innerWidth;
-      if (width >= 1536) {
+      if (width >= 1600) {
         setTier('WIDE');
       } else if (width >= 1200) {
         setTier('STANDARD');

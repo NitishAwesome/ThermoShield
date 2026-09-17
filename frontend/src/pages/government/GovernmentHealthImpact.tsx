@@ -167,7 +167,7 @@ export const GovernmentHealthImpact: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Calendar className="w-4 h-4 text-orange-500" />
               <h2 className="text-xs font-black uppercase tracking-wider text-orange-500">
-                Predictive Early Warning Pipeline (Prompt 22)
+                Predictive Early Warning Pipeline
               </h2>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30 uppercase">
                 3–5 Day Trajectory

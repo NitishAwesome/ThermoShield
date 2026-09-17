@@ -236,7 +236,7 @@ export const Navbar: React.FC = () => {
           </NavLink>
 
           {/* Desktop Nav Links - Responsive Single-Source Partition */}
-          <nav className="hidden md:flex items-center space-x-1 flex-1 min-w-0 justify-start pl-1 sm:pl-2">
+          <nav className="hidden md:flex items-center space-x-1 flex-1 min-w-0 overflow-hidden justify-start pl-1 sm:pl-2">
             {directItems.map((item) => {
               const Icon = item.icon;
               const displayLabel = getNavLabel(item, tier);
@@ -357,7 +357,7 @@ export const Navbar: React.FC = () => {
                     title="Switch to Citizen Safety Portal"
                   >
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                    <span className="hidden xl:inline text-[11px] whitespace-nowrap">Citizen View</span>
+                    <span className="hidden 2xl:inline text-[11px] whitespace-nowrap">Citizen View</span>
                   </Link>
                 ) : (
                   <Link
@@ -366,7 +366,7 @@ export const Navbar: React.FC = () => {
                     title="Switch to Authority Command Portal"
                   >
                     <Building2 className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />
-                    <span className="hidden xl:inline text-[11px] whitespace-nowrap">Authority View</span>
+                    <span className="hidden 2xl:inline text-[11px] whitespace-nowrap">Authority View</span>
                   </Link>
                 )}
               </div>
@@ -375,7 +375,7 @@ export const Navbar: React.FC = () => {
             {/* Location / Jurisdiction Indicator (Item 9 & 22) */}
             {isGovPortal ? (
               <div
-                className="hidden xl:flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 border ts-border text-xs ts-text-muted flex-shrink-0"
+                className="hidden 2xl:flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 border ts-border text-xs ts-text-muted flex-shrink-0"
                 title={`Operational Scope: ${(user as any)?.jurisdiction_id === 'IN-MH-MCGM' ? 'Greater Mumbai' : (user as any)?.jurisdiction_name || (user as any)?.jurisdiction_id || 'Greater Mumbai'}`}
               >
                 <Building2 className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />

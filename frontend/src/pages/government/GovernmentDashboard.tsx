@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Building2,
@@ -50,48 +50,106 @@ export const GovernmentDashboard: React.FC = () => {
   const [healthForecast, setHealthForecast] = useState<HealthImpactForecastResponse | null>(null);
   const [engineTelemetry, setEngineTelemetry] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [lastUpdatedTime, setLastUpdatedTime] = useState<string>('Recently');
 
-  useEffect(() => {
-    let isMounted = true;
-    const fetchDashboardData = async () => {
-      setIsLoading(true);
-      try {
-        const [thermalRes, weatherRes, forecastRes, telemetryRes, healthFcRes, jurRes] = await Promise.allSettled([
-          api.getThermal(coords.lat, coords.lon),
-          api.getWeather(coords.lat, coords.lon),
-          api.getForecast(coords.lat, coords.lon),
-          api.getAlertEngineStatus(),
-          api.getHealthImpactForecast({ lat: coords.lat, lon: coords.lon }),
-          api.getJurisdictionUserContext(),
-        ]);
+  const fetchDashboardData = useCallback(async (isManual = false) => {
+    if (isManual) setIsRefreshing(true);
+    else setIsLoading(true);
+    try {
+      const [thermalRes, weatherRes, forecastRes, telemetryRes, healthFcRes, jurRes] = await Promise.allSettled([
+        api.getThermal(coords.lat, coords.lon),
+        api.getWeather(coords.lat, coords.lon),
+        api.getForecast(coords.lat, coords.lon),
+        api.getAlertEngineStatus(),
+        api.getHealthImpactForecast({ lat: coords.lat, lon: coords.lon }),
+        api.getJurisdictionUserContext(),
+      ]);
 
-        if (!isMounted) return;
+      let loadedThermal: ThermalResponse | null = null;
 
-        if (thermalRes.status === 'fulfilled') setThermalData(thermalRes.value);
-        if (weatherRes.status === 'fulfilled') setWeatherData(weatherRes.value);
-        if (forecastRes.status === 'fulfilled') setForecastData(forecastRes.value);
-        if (telemetryRes.status === 'fulfilled') setEngineTelemetry(telemetryRes.value);
-        if (healthFcRes.status === 'fulfilled') setHealthForecast(healthFcRes.value);
-        if (jurRes.status === 'fulfilled') setJurisdictionContext(jurRes.value);
-
-        setLastUpdatedTime(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
-      } catch (e) {
-        console.debug('Gov Dashboard data load error', e);
-      } finally {
-        if (isMounted) setIsLoading(false);
+      if (thermalRes.status === 'fulfilled' && thermalRes.value) {
+        setThermalData(thermalRes.value);
+        loadedThermal = thermalRes.value;
       }
-    };
+      if (weatherRes.status === 'fulfilled' && weatherRes.value) {
+        setWeatherData(weatherRes.value);
+      } else if (loadedThermal?.weather) {
+        setWeatherData({
+          location: loadedThermal.location,
+          weather: loadedThermal.weather,
+          forecast: loadedThermal.forecast,
+          source_status: (loadedThermal.weather as any).source_status || 'LIVE',
+          source_name: (loadedThermal.weather as any).source_name || 'Open-Meteo',
+          data_timestamp: (loadedThermal.weather as any).data_timestamp,
+          cache_age_seconds: 0,
+          is_fallback: false,
+        } as any);
+      }
 
-    fetchDashboardData();
-    return () => {
-      isMounted = false;
-    };
+      if (forecastRes.status === 'fulfilled' && forecastRes.value) {
+        setForecastData(forecastRes.value);
+      } else if (loadedThermal?.forecast) {
+        setForecastData({
+          forecast: loadedThermal.forecast,
+          source_status: 'LIVE',
+          source_name: 'Open-Meteo',
+          data_timestamp: new Date().toISOString(),
+          cache_age_seconds: 0,
+          is_fallback: false,
+        } as any);
+      }
+
+      if (telemetryRes.status === 'fulfilled') setEngineTelemetry(telemetryRes.value);
+      if (healthFcRes.status === 'fulfilled') setHealthForecast(healthFcRes.value);
+      if (jurRes.status === 'fulfilled') setJurisdictionContext(jurRes.value);
+
+      setLastUpdatedTime(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+    } catch (e) {
+      console.debug('Gov Dashboard data load error', e);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
   }, [coords.lat, coords.lon]);
 
-  const currentRiskLevel: RiskLevel | null = (thermalData?.thermal?.risk_assessment?.level as RiskLevel) || null;
-  const currentTemp = weatherData?.weather?.temperature ?? thermalData?.thermal?.input_summary?.temperature_c ?? null;
-  const feelsLike = weatherData?.weather?.apparent_temperature ?? thermalData?.thermal?.indices?.heat_index_c ?? null;
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  // Auto-retry once after 2.5s if telemetry was initially unpopulated
+  useEffect(() => {
+    if (!isLoading && !weatherData && !thermalData) {
+      const timer = setTimeout(() => {
+        fetchDashboardData();
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, weatherData, thermalData, fetchDashboardData]);
+
+  const currentRiskLevel: RiskLevel | null =
+    (thermalData?.thermal?.risk_assessment?.level as RiskLevel) ||
+    (weatherData?.weather?.apparent_temperature && weatherData.weather.apparent_temperature >= 40
+      ? 'CRITICAL'
+      : weatherData?.weather?.apparent_temperature && weatherData.weather.apparent_temperature >= 36
+      ? 'HIGH'
+      : weatherData?.weather?.apparent_temperature && weatherData.weather.apparent_temperature >= 30
+      ? 'MODERATE'
+      : weatherData?.weather
+      ? 'LOW'
+      : null);
+
+  const currentTemp =
+    weatherData?.weather?.temperature ??
+    thermalData?.weather?.temperature ??
+    thermalData?.thermal?.input_summary?.temperature_c ??
+    null;
+
+  const feelsLike =
+    weatherData?.weather?.apparent_temperature ??
+    thermalData?.weather?.apparent_temperature ??
+    thermalData?.thermal?.indices?.heat_index_c ??
+    null;
 
   // Derived Trend Evolution using existing evaluator
   const evolution = useMemo(() => {
@@ -143,60 +201,6 @@ export const GovernmentDashboard: React.FC = () => {
         />
       )}
 
-      {/* AUTHENTIC OFFICIAL IDENTITY & OPERATIONAL JURISDICTION BAR */}
-      {user && (
-        <div className="rounded-2xl ts-card p-4 border ts-border shadow-md bg-gradient-to-r from-slate-900/90 via-slate-800/80 to-slate-900/90 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-10 h-10 rounded-xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-orange-400 shrink-0">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2 flex-wrap">
-                <span className="font-black text-sm ts-text-primary tracking-tight">
-                  {user.name || user.email}
-                </span>
-                {user.official_id && (
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-700/60 text-slate-300 border border-slate-600/50">
-                    {user.official_id}
-                  </span>
-                )}
-                <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center space-x-1" title="Simulated Government Workflow Account (Judging Persona)">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                  <span>Demo Authority Persona</span>
-                </span>
-              </div>
-              <div className="text-xs ts-text-muted mt-0.5 flex items-center space-x-2 flex-wrap">
-                <span>{user.designation || 'Government Decision Officer'}</span>
-                <span>•</span>
-                <span>{user.department || user.organization || 'Disaster Management'}</span>
-                {user.organization && user.department && (
-                  <>
-                    <span>•</span>
-                    <span>{user.organization}</span>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Assigned Scope & Hierarchy Badge */}
-          <div className="flex items-center gap-2 text-xs">
-            <div className="px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-300 flex items-center space-x-1.5">
-              <MapPin className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-              <div>
-                <span className="font-bold text-[11px] block text-orange-200">
-                  Assigned Scope: {jurisdictionContext?.jurisdiction_name || user.jurisdiction_name || user.jurisdiction_id || 'Jurisdiction Managed'}
-                </span>
-                <span className="text-[10px] text-orange-400 font-mono">
-                  Level: {jurisdictionContext?.jurisdiction_type || user.jurisdiction_type || 'OFFICIAL'}
-                  {jurisdictionContext?.subordinate_jurisdiction_ids?.length ? ` • ${jurisdictionContext.subordinate_jurisdiction_ids.length} Sub-jurisdictions` : ''}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* SECTION 1 — GOVERNMENT COMMAND HEADER */}
       <div className="rounded-3xl ts-card p-6 sm:p-8 border ts-border shadow-xl relative overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b ts-border">
@@ -228,6 +232,16 @@ export const GovernmentDashboard: React.FC = () => {
               <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-slate-500/15 text-slate-700 dark:text-slate-300 border border-slate-500/30">
                 Updated {lastUpdatedTime}
               </span>
+              <button
+                type="button"
+                onClick={() => fetchDashboardData(true)}
+                disabled={isRefreshing || isLoading}
+                className="px-2.5 py-1 rounded-lg ts-card-subtle hover:bg-orange-500/15 border ts-border text-xs font-semibold ts-text-primary transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                title="Refresh real-time weather & thermal telemetry"
+              >
+                <RefreshCw className={`w-3 h-3 text-orange-500 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span className="text-[11px]">{isRefreshing ? 'Refreshing...' : 'Refresh Telemetry'}</span>
+              </button>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black ts-text-primary tracking-tight font-sans mt-2">
               Government Command Center
@@ -247,13 +261,21 @@ export const GovernmentDashboard: React.FC = () => {
         </div>
 
         {/* Compact Jurisdiction Summary Bar */}
-        <div className="mt-4 pt-2 flex flex-wrap items-center justify-between gap-3 text-xs ts-text-muted">
-          <div className="flex items-center space-x-2">
-            <MapPin className="w-3.5 h-3.5 text-orange-500" />
+        <div className="mt-4 pt-3 flex flex-wrap items-center justify-between gap-3 text-xs ts-text-muted border-t ts-border">
+          <div className="flex items-center space-x-2 flex-wrap">
+            <MapPin className="w-3.5 h-3.5 text-orange-500 shrink-0" />
             <span>
               <strong className="ts-text-primary font-bold">Operational Jurisdiction:</strong>{' '}
               {jurisdictionContext?.jurisdiction_name || user?.jurisdiction_name || locationName}
             </span>
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30">
+              Level: {jurisdictionContext?.jurisdiction_type || user?.jurisdiction_type || 'STATE_UT'}
+            </span>
+            {jurisdictionContext?.subordinate_jurisdiction_ids?.length ? (
+              <span className="text-[11px] ts-text-muted">
+                • {jurisdictionContext.subordinate_jurisdiction_ids.length} Sub-jurisdictions
+              </span>
+            ) : null}
           </div>
           <div className="flex items-center space-x-2 font-mono text-[11px]">
             <span>Lat {coords.lat.toFixed(2)}°, Lon {coords.lon.toFixed(2)}°</span>
@@ -421,7 +443,7 @@ export const GovernmentDashboard: React.FC = () => {
           <div className="flex items-center space-x-2">
             <Calendar className="w-4 h-4 text-orange-500" />
             <h2 className="text-xs font-black uppercase tracking-wider text-orange-500">
-              Early Warning Trajectory (Prompt 22)
+              Early Warning Trajectory
             </h2>
             <span className="text-sm font-black ts-text-primary font-sans">
               NEXT 5 DAYS OUTLOOK
