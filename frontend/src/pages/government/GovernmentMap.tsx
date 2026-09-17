@@ -277,6 +277,22 @@ export const GovernmentMap: React.FC = () => {
     });
   }, [forecastDayIdx, wardsForecastSummary, activeCityWards, thermalData]);
 
+  const [selectedDistrictFilter, setSelectedDistrictFilter] = useState<string>('ALL');
+
+  useEffect(() => {
+    setSelectedDistrictFilter('ALL');
+  }, [locationName]);
+
+  const availableDistricts = useMemo(() => {
+    const dists = Array.from(new Set(effectiveAdminWards.map((w) => w.district).filter(Boolean)));
+    return ['ALL', ...dists];
+  }, [effectiveAdminWards]);
+
+  const displayedAdminWards = useMemo(() => {
+    if (selectedDistrictFilter === 'ALL') return effectiveAdminWards;
+    return effectiveAdminWards.filter((w) => w.district === selectedDistrictFilter);
+  }, [effectiveAdminWards, selectedDistrictFilter]);
+
   const filteredGlobalStations = useMemo(() => {
     return getStationsByRegion(selectedRegionFilter);
   }, [selectedRegionFilter]);
@@ -462,33 +478,73 @@ export const GovernmentMap: React.FC = () => {
 
         {/* Row 3: Mode-Specific Quick Jump Tracks */}
         {gisLayerMode === 'official_wards' && (
-          <div className="pt-2 border-t ts-border flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap flex items-center gap-1 shrink-0">
-              <Building2 className="w-3.5 h-3.5 text-orange-500" />
-              <span>Ward Quick Jump ({effectiveAdminWards.length}):</span>
-            </span>
-            <div className="flex items-center gap-1.5">
-              {effectiveAdminWards.map((ward) => {
-                const isSelected = selectedWard?.id === ward.id;
-                const rStyle = getRiskStyle(ward.risk.level);
-                return (
-                  <button
-                    key={ward.id}
-                    type="button"
-                    onClick={() => setSelectedWard(ward)}
-                    className={`px-2.5 py-1 rounded-xl border text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center space-x-1.5 ${
-                      isSelected
-                        ? 'bg-orange-500 text-white border-orange-500 shadow-sm font-bold'
-                        : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary hover:bg-slate-500/10'
-                    }`}
-                    title={`${ward.name} — ${ward.risk.level} Risk (${ward.risk.score}/100)`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: rStyle.fill }} />
-                    <span>{ward.wardCode.startsWith('Ward') || ward.wardCode.includes('-') ? ward.wardCode : `Ward ${ward.wardCode}`}</span>
-                    <span className="text-[10.5px] font-mono opacity-80">{ward.weather.temperatureC.toFixed(0)}°C</span>
-                  </button>
-                );
-              })}
+          <div className="pt-2 border-t ts-border space-y-2">
+            {/* District Filter Selector */}
+            {availableDistricts.length > 2 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+                <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap flex items-center gap-1 shrink-0 mr-0.5">
+                  <Building2 className="w-3.5 h-3.5 text-orange-500" />
+                  <span>District:</span>
+                </span>
+                {availableDistricts.map((dist) => {
+                  const isSelected = selectedDistrictFilter === dist;
+                  const count =
+                    dist === 'ALL'
+                      ? effectiveAdminWards.length
+                      : effectiveAdminWards.filter((w) => w.district === dist).length;
+                  return (
+                    <button
+                      key={dist}
+                      type="button"
+                      onClick={() => setSelectedDistrictFilter(dist)}
+                      className={`px-2.5 py-1 rounded-xl border text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-orange-500 text-white border-orange-500 shadow-sm font-bold'
+                          : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary hover:bg-slate-500/10'
+                      }`}
+                    >
+                      <span>{dist === 'ALL' ? 'All Districts' : dist}</span>
+                      <span className="ml-1 text-[10px] opacity-75 font-mono">({count})</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Ward Quick Jump Buttons */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap flex items-center gap-1 shrink-0">
+                <span>Wards ({displayedAdminWards.length}):</span>
+              </span>
+              <div className="flex items-center gap-1.5">
+                {displayedAdminWards.map((ward) => {
+                  const isSelected = selectedWard?.id === ward.id;
+                  const rStyle = getRiskStyle(ward.risk.level);
+                  return (
+                    <button
+                      key={ward.id}
+                      type="button"
+                      onClick={() => setSelectedWard(ward)}
+                      className={`px-2.5 py-1 rounded-xl border text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center space-x-1.5 ${
+                        isSelected
+                          ? 'bg-orange-500 text-white border-orange-500 shadow-sm font-bold'
+                          : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary hover:bg-slate-500/10'
+                      }`}
+                      title={`${ward.name} (${ward.district}) — ${ward.risk.level} Risk (${ward.risk.score}/100)`}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: rStyle.fill }} />
+                      <span>
+                        {ward.wardCode.startsWith('Ward') || ward.wardCode.includes('-')
+                          ? ward.wardCode
+                          : `Ward ${ward.wardCode}`}
+                      </span>
+                      <span className="text-[10.5px] font-mono opacity-80">
+                        {ward.weather.temperatureC.toFixed(0)}°C
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
@@ -899,7 +955,7 @@ export const GovernmentMap: React.FC = () => {
                 <>
                   <span><strong>Ward Code:</strong> {selectedWard.wardCode}</span>
                   <span>•</span>
-                  <span><strong>District:</strong> {selectedWard.district}</span>
+                  <span><strong>District:</strong> <span className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 font-semibold border border-amber-500/30">{selectedWard.district}</span></span>
                   <span>•</span>
                   <span><strong>Geography:</strong> Official Administrative Ward</span>
                   <span>•</span>
