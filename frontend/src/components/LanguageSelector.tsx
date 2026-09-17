@@ -105,14 +105,14 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         title={`Language: ${currentLanguageOption.label} (${currentLanguageOption.englishLabel})`}
       >
         <Languages className="w-4 h-4 text-orange-400 flex-shrink-0" />
-        <span className="text-xs font-semibold hidden md:inline truncate max-w-[70px]">
+        <span className="text-xs font-semibold hidden xl:inline truncate max-w-[65px]">
           {currentLanguageOption.label}
         </span>
-        <span className="text-xs font-bold uppercase md:hidden text-orange-400">
+        <span className="text-[11px] font-bold uppercase xl:hidden text-orange-400 font-mono">
           {currentLanguageOption.code}
         </span>
         <ChevronDown
-          className={`w-3 h-3 text-slate-400 transition-transform hidden min-[360px]:inline ${
+          className={`w-3 h-3 text-slate-400 transition-transform hidden xl:inline ${
             isOpen ? 'rotate-180' : ''
           }`}
         />

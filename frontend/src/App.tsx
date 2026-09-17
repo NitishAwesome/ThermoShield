@@ -51,6 +51,18 @@ const MunicipalMatrix = lazy(() =>
   }))
 );
 
+const PortalLanding = lazy(() =>
+  import('./pages/auth/PortalLanding').then((m) => ({ default: m.PortalLanding }))
+);
+
+const CitizenAuth = lazy(() =>
+  import('./pages/auth/CitizenAuth').then((m) => ({ default: m.CitizenAuth }))
+);
+
+const AuthorityAuth = lazy(() =>
+  import('./pages/auth/AuthorityAuth').then((m) => ({ default: m.AuthorityAuth }))
+);
+
 const Auth = lazy(() =>
   import('./pages/Auth').then((m) => ({ default: m.Auth }))
 );
@@ -121,7 +133,7 @@ export const App: React.FC = () => {
                     <Navbar />
 
                     {/* Main Content Viewport */}
-                    <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+                    <main className="flex-1 max-w-7xl 2xl:max-w-screen-2xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
                       <Suspense
                         fallback={<LoadingState message="Loading module..." />}
                       >
@@ -222,19 +234,32 @@ export const App: React.FC = () => {
                           </Route>
 
                           {/* ========================================================= */}
-                          {/* 3. AUTHENTICATION & ACCESS ROUTES                         */}
+                          {/* 3. AUTHENTICATION & ACCESS ROUTES (Two-Portal Architecture) */}
                           {/* ========================================================= */}
+                          {/* Portal Selection & Landing */}
+                          <Route path="/auth" element={<PortalLanding />} />
+                          <Route path="/login" element={<PortalLanding />} />
+                          <Route path="/register" element={<PortalLanding />} />
+                          <Route path="/signup" element={<Navigate to="/auth/citizen/register" replace />} />
+
+                          {/* Citizen Portal Authentication */}
                           <Route
-                            path="/login"
-                            element={<Auth initialMode="login" />}
+                            path="/auth/citizen/login"
+                            element={<CitizenAuth initialMode="login" />}
                           />
                           <Route
-                            path="/register"
-                            element={<Auth initialMode="register" />}
+                            path="/auth/citizen/register"
+                            element={<CitizenAuth initialMode="register" />}
+                          />
+
+                          {/* Authority Portal Authentication */}
+                          <Route
+                            path="/auth/authority/login"
+                            element={<AuthorityAuth initialMode="login" />}
                           />
                           <Route
-                            path="/signup"
-                            element={<Auth initialMode="register" />}
+                            path="/auth/authority/register"
+                            element={<AuthorityAuth initialMode="register" />}
                           />
 
                           {/* Fallback Catch-All */}

@@ -165,8 +165,13 @@ class TestAuthSecurity(unittest.TestCase):
     # 9. Authorized admin/official access works
     def test_09_authorized_admin_access_works(self):
         admin_data = self._generate_unique_user_data()
-        admin_data["role"] = "admin"
+        admin_data["role"] = "official"
+        admin_data["organization"] = "NDMA"
+        admin_data["department"] = "Administration"
+        admin_data["designation"] = "Director"
+        admin_data["requested_jurisdiction"] = "IN"
         reg = self.client.post("/auth/register", json=admin_data)
+        self.assertEqual(reg.status_code, 201, reg.text)
         admin_token = reg.json()["access_token"]
         headers = {"Authorization": f"Bearer {admin_token}"}
 

@@ -97,9 +97,25 @@ export const Forecast: React.FC = () => {
             5-Day Horizon
           </Badge>
           <DataRealityBadge
-            tier={isFallback ? 'OFFLINE_FALLBACK' : 'LIVE'}
+            tier={
+              isLoading && !forecastData
+                ? 'LOADING'
+                : (error || !forecastData) && !isLoading
+                ? 'UNAVAILABLE'
+                : isFallback
+                ? 'OFFLINE_FALLBACK'
+                : (forecastData?.source_status as any) || 'LIVE'
+            }
             size="xs"
-            customLabel={isFallback ? 'Demonstration Baseline' : 'Live Open-Meteo'}
+            customLabel={
+              (error || !forecastData) && !isLoading
+                ? 'Forecast Unavailable'
+                : isLoading && !forecastData
+                ? 'Loading Forecast'
+                : isFallback
+                ? 'Demonstration Baseline'
+                : 'Live Open-Meteo'
+            }
           />
         </div>
         <h1 className="text-2xl sm:text-3xl font-black ts-text-primary font-sans mt-0.5">
@@ -368,8 +384,8 @@ export const Forecast: React.FC = () => {
       ) : (
         <EmptyState
           icon={<Calendar className="w-8 h-8 text-slate-400" />}
-          title="Forecast Unavailable"
-          description="No forecast data returned for the specified coordinates. Try selecting another nearby city."
+          title="Forecast Data Temporarily Unavailable"
+          description="Current atmospheric forecast cannot be retrieved from the weather telemetry engine. Multi-day planning calculations are paused."
           action={
             <Button variant="primary" onClick={fetchForecast} leftIcon={<RefreshCw className="w-4 h-4" />}>
               Retry Forecast

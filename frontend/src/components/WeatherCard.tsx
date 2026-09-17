@@ -1,41 +1,128 @@
 import React from 'react';
-import { Thermometer, Droplets, Wind, Sun, Clock, Flame, ShieldAlert, SunMedium } from 'lucide-react';
+import { Thermometer, Droplets, Wind, Clock, Flame, SunMedium } from 'lucide-react';
 import { WeatherCondition } from '../types';
 import { formatTemperature, formatPercent, formatSpeed } from '../utils/risk';
-import { Card, CardHeader, CardContent, Badge, EmptyState } from './ui';
+import { Card, CardHeader, CardContent } from './ui';
 import { useTranslation } from '../context/LanguageContext';
 import { DataRealityBadge } from './provenance';
+import { TelemetryState } from '../utils/telemetryState';
 
 interface WeatherCardProps {
   weather?: WeatherCondition;
+  locationName?: string;
   className?: string;
   variant?: 'citizen' | 'full';
+  telemetryState?: TelemetryState;
+  isFallback?: boolean;
+  weatherSourceName?: string;
 }
 
 export const WeatherCard: React.FC<WeatherCardProps> = ({
   weather,
+  locationName,
   className = '',
   variant = 'citizen',
+  telemetryState,
+  isFallback = false,
+  weatherSourceName,
 }) => {
   const { t } = useTranslation();
 
-  if (!weather) {
+  const isAvailable = Boolean(
+    weather &&
+    weather.temperature !== undefined &&
+    weather.temperature !== null &&
+    !isNaN(weather.temperature) &&
+    telemetryState !== 'UNAVAILABLE'
+  );
+
+  // If weather observations are unavailable, render clean neutral unavailable state
+  if (!isAvailable || !weather) {
     return (
-      <Card className={className}>
-        <EmptyState
-          icon={<Thermometer className="w-6 h-6 text-slate-400" />}
-          title={t('weatherCard.telemetryInactive', 'Weather data loading...')}
-          description={t('weatherCard.telemetryWaiting', 'Fetching current meteorological observations.')}
+      <Card variant="elevated" className={`flex flex-col justify-between shadow-md ${className}`}>
+        <CardHeader
+          title={t('weatherCard.title', 'Current Local Conditions')}
+          subtitle={locationName ? `${locationName.split(',')[0]} • Observations unavailable` : 'Observations unavailable'}
+          badge={
+            <DataRealityBadge
+              tier="UNAVAILABLE"
+              size="xs"
+              customLabel="Unavailable"
+            />
+          }
+          action={
+            <div className="flex items-center space-x-1.5 text-xs ts-text-muted px-2.5 py-1 rounded-lg ts-card-subtle border ts-border">
+              <Clock className="w-3.5 h-3.5 text-slate-400" />
+              <span className="font-mono text-[11px]">—</span>
+            </div>
+          }
         />
+        <CardContent className="space-y-4">
+          <div className="p-4 rounded-xl ts-card-subtle border ts-border flex items-center justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-bold uppercase tracking-wider ts-text-muted">
+                  {variant === 'citizen' ? t('weather.temperature', 'Current Temperature') : 'Dry-Bulb Air Temperature'}
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-slate-500/10 text-slate-400 border border-slate-500/20">
+                  Unavailable
+                </span>
+              </div>
+              <div className="flex items-baseline space-x-3">
+                <div className="text-4xl sm:text-5xl font-black font-mono ts-text-muted tracking-tight">
+                  —
+                </div>
+                <div className="flex items-center space-x-1 text-xs sm:text-sm font-semibold text-slate-400 bg-slate-500/10 px-2.5 py-1 rounded-lg border border-slate-500/20">
+                  <Flame className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>Feels like —</span>
+                </div>
+              </div>
+              <p className="text-[11px] ts-text-subtle">
+                Weather observations are currently unavailable for this location.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2.5 pt-1">
+            <div className="p-3 rounded-xl ts-card-subtle border ts-border flex items-center space-x-2.5">
+              <Droplets className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              <div>
+                <div className="text-[10.5px] ts-text-muted uppercase font-bold">Humidity</div>
+                <div className="text-sm font-black font-mono ts-text-muted">—</div>
+              </div>
+            </div>
+            <div className="p-3 rounded-xl ts-card-subtle border ts-border flex items-center space-x-2.5">
+              <Wind className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              <div>
+                <div className="text-[10.5px] ts-text-muted uppercase font-bold">Wind Speed</div>
+                <div className="text-sm font-black font-mono ts-text-muted">—</div>
+              </div>
+            </div>
+            <div className="p-3 rounded-xl ts-card-subtle border ts-border flex items-center space-x-2.5">
+              <SunMedium className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              <div>
+                <div className="text-[10.5px] ts-text-muted uppercase font-bold">UV Index</div>
+                <div className="text-sm font-black font-mono ts-text-muted">—</div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
       </Card>
     );
   }
 
-  const isFallback = Boolean(weather.is_fallback || weather.source_status === 'OFFLINE_FALLBACK');
+  const effectiveFallback = Boolean(
+    isFallback ||
+    weather.is_fallback ||
+    weather.source_status === 'OFFLINE_FALLBACK' ||
+    telemetryState === 'OFFLINE_FALLBACK'
+  );
 
   const formattedTime = weather.time
     ? new Date(weather.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : t('riskCard.liveTelemetry', 'Live telemetry');
+    : effectiveFallback
+    ? 'Offline Fallback'
+    : 'Live Observation';
 
   const feelsLike = weather.apparent_temperature ?? weather.temperature;
   const uvIndex = weather.uv_index ?? (weather.solar_radiation && weather.solar_radiation > 400 ? 7.5 : 2.0);
@@ -50,16 +137,39 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({
 
   const uvBadge = getUvBadge(uvIndex);
 
+  // Provenance tier
+  const realityTier = effectiveFallback
+    ? 'OFFLINE_FALLBACK'
+    : weather.source_status === 'STALE_CACHED' || telemetryState === 'STALE_CACHED'
+    ? 'STALE_CACHED'
+    : weather.source_status === 'CACHED' || telemetryState === 'CACHED'
+    ? 'CACHED'
+    : 'LIVE';
+
+  const realityLabel = effectiveFallback
+    ? 'Offline Fallback'
+    : weather.source_status === 'STALE_CACHED'
+    ? 'Stale Cached'
+    : weather.source_status === 'CACHED'
+    ? 'Cached Data'
+    : 'Live Data';
+
   return (
     <Card variant="elevated" className={`flex flex-col justify-between shadow-md ${className}`}>
       <CardHeader
         title={t('weatherCard.title', 'Current Local Conditions')}
-        subtitle={variant === 'citizen' ? (isFallback ? 'Offline Regional Baseline • Continuous fallback' : 'Live Open-Meteo observations • Regional coordinate') : t('weatherCard.subtitle')}
+        subtitle={
+          variant === 'citizen'
+            ? effectiveFallback
+              ? 'Offline Regional Baseline • Continuous fallback'
+              : 'Live Open-Meteo observations • Regional coordinate'
+            : t('weatherCard.subtitle')
+        }
         badge={
           <DataRealityBadge
-            tier={isFallback ? 'OFFLINE_FALLBACK' : 'LIVE'}
+            tier={realityTier}
             size="xs"
-            customLabel={isFallback ? 'Demonstration Baseline' : 'Live Telemetry'}
+            customLabel={realityLabel}
           />
         }
         action={
@@ -98,61 +208,57 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({
                 : t('weatherCard.synopticNote')}
             </p>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 flex-shrink-0 ml-3">
-            <Thermometer className="w-6 h-6" />
-          </div>
         </div>
 
-        {/* 4 Meteorological Environmental Metrics */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        {/* 3 Secondary Critical Meteorological Parameters */}
+        <div className="grid grid-cols-3 gap-2.5 pt-1">
           {/* Relative Humidity */}
-          <div className="p-2.5 rounded-xl ts-card-subtle border ts-border text-center flex flex-col items-center justify-center">
-            <div className="flex items-center space-x-1 text-sky-400 mb-1">
-              <Droplets className="w-3.5 h-3.5" />
-              <span className="text-[10px] uppercase font-bold ts-text-muted">{t('weather.humidity', 'Humidity')}</span>
+          <div className="p-3 rounded-xl ts-card-subtle border ts-border flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-lg bg-sky-500/10 flex items-center justify-center text-sky-400 flex-shrink-0">
+              <Droplets className="w-4 h-4" />
             </div>
-            <span className="text-base sm:text-lg font-bold font-mono ts-text-primary">
-              {formatPercent(weather.humidity)}
-            </span>
+            <div className="min-w-0">
+              <div className="text-[10.5px] ts-text-muted uppercase font-bold tracking-wider">
+                {t('weather.humidity', 'Humidity')}
+              </div>
+              <div className="text-sm font-black font-mono ts-text-primary mt-0.5">
+                {formatPercent(weather.humidity)}
+              </div>
+            </div>
           </div>
 
           {/* Wind Speed */}
-          <div className="p-2.5 rounded-xl ts-card-subtle border ts-border text-center flex flex-col items-center justify-center">
-            <div className="flex items-center space-x-1 text-teal-400 mb-1">
-              <Wind className="w-3.5 h-3.5" />
-              <span className="text-[10px] uppercase font-bold ts-text-muted">{t('weather.windSpeed', 'Wind Speed')}</span>
+          <div className="p-3 rounded-xl ts-card-subtle border ts-border flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center text-teal-400 flex-shrink-0">
+              <Wind className="w-4 h-4" />
             </div>
-            <span className="text-base sm:text-lg font-bold font-mono ts-text-primary">
-              {formatSpeed(weather.wind_speed)}
-            </span>
+            <div className="min-w-0">
+              <div className="text-[10.5px] ts-text-muted uppercase font-bold tracking-wider">
+                {t('weather.windSpeed', 'Wind')}
+              </div>
+              <div className="text-sm font-black font-mono ts-text-primary mt-0.5">
+                {formatSpeed(weather.wind_speed)}
+              </div>
+            </div>
           </div>
 
-          {/* Solar Irradiance */}
-          <div className="p-2.5 rounded-xl ts-card-subtle border ts-border text-center flex flex-col items-center justify-center">
-            <div className="flex items-center space-x-1 text-amber-400 mb-1">
-              <Sun className="w-3.5 h-3.5" />
-              <span className="text-[10px] uppercase font-bold ts-text-muted">Solar Sun</span>
+          {/* Solar / UV Index */}
+          <div className="p-3 rounded-xl ts-card-subtle border ts-border flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400 flex-shrink-0">
+              <SunMedium className="w-4 h-4" />
             </div>
-            <span className="text-base sm:text-lg font-bold font-mono ts-text-primary">
-              {weather.solar_radiation !== null && weather.solar_radiation !== undefined
-                ? `${Math.round(weather.solar_radiation)} W/m²`
-                : 'Daylight'}
-            </span>
-          </div>
-
-          {/* UV Radiation Index */}
-          <div className="p-2.5 rounded-xl ts-card-subtle border ts-border text-center flex flex-col items-center justify-center">
-            <div className="flex items-center space-x-1 text-purple-400 mb-1">
-              <SunMedium className="w-3.5 h-3.5" />
-              <span className="text-[10px] uppercase font-bold ts-text-muted">UV Index</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <span className="text-base sm:text-lg font-bold font-mono ts-text-primary">
-                {uvIndex.toFixed(1)}
-              </span>
-              <span className={`px-1 py-0.2 rounded text-[9px] font-bold border ${uvBadge.color}`}>
-                {uvBadge.label}
-              </span>
+            <div className="min-w-0">
+              <div className="text-[10.5px] ts-text-muted uppercase font-bold tracking-wider">
+                UV Index
+              </div>
+              <div className="flex items-center space-x-1.5 mt-0.5">
+                <span className="text-sm font-black font-mono ts-text-primary">
+                  {uvIndex.toFixed(1)}
+                </span>
+                <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${uvBadge.color}`}>
+                  {uvBadge.label}
+                </span>
+              </div>
             </div>
           </div>
         </div>

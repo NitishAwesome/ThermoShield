@@ -97,6 +97,32 @@ const getInitialProfile = (user: any): UserProfile => {
   const email = user?.email || 'guest@thermoshield.org';
   const name = user?.name || 'ThermoShield Resident';
 
+  const isAuthority =
+    user?.portal_type === 'AUTHORITY' ||
+    Boolean(user?.organization || user?.jurisdiction_id || (user?.role && !['user', 'citizen'].includes(role)));
+
+  if (isAuthority) {
+    return {
+      email,
+      fullName: name,
+      phoneNumber: user?.phone_number || '',
+      age: 45,
+      gender: 'Other',
+      role: user?.role || 'official',
+      city: '',
+      state: '',
+      district: '',
+      organization: user?.organization || 'Government Authority',
+      jurisdiction: user?.jurisdiction_name || user?.jurisdiction_id || 'Operational Jurisdiction',
+      department: user?.department || 'Operations Wing',
+      health: { ...DEFAULT_HEALTH },
+      exposure: { ...DEFAULT_EXPOSURE, dailyOutdoorTime: 'mixed' },
+      preparedness: { ...DEFAULT_PREPAREDNESS, hasCoolingAccess: true },
+      preferences: { ...DEFAULT_PREFERENCES, preferredLanguage: 'English' },
+      notificationPreferences: getDefaultNotificationPreferences('smart', 'official'),
+    };
+  }
+
   if (role === 'official') {
     return {
       email,
@@ -105,61 +131,17 @@ const getInitialProfile = (user: any): UserProfile => {
       age: 48,
       gender: 'Male',
       role: 'official',
-      city: 'Jaipur',
-      state: 'Rajasthan',
-      district: 'Jaipur Urban',
+      city: '',
+      state: '',
+      district: '',
       organization: 'Ministry of Health & Family Welfare',
-      jurisdiction: 'Jaipur Metropolitan Division',
+      jurisdiction: 'National Coordination',
       department: 'Public Health Emergency & Heatwave Response Wing',
       health: { ...DEFAULT_HEALTH, conditions: ['hypertension'] },
       exposure: { ...DEFAULT_EXPOSURE, dailyOutdoorTime: 'mostly_indoors', coolingAccess: 'reliable' },
       preparedness: { ...DEFAULT_PREPAREDNESS, hasCoolingAccess: true, knowsCoolingCenter: true },
       preferences: { ...DEFAULT_PREFERENCES, preferredLanguage: 'English' },
       notificationPreferences: getDefaultNotificationPreferences('smart', 'official'),
-    };
-  }
-
-  if (role === 'responder') {
-    return {
-      email,
-      fullName: name,
-      phoneNumber: user?.phone_number || '+91 98223 34455',
-      age: 38,
-      gender: 'Male',
-      role: 'responder',
-      city: 'Jaipur',
-      state: 'Rajasthan',
-      district: 'Zone 4 Emergency Corridor',
-      organization: 'National Disaster Response Force (NDRF)',
-      jurisdiction: 'North-Western Command',
-      department: 'Rapid Heat Respite & Mobile Cooling Shelter Unit',
-      health: { ...DEFAULT_HEALTH, isOutdoorWorker: true },
-      exposure: { ...DEFAULT_EXPOSURE, dailyOutdoorTime: 'mostly_outdoors', activityLevel: 'heavy', clothingType: 'heavy_protective' },
-      preparedness: { ...DEFAULT_PREPAREDNESS, knowsCoolingCenter: true },
-      preferences: { ...DEFAULT_PREFERENCES, preferredLanguage: 'Hindi / English' },
-      notificationPreferences: getDefaultNotificationPreferences('smart', 'responder'),
-    };
-  }
-
-  if (role === 'analyst') {
-    return {
-      email,
-      fullName: name,
-      phoneNumber: user?.phone_number || '+91 98334 45566',
-      age: 34,
-      gender: 'Female',
-      role: 'analyst',
-      city: 'Delhi',
-      state: 'Delhi',
-      district: 'National Synoptic Node',
-      organization: 'India Meteorological Department (IMD)',
-      jurisdiction: 'Northern India Meteorological Grid',
-      department: 'Urban Heat Island & Biometeorological Modeling Unit',
-      health: { ...DEFAULT_HEALTH },
-      exposure: { ...DEFAULT_EXPOSURE, dailyOutdoorTime: 'mostly_indoors', coolingAccess: 'reliable' },
-      preparedness: { ...DEFAULT_PREPAREDNESS, hasCoolingAccess: true },
-      preferences: { ...DEFAULT_PREFERENCES, preferredLanguage: 'English' },
-      notificationPreferences: getDefaultNotificationPreferences('smart', 'analyst'),
     };
   }
 
@@ -172,9 +154,9 @@ const getInitialProfile = (user: any): UserProfile => {
     age: isDemoCitizen ? 42 : null,
     gender: isDemoCitizen ? 'Male' : '',
     role: 'user',
-    city: 'Jaipur',
-    state: 'Rajasthan',
-    district: 'Civil Lines',
+    city: isDemoCitizen ? 'Mumbai' : '',
+    state: isDemoCitizen ? 'Maharashtra' : '',
+    district: isDemoCitizen ? 'K/East Ward' : '',
     organization: '',
     jurisdiction: '',
     department: '',

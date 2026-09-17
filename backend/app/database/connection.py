@@ -129,6 +129,7 @@ def init_db_schema():
     SQLAlchemy's create_all creates tables with 'CREATE TABLE IF NOT EXISTS'
     so it is completely idempotent, non-destructive, and guarantees essential tables
     exist immediately on server boot.
+    Also executes safe, non-destructive ALTER TABLE checks for column additions.
     """
     try:
         try:
@@ -137,6 +138,31 @@ def init_db_schema():
             from backend.app.database import models  # noqa: F401
         Base.metadata.create_all(bind=engine)
         logger.info("Database schema tables verified via create_all().")
+
+        # Safe non-destructive column additions for User model
+        from sqlalchemy import inspect, text
+        inspector = inspect(engine)
+        if "users" in inspector.get_table_names():
+            columns = {col["name"] for col in inspector.get_columns("users")}
+            user_extensions = [
+                ("organization", "VARCHAR(150)"),
+                ("department", "VARCHAR(100)"),
+                ("designation", "VARCHAR(100)"),
+                ("official_id", "VARCHAR(50)"),
+                ("jurisdiction_id", "VARCHAR(50) DEFAULT 'IN'"),
+                ("jurisdiction_type", "VARCHAR(30) DEFAULT 'COUNTRY'"),
+                ("permissions", "VARCHAR(500) DEFAULT ''"),
+                ("account_status", "VARCHAR(30) DEFAULT 'APPROVED'"),
+            ]
+            with engine.connect() as conn:
+                for col_name, col_type in user_extensions:
+                    if col_name not in columns:
+                        logger.info(f"Adding missing column '{col_name}' to users table...")
+                        try:
+                            conn.execute(text(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}"))
+                            conn.commit()
+                        except Exception as alter_err:
+                            logger.warning(f"Notice adding column {col_name}: {alter_err}")
     except Exception as e:
         logger.warning(f"Database initialization warning: {e}")
 

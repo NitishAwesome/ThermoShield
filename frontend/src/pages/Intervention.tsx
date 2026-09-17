@@ -664,8 +664,8 @@ export const Intervention: React.FC = () => {
                     {simulationData?.projected_risk.toFixed(1) ?? baselineRiskScore.toFixed(1)}
                   </span>
                   <div>
-                    <Badge riskLevel={simulationData?.projected_level || 'LOW'} size="sm">
-                      {simulationData?.projected_level || 'LOW'}
+                    <Badge riskLevel={simulationData?.projected_level || (baselineRiskScore > 0 ? (currentRiskLevel as any) : null)} size="sm">
+                      {simulationData?.projected_level || (baselineRiskScore > 0 ? currentRiskLevel : 'Unavailable')}
                     </Badge>
                   </div>
                 </div>

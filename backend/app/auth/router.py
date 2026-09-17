@@ -1,7 +1,7 @@
 import os
 import time
 import logging
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 
 import httpx
@@ -15,8 +15,23 @@ from sqlalchemy.orm import Session
 from app.database.connection import get_db
 from app.database.models import User
 from app.schemas import UserResponse
+from app.jurisdiction import get_jurisdiction, is_in_jurisdiction_scope, JurisdictionType
+from app.auth.authority_validation import validate_authority_access_request
 
 logger = logging.getLogger(__name__)
+
+GOV_ROLES = {
+    "system_admin",
+    "national_analyst",
+    "state_coordinator",
+    "district_authority",
+    "municipal_hap_officer",
+    "ward_officer",
+    "responder",
+    "official",
+    "analyst",
+    "admin",
+}
 
 router = APIRouter(
     prefix="/auth",
@@ -132,6 +147,11 @@ class UserRegister(BaseModel):
     phone_number: str = Field(..., min_length=7, max_length=20)
     password: str = Field(..., min_length=8, description="Password must be at least 8 characters long")
     role: Optional[str] = "user"
+    organization: Optional[str] = None
+    department: Optional[str] = None
+    designation: Optional[str] = None
+    official_id: Optional[str] = None
+    requested_jurisdiction: Optional[str] = None
 
 
 class UserLogin(BaseModel):
@@ -157,20 +177,100 @@ class AuthResponse(BaseModel):
 
 
 # ==================================================
-# TOKEN HELPERS
+# TOKEN & PERMISSION HELPERS
 # ==================================================
 
 
+def get_default_permissions_for_role(role: str) -> List[str]:
+    """Provides canonical permission bundle for a given government role."""
+    r = role.strip().upper()
+    role_map = {
+        "NATIONAL_ANALYST": ["VIEW_JURISDICTION", "VIEW_NATIONAL_CONTEXT", "VIEW_SUBORDINATE_REGIONS", "ANALYZE_RISK", "RECOMMEND_HAP_ACTION", "EXPORT_REPORT"],
+        "STATE_COORDINATOR": ["VIEW_JURISDICTION", "VIEW_PARENT_CONTEXT", "VIEW_NATIONAL_CONTEXT", "VIEW_SUBORDINATE_REGIONS", "ANALYZE_RISK", "RECOMMEND_HAP_ACTION", "EXPORT_REPORT"],
+        "DISTRICT_AUTHORITY": ["VIEW_JURISDICTION", "VIEW_PARENT_CONTEXT", "VIEW_SUBORDINATE_REGIONS", "ANALYZE_RISK", "RECOMMEND_HAP_ACTION", "ACTIVATE_HAP", "APPROVE_HAP_ACTION", "DISPATCH_RESPONDER", "EXPORT_REPORT"],
+        "MUNICIPAL_HAP_OFFICER": ["VIEW_JURISDICTION", "VIEW_PARENT_CONTEXT", "VIEW_NATIONAL_CONTEXT", "VIEW_SUBORDINATE_REGIONS", "ANALYZE_RISK", "RECOMMEND_HAP_ACTION", "APPROVE_HAP_ACTION", "ACTIVATE_HAP", "CLOSE_HAP_ACTION", "SEND_PUBLIC_ADVISORY", "DISPATCH_RESPONDER", "EXPORT_REPORT"],
+        "OFFICIAL": ["VIEW_JURISDICTION", "VIEW_PARENT_CONTEXT", "VIEW_NATIONAL_CONTEXT", "VIEW_SUBORDINATE_REGIONS", "ANALYZE_RISK", "RECOMMEND_HAP_ACTION", "APPROVE_HAP_ACTION", "ACTIVATE_HAP", "CLOSE_HAP_ACTION", "SEND_PUBLIC_ADVISORY", "DISPATCH_RESPONDER", "EXPORT_REPORT"],
+        "WARD_OFFICER": ["VIEW_JURISDICTION", "VIEW_PARENT_CONTEXT", "ACKNOWLEDGE_TASK", "DISPATCH_RESPONDER", "RECOMMEND_HAP_ACTION"],
+        "HEALTH_OFFICER": ["VIEW_JURISDICTION", "VIEW_PARENT_CONTEXT", "ANALYZE_RISK", "RECOMMEND_HAP_ACTION", "ACKNOWLEDGE_TASK"],
+        "RESPONDER": ["VIEW_JURISDICTION", "ACKNOWLEDGE_TASK"],
+        "ANALYST": ["VIEW_JURISDICTION", "VIEW_NATIONAL_CONTEXT", "VIEW_SUBORDINATE_REGIONS", "ANALYZE_RISK", "RECOMMEND_HAP_ACTION", "RUN_SCENARIO", "EXPORT_REPORT"],
+        "SYSTEM_ADMIN": ["MANAGE_JURISDICTION_USERS", "VIEW_JURISDICTION"],
+        "ADMIN": ["MANAGE_JURISDICTION_USERS", "VIEW_JURISDICTION"],
+        "USER": ["VIEW_JURISDICTION"],
+    }
+    return role_map.get(r, ["VIEW_JURISDICTION"])
+
+
+def is_demo_auto_approval_enabled() -> bool:
+    """
+    Returns True if demo auto-approval for authority registration is active.
+    Default: True in development/demo environments.
+    Strictly False in production unless explicitly configured with AUTO_APPROVE_AUTHORITY_REGISTRATION=true.
+    """
+    if _is_production_environment():
+        flag = os.getenv("AUTO_APPROVE_AUTHORITY_REGISTRATION", "false").lower()
+        return flag in ("true", "1", "yes")
+    flag = os.getenv("AUTO_APPROVE_AUTHORITY_REGISTRATION", "true").lower()
+    return flag in ("true", "1", "yes")
+
+
+def build_user_response(user: User) -> UserResponse:
+    """Helper to assemble a canonical UserResponse with portal_type and jurisdiction_name."""
+    juris_id = user.jurisdiction_id or "IN"
+    node = get_jurisdiction(juris_id)
+    juris_name = node.name if node else ("India (National)" if juris_id == "IN" else juris_id)
+    is_gov = (user.role or "").lower() in GOV_ROLES
+    portal_type = "AUTHORITY" if is_gov else "CITIZEN"
+
+    return UserResponse(
+        id=user.id,
+        name=user.name,
+        phone_number=user.phone_number,
+        email=user.email,
+        role=user.role,
+        organization=user.organization,
+        department=user.department,
+        designation=user.designation,
+        official_id=user.official_id,
+        jurisdiction_id=juris_id,
+        jurisdiction_name=juris_name,
+        jurisdiction_type=user.jurisdiction_type or "COUNTRY",
+        permissions=user.permissions or "",
+        account_status=user.account_status or "APPROVED",
+        portal_type=portal_type,
+    )
+
+
 def create_access_token(user: User) -> str:
-    """Generate a signed JWT token containing user identity claims."""
+    """Generate a signed JWT token containing user identity and jurisdiction claims."""
     expire = datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS)
+    perms = [p.strip() for p in (user.permissions or "").split(",") if p.strip()]
+    if not perms:
+        perms = get_default_permissions_for_role(user.role or "user")
+
+    juris_id = user.jurisdiction_id or "IN"
+    node = get_jurisdiction(juris_id)
+    juris_name = node.name if node else ("India (National)" if juris_id == "IN" else juris_id)
+    is_gov = (user.role or "").lower() in GOV_ROLES
+    portal_type = "AUTHORITY" if is_gov else "CITIZEN"
+
     payload = {
         "sub": str(user.id),
         "user_id": user.id,
         "email": user.email,
         "name": user.name,
         "role": user.role,
+        "portal_type": portal_type,
         "phone_number": user.phone_number,
+        "organization": user.organization,
+        "department": user.department,
+        "designation": user.designation,
+        "official_id": user.official_id,
+        "jurisdiction_id": juris_id,
+        "jurisdiction_name": juris_name,
+        "jurisdiction_type": user.jurisdiction_type or "COUNTRY",
+        "permissions": perms,
+        "account_status": user.account_status or "APPROVED",
         "exp": expire,
         "iat": datetime.utcnow()
     }
@@ -225,6 +325,14 @@ def get_current_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User account no longer exists.",
         )
+
+    # Real-time account suspension / revocation verification
+    # If account status is SUSPENDED, invalidate session immediately regardless of JWT token expiration
+    if (user.account_status or "").strip().upper() == "SUSPENDED":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account has been suspended. Operational authorization revoked.",
+        )
     
     return user
 
@@ -241,7 +349,10 @@ def get_current_user_optional(
         user_id = payload.get("user_id")
         if user_id is None:
             return None
-        return db.query(User).filter(User.id == int(user_id)).first()
+        user = db.query(User).filter(User.id == int(user_id)).first()
+        if user and (user.account_status or "").strip().upper() == "SUSPENDED":
+            return None
+        return user
     except Exception:
         return None
 
@@ -258,6 +369,32 @@ def require_roles(*allowed_roles: str):
             )
         return current_user
     return role_checker
+
+
+def require_permission(required_permission: str):
+    """Factory dependency for permission-based authorization enforcing approved account status and live DB permissions."""
+    def permission_checker(current_user: User = Depends(get_current_user)) -> User:
+        status_norm = (current_user.account_status or "APPROVED").strip().upper()
+        if status_norm != "APPROVED":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access forbidden: account status is '{current_user.account_status}'. Only APPROVED accounts can perform operational actions."
+            )
+        
+        # Resolve live permissions directly from the database model
+        # If permissions is explicitly set (even if empty string to revoke privileges), do not fall back to defaults!
+        if current_user.permissions is not None:
+            user_perms = [p.strip().upper() for p in current_user.permissions.split(",") if p.strip()]
+        else:
+            user_perms = get_default_permissions_for_role(current_user.role or "user")
+
+        if required_permission.upper() not in user_perms:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission denied: action requires '{required_permission}' permission."
+            )
+        return current_user
+    return permission_checker
 
 
 require_admin_or_official = require_roles("admin", "official")
@@ -310,12 +447,56 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
     # Hash password securely
     hashed = hash_password(user_data.password)
 
+    # Authority registration: official department requests require valid compatibility
+    is_official_request = bool(user_data.organization or user_data.department or role not in ("user", "citizen"))
+
+    if is_official_request:
+        is_valid, errors, normalized = validate_authority_access_request(
+            organization=user_data.organization,
+            department=user_data.department,
+            designation=user_data.designation,
+            requested_role=role,
+            jurisdiction_id=user_data.requested_jurisdiction,
+        )
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Authority access request validation failed: " + "; ".join(errors)
+            )
+
+        role = normalized["normalized_role"]
+        juris_id = normalized["normalized_jurisdiction_id"]
+        juris_type = normalized["normalized_jurisdiction_type"]
+        org_name = normalized["organization"]
+
+        # Environment-gated auto-approval (Section 1 & 2)
+        if is_demo_auto_approval_enabled():
+            account_status = "APPROVED"
+            initial_perms = ",".join(get_default_permissions_for_role(role))
+        else:
+            account_status = "PENDING_VERIFICATION"
+            initial_perms = ""
+    else:
+        account_status = "APPROVED"
+        initial_perms = ",".join(get_default_permissions_for_role(role))
+        org_name = None
+        juris_id = "IN"
+        juris_type = "COUNTRY"
+
     new_user = User(
         name=cleaned_name,
         email=cleaned_email,
         phone_number=cleaned_phone,
         password_hash=hashed,
-        role=role
+        role=role,
+        organization=org_name,
+        department=user_data.department.strip() if user_data.department else None,
+        designation=user_data.designation.strip() if user_data.designation else None,
+        official_id=user_data.official_id.strip() if user_data.official_id else None,
+        jurisdiction_id=juris_id,
+        jurisdiction_type=juris_type,
+        permissions=initial_perms,
+        account_status=account_status,
     )
 
     try:
@@ -335,7 +516,7 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
     return AuthResponse(
         access_token=access_token,
         token_type="bearer",
-        user=UserResponse.model_validate(new_user)
+        user=build_user_response(new_user)
     )
 
 
@@ -377,7 +558,49 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
     return AuthResponse(
         access_token=access_token,
         token_type="bearer",
-        user=UserResponse.model_validate(user)
+        user=build_user_response(user)
+    )
+
+
+@router.post("/authority/auto-approve", response_model=AuthResponse)
+def auto_approve_authority_endpoint(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Demo auto-approval endpoint for authority accounts in PENDING_VERIFICATION.
+    Gated by environment: rejected in production unless AUTO_APPROVE_AUTHORITY_REGISTRATION=true.
+    """
+    if not is_demo_auto_approval_enabled():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Authority auto-approval is disabled in production environments."
+        )
+
+    is_valid, errors, normalized = validate_authority_access_request(
+        organization=current_user.organization,
+        department=current_user.department,
+        designation=current_user.designation,
+        requested_role=current_user.role,
+        jurisdiction_id=current_user.jurisdiction_id,
+        jurisdiction_type=current_user.jurisdiction_type,
+    )
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot auto-approve invalid authority credentials: " + "; ".join(errors)
+        )
+
+    current_user.account_status = "APPROVED"
+    current_user.permissions = ",".join(get_default_permissions_for_role(current_user.role or "user"))
+    db.commit()
+    db.refresh(current_user)
+
+    token = create_access_token(current_user)
+    return AuthResponse(
+        access_token=token,
+        token_type="bearer",
+        user=build_user_response(current_user)
     )
 
 
@@ -387,7 +610,7 @@ def get_current_user_profile(current_user: User = Depends(get_current_user)):
     Retrieve the profile of the currently authenticated user.
     Returns safe user information only (never exposes password hashes or tokens).
     """
-    return UserResponse.model_validate(current_user)
+    return build_user_response(current_user)
 
 
 @router.patch("/me", response_model=UserResponse)

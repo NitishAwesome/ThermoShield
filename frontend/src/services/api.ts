@@ -21,9 +21,13 @@ import {
   HeatActionDecisionUpdateRequest,
   HealthImpactForecastResponse,
   WardsForecastSummaryResponse,
+  NationalHeatRiskResponse,
+  StateHeatRiskResponse,
+  DistrictHeatRiskResponse,
 } from '../types';
 
 const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
   import.meta.env.VITE_API_BASE_URL ||
   (import.meta.env.PROD
     ? 'https://thermoshield.onrender.com'
@@ -401,6 +405,49 @@ export const api = {
 
   getWardsForecastSummary: async (): Promise<WardsForecastSummaryResponse> => {
     const res = await apiClient.get<WardsForecastSummaryResponse>('/api/forecast/wards-summary');
+    return res.data;
+  },
+
+  getNationalHeatRisk: async (day: number = 0): Promise<NationalHeatRiskResponse> => {
+    const res = await apiClient.get<NationalHeatRiskResponse>('/api/heat-risk/national', {
+      params: { day },
+    });
+    return res.data;
+  },
+
+  getStateHeatRisk: async (stateId: string, day: number = 0): Promise<StateHeatRiskResponse> => {
+    const res = await apiClient.get<StateHeatRiskResponse>(`/api/heat-risk/states/${encodeURIComponent(stateId)}`, {
+      params: { day },
+    });
+    return res.data;
+  },
+
+  getDistrictHeatRisk: async (districtId: string, day: number = 0): Promise<DistrictHeatRiskResponse> => {
+    const res = await apiClient.get<DistrictHeatRiskResponse>(`/api/heat-risk/districts/${encodeURIComponent(districtId)}`, {
+      params: { day },
+    });
+    return res.data;
+  },
+
+  // Jurisdiction & Governance Endpoints
+  getJurisdictionUserContext: async (): Promise<any> => {
+    const res = await apiClient.get('/api/jurisdiction/user-context');
+    return res.data;
+  },
+
+  getJurisdictionDetail: async (jurisdictionId: string): Promise<any> => {
+    const res = await apiClient.get(`/api/jurisdiction/${encodeURIComponent(jurisdictionId)}`);
+    return res.data;
+  },
+
+  getHAPAuditLogs: async (jurisdictionId?: string): Promise<{ count: number; audit_logs: any[] }> => {
+    const params = jurisdictionId ? { jurisdiction_id: jurisdictionId } : {};
+    const res = await apiClient.get('/api/action-plan/audit-logs', { params });
+    return res.data;
+  },
+
+  autoApproveAuthority: async (): Promise<any> => {
+    const res = await apiClient.post('/auth/authority/auto-approve');
     return res.data;
   },
 };

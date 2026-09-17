@@ -24,9 +24,10 @@ export interface WeatherCondition {
   weather_icon?: string;
   precipitation?: number;
   wind_direction?: number;
-  source_status?: 'LIVE' | 'OFFLINE_FALLBACK';
+  source_status?: 'LIVE' | 'CACHED' | 'STALE_CACHED' | 'OFFLINE_FALLBACK' | 'UNAVAILABLE';
   source_name?: string;
   is_fallback?: boolean;
+  cache_age_seconds?: number;
 }
 
 export interface HourlyForecast {
@@ -204,6 +205,55 @@ export interface User {
   phone_number: string;
   email: string;
   role: 'user' | 'official' | 'responder' | 'analyst' | string;
+  organization?: string;
+  department?: string;
+  designation?: string;
+  official_id?: string;
+  jurisdiction_id?: string;
+  jurisdiction_name?: string;
+  jurisdiction_type?: 'NATIONAL' | 'STATE' | 'DISTRICT' | 'MUNICIPAL_CORPORATION' | 'WARD' | string;
+  permissions?: string[];
+  account_status?: 'APPROVED' | 'PENDING_VERIFICATION' | 'SUSPENDED' | string;
+  portal_type?: 'CITIZEN' | 'AUTHORITY' | string;
+}
+
+export interface JurisdictionContextResponse {
+  user_id: number;
+  name: string;
+  email: string;
+  role: string;
+  organization?: string | null;
+  department?: string | null;
+  designation?: string | null;
+  official_id?: string | null;
+  jurisdiction_id: string;
+  jurisdiction_type: string;
+  jurisdiction_name: string;
+  parent_id?: string | null;
+  permissions: string[];
+  account_status: string;
+  subordinate_jurisdiction_ids: string[];
+  can_activate_hap?: boolean;
+  is_national: boolean;
+  is_state: boolean;
+  is_municipal: boolean;
+  portal_type?: 'CITIZEN' | 'AUTHORITY' | string;
+}
+
+export interface HAPAuditLogItem {
+  id: number;
+  action_id: string;
+  jurisdiction_id: string;
+  action_key: string;
+  recommended_action: string;
+  created_by: string;
+  approved_by?: string | null;
+  status: string;
+  reason_comment?: string | null;
+  risk_snapshot_score?: number | null;
+  risk_snapshot_level?: string | null;
+  activated_at: string;
+  created_at: string;
 }
 
 export interface AuthResponse {
@@ -223,6 +273,13 @@ export interface RegisterCredentials {
   phone_number: string;
   password: string;
   role?: string;
+  organization?: string;
+  department?: string;
+  designation?: string;
+  official_id?: string;
+  jurisdiction_id?: string;
+  jurisdiction_type?: string;
+  requested_jurisdiction?: string;
 }
 
 export interface PersonalRiskRequest {
@@ -664,7 +721,11 @@ export interface WardForecastSummaryItem {
   day_index: number;
   day_label: string;
   temperature_c: number;
+  humidity?: number;
+  wind_speed_ms?: number;
+  solar_radiation_wm2?: number;
   wbgt_c: number;
+  heat_index_c?: number;
   risk_level: RiskLevel;
   risk_score: number;
   health_concern: string;
@@ -687,6 +748,8 @@ export interface WardForecastSummary {
   forecast_source_classification?: ForecastSourceClassification;
   source_status?: string;
   source_name?: string;
+  data_timestamp?: string;
+  cache_age_seconds?: number;
 }
 
 export interface WardsForecastSummaryResponse {
@@ -700,5 +763,137 @@ export interface WardsForecastSummaryResponse {
 
 export * from './notifications';
 export * from './provenance';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NATIONAL GIS INTELLIGENCE & ADMINISTRATIVE DRILL-DOWN TYPES (PRE-SIH-26)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type GisDrillDownLevel = 'india' | 'state' | 'district' | 'ward';
+
+export interface NationalHeatCell {
+  cell_id: string;
+  latitude: number;
+  longitude: number;
+  state_id: string;
+  state_name: string;
+  forecast_day: number;
+  temperature_c: number;
+  relative_humidity_pct: number;
+  wind_speed_mps: number;
+  shortwave_radiation_wm2: number;
+  estimated_wbgt_c: number;
+  heat_index_c?: number | null;
+  risk_score: number;
+  risk_level: RiskLevel;
+  source_status: string;
+  data_timestamp: string;
+  cache_age_seconds: number;
+  fallback_active: boolean;
+}
+
+export interface StateHeatSummary {
+  id: string;
+  name: string;
+  administrative_level: string;
+  sample_count: number;
+  mean_temperature_c: number;
+  peak_temperature_c: number;
+  mean_estimated_wbgt_c: number;
+  peak_estimated_wbgt_c: number;
+  mean_risk_score: number;
+  peak_risk_score: number;
+  dominant_risk_level: RiskLevel;
+  highest_risk_level: RiskLevel;
+  risk_level: RiskLevel; // Conservative peak planning color
+  data_quality: string;
+  data_quality_summary: {
+    real_cells: number;
+    cached_cells: number;
+    fallback_cells: number;
+    unavailable_cells: number;
+    overall_status: string;
+  };
+  centroid: {
+    latitude: number;
+    longitude: number;
+  };
+  has_municipal_detail?: boolean;
+}
+
+export interface DistrictHeatSummary {
+  district_id: string;
+  district_name: string;
+  state_id: string;
+  state_name: string;
+  temperature_c: number;
+  relative_humidity_pct: number;
+  estimated_wbgt_c: number;
+  risk_score: number;
+  risk_level: RiskLevel;
+  has_municipal_detail: boolean;
+  centroid: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
+export interface NationalHeatRiskResponse {
+  coverage: string;
+  forecast_day: number;
+  forecast_day_label: string;
+  generated_at: string;
+  grid_resolution: string;
+  total_cells: number;
+  states_monitored_count: number;
+  national_summary: {
+    states_monitored: number;
+    areas_high: number;
+    areas_extreme: number;
+    highest_risk_state: string;
+    highest_risk_score: number;
+    peak_estimated_wbgt_c: number;
+    data_quality_status: string;
+    last_updated: string;
+  };
+  data_quality_breakdown: {
+    real_cells: number;
+    cached_cells: number;
+    fallback_cells: number;
+    unavailable_cells: number;
+    overall_status: string;
+  };
+  states: StateHeatSummary[];
+  cells?: NationalHeatCell[];
+  provenance: any;
+}
+
+export interface StateHeatRiskResponse {
+  state_id: string;
+  state_name: string;
+  forecast_day: number;
+  forecast_day_label: string;
+  state_summary: StateHeatSummary;
+  districts: DistrictHeatSummary[];
+  has_municipal_detail: boolean;
+  municipal_system_id?: string | null;
+  data_quality: string;
+  provenance: any;
+}
+
+export interface DistrictHeatRiskResponse {
+  district_id: string;
+  district_name: string;
+  state_id: string;
+  state_name: string;
+  forecast_day: number;
+  forecast_day_label: string;
+  district_summary: DistrictHeatSummary;
+  has_municipal_detail: boolean;
+  municipal_system_id?: string | null;
+  municipal_message: string;
+  data_quality: string;
+  provenance: any;
+}
+
 
 

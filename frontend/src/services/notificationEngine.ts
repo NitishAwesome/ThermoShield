@@ -201,7 +201,10 @@ function evaluateRiskEscalation(
   history: NotificationHistoryState,
   now: number
 ): CandidateEvent | null {
-  const currentLevel: RiskLevel = input.currentRiskLevel || 'MODERATE';
+  if (!input.currentRiskLevel) {
+    return null;
+  }
+  const currentLevel: RiskLevel = input.currentRiskLevel;
   const previousLevel = history.lastRiskLevel;
   const temp = Math.round(input.currentTemp || 35);
   const wbgt = Math.round(input.wbgt || 28);

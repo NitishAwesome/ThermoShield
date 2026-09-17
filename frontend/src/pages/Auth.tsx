@@ -33,21 +33,45 @@ interface AuthPageProps {
   initialMode?: 'login' | 'register';
 }
 
-// Preset Google Demo Accounts with role metadata
+// Preset Google Demo Accounts with role and jurisdiction metadata
 const GOOGLE_DEMO_ACCOUNTS = [
   {
     name: 'Dr. Aarav Sharma',
     email: 'aarav.sharma@health.gov.in',
     role: 'official' as const,
-    label: 'Health Ministry Official',
+    label: 'Municipal HAP Nodal Officer (Greater Mumbai - 24 Wards)',
     bgColor: 'bg-[#4285F4]',
     avatarText: 'AS',
+  },
+  {
+    name: 'Sunil More',
+    email: 'coordinator.mh@maharashtra.gov.in',
+    role: 'official' as const,
+    label: 'State HAP Coordinator (Maharashtra - 36 Districts)',
+    bgColor: 'bg-[#0F9D58]',
+    avatarText: 'SM',
+  },
+  {
+    name: 'Vipul Patil',
+    email: 'collector.nagpur@maharashtra.gov.in',
+    role: 'official' as const,
+    label: 'District Collector & Magistrate (Nagpur District)',
+    bgColor: 'bg-[#AB47BC]',
+    avatarText: 'VP',
+  },
+  {
+    name: 'Mahesh Kulkarni',
+    email: 'ward.ke@mcgm.gov.in',
+    role: 'official' as const,
+    label: 'Assistant Municipal Commissioner (BMC Ward K/East)',
+    bgColor: 'bg-[#00ACC1]',
+    avatarText: 'MK',
   },
   {
     name: 'Pooja Iyer',
     email: 'pooja.iyer@imd.gov.in',
     role: 'analyst' as const,
-    label: 'IMD Climate Analyst',
+    label: 'IMD National Climate Analyst (National Scope)',
     bgColor: 'bg-[#34A853]',
     avatarText: 'PI',
   },
@@ -95,6 +119,11 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<'user' | 'official' | 'responder' | 'analyst'>('user');
+  const [organization, setOrganization] = useState('');
+  const [department, setDepartment] = useState('');
+  const [designation, setDesignation] = useState('');
+  const [officialId, setOfficialId] = useState('');
+  const [jurisdictionId, setJurisdictionId] = useState('IN-MH-MCGM');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -128,7 +157,7 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
   }, []);
 
   const userRole = (user?.role || '').toLowerCase();
-  const defaultRoleDest = ['official', 'responder', 'analyst', 'admin'].includes(userRole)
+  const defaultRoleDest = ['official', 'responder', 'analyst', 'admin', 'municipal_hap_officer', 'state_coordinator', 'district_authority', 'ward_officer', 'national_analyst'].includes(userRole)
     ? '/gov/dashboard'
     : '/';
   const targetUrl = (location.state as any)?.from || defaultRoleDest;
@@ -171,7 +200,6 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
     clearError();
 
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    // If native Google Identity Services is available in production
     if (clientId && (window as any).google?.accounts?.id) {
       try {
         (window as any).google.accounts.id.initialize({
@@ -191,7 +219,6 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
         setIsGoogleModalOpen(true);
       }
     } else {
-      // Open the authentic Google Account Chooser dialog
       setIsGoogleModalOpen(true);
     }
   };
@@ -203,7 +230,7 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
     clearError();
     try {
       const activeRole = (selectedRole || role || '').toLowerCase();
-      const defaultDest = ['official', 'responder', 'analyst', 'admin'].includes(activeRole)
+      const defaultDest = ['official', 'responder', 'analyst', 'admin', 'municipal_hap_officer', 'state_coordinator', 'district_authority', 'ward_officer', 'national_analyst'].includes(activeRole)
         ? '/gov/dashboard'
         : '/';
       const redirectDest = (location.state as any)?.from || defaultDest;
@@ -288,8 +315,17 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
           phone_number: phoneNumber.trim(),
           password,
           role,
+          organization: role !== 'user' ? organization.trim() : undefined,
+          department: role !== 'user' ? department.trim() : undefined,
+          designation: role !== 'user' ? designation.trim() : undefined,
+          official_id: role !== 'user' ? officialId.trim() : undefined,
+          jurisdiction_id: role !== 'user' ? jurisdictionId.trim() : undefined,
         });
-        setSuccessMsg('Account registered successfully! Welcome to ThermoShield.');
+        setSuccessMsg(
+          role !== 'user'
+            ? 'Official registration submitted! Account placed in PENDING_VERIFICATION until authorized.'
+            : 'Account registered successfully! Welcome to ThermoShield.'
+        );
         setTimeout(() => navigate(targetUrl), 600);
       } catch (err: any) {
         setLocalError(err.message || 'Registration failed. Please check your details.');
@@ -300,33 +336,67 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
   };
 
   // Demo auto-fill
-  const handleDemoFill = async (demoRole: 'user' | 'official' | 'responder' | 'analyst') => {
+  const handleDemoFill = async (demoKey: string) => {
     setLocalError(null);
     clearError();
-    const demoAccounts = {
+    const demoAccounts: Record<string, { name: string; email: string; phone: string; role: any }> = {
+      municipal: {
+        name: 'Dr. Aarav Sharma',
+        email: 'aarav.sharma@health.gov.in',
+        phone: '+91 9811223344',
+        role: 'official',
+      },
       official: {
         name: 'Dr. Aarav Sharma',
         email: 'aarav.sharma@health.gov.in',
         phone: '+91 9811223344',
+        role: 'official',
       },
-      responder: {
-        name: 'Rajesh Verma (NDRF)',
-        email: 'rajesh.verma@disastermgmt.gov.in',
-        phone: '+91 9822334455',
+      state: {
+        name: 'Sunil More (SDMA)',
+        email: 'coordinator.mh@maharashtra.gov.in',
+        phone: '+91 9822339900',
+        role: 'official',
+      },
+      district: {
+        name: 'Vipul Patil (DM Office)',
+        email: 'collector.nagpur@maharashtra.gov.in',
+        phone: '+91 9855667788',
+        role: 'official',
+      },
+      ward: {
+        name: 'Mahesh Kulkarni (Ward K/E)',
+        email: 'ward.ke@mcgm.gov.in',
+        phone: '+91 9877889900',
+        role: 'official',
+      },
+      national: {
+        name: 'Pooja Iyer (IMD)',
+        email: 'pooja.iyer@imd.gov.in',
+        phone: '+91 9833445566',
+        role: 'analyst',
       },
       analyst: {
         name: 'Pooja Iyer (IMD)',
         email: 'pooja.iyer@imd.gov.in',
         phone: '+91 9833445566',
+        role: 'analyst',
+      },
+      responder: {
+        name: 'Rajesh Verma (NDRF)',
+        email: 'rajesh.verma@disastermgmt.gov.in',
+        phone: '+91 9822334455',
+        role: 'responder',
       },
       user: {
         name: 'Siddharth Patel',
         email: 'siddharth.patel@gmail.com',
         phone: '+91 9844556677',
+        role: 'user',
       },
     };
 
-    const target = demoAccounts[demoRole];
+    const target = demoAccounts[demoKey] || demoAccounts.user;
     if (mode === 'login') {
       setEmail(target.email);
       setPassword('demo12345');
@@ -334,7 +404,7 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
       setName(target.name);
       setEmail(target.email);
       setPhoneNumber(target.phone);
-      setRole(demoRole);
+      setRole(target.role);
       setPassword('demo12345');
     }
   };
@@ -740,37 +810,124 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
 
                 {/* Role Selection (Register Mode only) */}
                 {mode === 'register' && (
-                  <div className="pt-1">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
-                      {t('auth.role')}
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {roleOptions.map((opt) => {
-                        const Icon = opt.icon;
-                        const isSelected = role === opt.id;
-                        return (
-                          <div
-                            key={opt.id}
-                            onClick={() => setRole(opt.id as any)}
-                            className={`p-2.5 rounded-xl border cursor-pointer transition-all ${
-                              isSelected
-                                ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-500 ring-1 ring-emerald-500/40'
-                                : 'ts-card-subtle hover:border-slate-400 dark:hover:border-slate-700'
-                            }`}
-                          >
-                            <div className="flex items-center space-x-2.5">
-                              <div className={`p-1.5 rounded-lg border ${opt.badgeColor} flex items-center justify-center flex-shrink-0`}>
-                                <Icon className="w-4 h-4" />
-                              </div>
-                              <div className="min-w-0">
-                                <div className="text-xs font-bold ts-text-primary truncate">{opt.label}</div>
-                                <div className="text-[10px] ts-text-muted leading-tight line-clamp-1">{opt.desc}</div>
+                  <div className="pt-1 space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                        {t('auth.role')}
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {roleOptions.map((opt) => {
+                          const Icon = opt.icon;
+                          const isSelected = role === opt.id;
+                          return (
+                            <div
+                              key={opt.id}
+                              onClick={() => setRole(opt.id as any)}
+                              className={`p-2.5 rounded-xl border cursor-pointer transition-all ${
+                                isSelected
+                                  ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-500 ring-1 ring-emerald-500/40'
+                                  : 'ts-card-subtle hover:border-slate-400 dark:hover:border-slate-700'
+                              }`}
+                            >
+                              <div className="flex items-center space-x-2.5">
+                                <div className={`p-1.5 rounded-lg border ${opt.badgeColor} flex items-center justify-center flex-shrink-0`}>
+                                  <Icon className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-xs font-bold ts-text-primary truncate">{opt.label}</div>
+                                  <div className="text-[10px] ts-text-muted leading-tight line-clamp-1">{opt.desc}</div>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
+
+                    {/* Official Authority Credentials & Scope Request (When role is not citizen) */}
+                    {role !== 'user' && (
+                      <div className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-700/80 space-y-2.5 animate-fadeIn">
+                        <div className="flex items-center space-x-1.5 text-orange-400 text-xs font-bold">
+                          <Building2 className="w-3.5 h-3.5" />
+                          <span>Official Government Office Verification</span>
+                        </div>
+                        <p className="text-[10.5px] ts-text-muted leading-relaxed">
+                          Authority accounts require verified administrative credentials. Once submitted, operational authority is held in <strong className="text-amber-400">PENDING_VERIFICATION</strong> status.
+                        </p>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                              Government Organization
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={organization}
+                              onChange={(e) => setOrganization(e.target.value)}
+                              placeholder="e.g. MCGM / SDMA / IMD"
+                              className="w-full ts-input px-2.5 py-1.5 text-xs rounded-lg"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                              Department / Cell
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={department}
+                              onChange={(e) => setDepartment(e.target.value)}
+                              placeholder="e.g. Disaster Management Cell"
+                              className="w-full ts-input px-2.5 py-1.5 text-xs rounded-lg"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                              Official Designation
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={designation}
+                              onChange={(e) => setDesignation(e.target.value)}
+                              placeholder="e.g. Nodal Officer / Collector"
+                              className="w-full ts-input px-2.5 py-1.5 text-xs rounded-lg"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                              Official ID / Service No.
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={officialId}
+                              onChange={(e) => setOfficialId(e.target.value)}
+                              placeholder="e.g. GOV-HAP-2026"
+                              className="w-full ts-input px-2.5 py-1.5 text-xs rounded-lg"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                            Requested Operational Jurisdiction
+                          </label>
+                          <select
+                            value={jurisdictionId}
+                            onChange={(e) => setJurisdictionId(e.target.value)}
+                            className="w-full ts-input px-2.5 py-1.5 text-xs rounded-lg"
+                          >
+                            <option value="IN-MH-MCGM">Municipal: Greater Mumbai (IN-MH-MCGM - 24 BMC Wards)</option>
+                            <option value="IN-MH">State: Maharashtra (IN-MH - 36 Districts)</option>
+                            <option value="IN-MH-DIST-NAGPUR">District: Nagpur District (IN-MH-DIST-NAGPUR)</option>
+                            <option value="IN-MH-MCGM-KE">Ward: BMC Ward K/East (Andheri East)</option>
+                            <option value="IN">National: India Subcontinent (IN - 36 States/UTs)</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -802,18 +959,128 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
                   <div className="flex items-center space-x-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                      Evaluation &amp; Demo Roles
+                      Evaluation &amp; Demo Authority Personas
                     </span>
                   </div>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-                    1-Click Test Sign-In
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                    1-Click Demo Persona Sign-In
                   </span>
                 </div>
                 <p className="text-[11px] ts-text-muted mb-3 leading-relaxed">
-                  Select a verified test persona to evaluate personalized thermal stress, authority command, or field responder views:
+                  Select a Demo Authority Persona (simulated government workflow account) to evaluate jurisdictional governance, scope authorization, and civic heat defense workflows:
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {/* Citizen */}
+                  {/* Municipal Authority (MCGM - 24 Wards) */}
+                  <button
+                    type="button"
+                    onClick={() => handleDemoFill('municipal')}
+                    className="p-2.5 rounded-xl ts-card-subtle border ts-border hover:border-cyan-500/50 hover:bg-cyan-500/5 transition-all text-left flex items-start space-x-2.5 cursor-pointer group"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                      AS
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold ts-text-primary group-hover:text-cyan-600 dark:group-hover:text-cyan-400 truncate">
+                          Dr. Aarav Sharma
+                        </span>
+                        <span className="text-[8.5px] font-bold px-1.5 py-0.2 rounded bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30">
+                          MCGM 24-Ward Scope
+                        </span>
+                      </div>
+                      <div className="text-[10px] ts-text-muted truncate">aarav.sharma@health.gov.in • Municipal Nodal Officer</div>
+                    </div>
+                  </button>
+
+                  {/* State Coordinator (Maharashtra SDMA - 36 Districts) */}
+                  <button
+                    type="button"
+                    onClick={() => handleDemoFill('state')}
+                    className="p-2.5 rounded-xl ts-card-subtle border ts-border hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all text-left flex items-start space-x-2.5 cursor-pointer group"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                      SM
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold ts-text-primary group-hover:text-emerald-600 dark:group-hover:text-emerald-400 truncate">
+                          Sunil More (SDMA)
+                        </span>
+                        <span className="text-[8.5px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                          State Scope (36 Districts)
+                        </span>
+                      </div>
+                      <div className="text-[10px] ts-text-muted truncate">coordinator.mh@maharashtra.gov.in • State Coordinator</div>
+                    </div>
+                  </button>
+
+                  {/* District Authority (Nagpur Collectorate) */}
+                  <button
+                    type="button"
+                    onClick={() => handleDemoFill('district')}
+                    className="p-2.5 rounded-xl ts-card-subtle border ts-border hover:border-purple-500/50 hover:bg-purple-500/5 transition-all text-left flex items-start space-x-2.5 cursor-pointer group"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                      VP
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold ts-text-primary group-hover:text-purple-600 dark:group-hover:text-purple-400 truncate">
+                          Vipul Patil (Nagpur)
+                        </span>
+                        <span className="text-[8.5px] font-bold px-1.5 py-0.2 rounded bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30">
+                          District Scope
+                        </span>
+                      </div>
+                      <div className="text-[10px] ts-text-muted truncate">collector.nagpur@maharashtra.gov.in • Collectorate</div>
+                    </div>
+                  </button>
+
+                  {/* Ward Officer (BMC Ward K/East) */}
+                  <button
+                    type="button"
+                    onClick={() => handleDemoFill('ward')}
+                    className="p-2.5 rounded-xl ts-card-subtle border ts-border hover:border-blue-500/50 hover:bg-blue-500/5 transition-all text-left flex items-start space-x-2.5 cursor-pointer group"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                      MK
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold ts-text-primary group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate">
+                          Mahesh Kulkarni
+                        </span>
+                        <span className="text-[8.5px] font-bold px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30">
+                          Ward K/E Scope
+                        </span>
+                      </div>
+                      <div className="text-[10px] ts-text-muted truncate">ward.ke@mcgm.gov.in • Asst. Commissioner</div>
+                    </div>
+                  </button>
+
+                  {/* Climate Analyst (IMD National Scope) */}
+                  <button
+                    type="button"
+                    onClick={() => handleDemoFill('national')}
+                    className="p-2.5 rounded-xl ts-card-subtle border ts-border hover:border-amber-500/50 hover:bg-amber-500/5 transition-all text-left flex items-start space-x-2.5 cursor-pointer group"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                      PI
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold ts-text-primary group-hover:text-amber-600 dark:group-hover:text-amber-400 truncate">
+                          Pooja Iyer (IMD)
+                        </span>
+                        <span className="text-[8.5px] font-bold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                          National Scope
+                        </span>
+                      </div>
+                      <div className="text-[10px] ts-text-muted truncate">pooja.iyer@imd.gov.in • Lead Analyst</div>
+                    </div>
+                  </button>
+
+                  {/* Citizen Subscriber */}
                   <button
                     type="button"
                     onClick={() => handleDemoFill('user')}
@@ -827,77 +1094,11 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
                         <span className="text-xs font-bold ts-text-primary group-hover:text-emerald-600 dark:group-hover:text-emerald-400 truncate">
                           Siddharth Patel
                         </span>
-                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                          Citizen
+                        <span className="text-[8.5px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                          Citizen Alert View
                         </span>
                       </div>
-                      <div className="text-[10px] ts-text-muted truncate">siddharth.patel@gmail.com</div>
-                    </div>
-                  </button>
-
-                  {/* Municipal Authority */}
-                  <button
-                    type="button"
-                    onClick={() => handleDemoFill('official')}
-                    className="p-2.5 rounded-xl ts-card-subtle border ts-border hover:border-cyan-500/50 hover:bg-cyan-500/5 transition-all text-left flex items-start space-x-2.5 cursor-pointer group"
-                  >
-                    <div className="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
-                      AS
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold ts-text-primary group-hover:text-cyan-600 dark:group-hover:text-cyan-400 truncate">
-                          Dr. Aarav Sharma
-                        </span>
-                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30">
-                          Authority
-                        </span>
-                      </div>
-                      <div className="text-[10px] ts-text-muted truncate">aarav.sharma@health.gov.in</div>
-                    </div>
-                  </button>
-
-                  {/* Responder */}
-                  <button
-                    type="button"
-                    onClick={() => handleDemoFill('responder')}
-                    className="p-2.5 rounded-xl ts-card-subtle border ts-border hover:border-orange-500/50 hover:bg-orange-500/5 transition-all text-left flex items-start space-x-2.5 cursor-pointer group"
-                  >
-                    <div className="w-7 h-7 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
-                      RV
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold ts-text-primary group-hover:text-orange-600 dark:group-hover:text-orange-400 truncate">
-                          Rajesh Verma (NDRF)
-                        </span>
-                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30">
-                          Responder
-                        </span>
-                      </div>
-                      <div className="text-[10px] ts-text-muted truncate">rajesh.verma@disastermgmt.gov.in</div>
-                    </div>
-                  </button>
-
-                  {/* Climate Analyst */}
-                  <button
-                    type="button"
-                    onClick={() => handleDemoFill('analyst')}
-                    className="p-2.5 rounded-xl ts-card-subtle border ts-border hover:border-purple-500/50 hover:bg-purple-500/5 transition-all text-left flex items-start space-x-2.5 cursor-pointer group"
-                  >
-                    <div className="w-7 h-7 rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
-                      PI
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold ts-text-primary group-hover:text-purple-600 dark:group-hover:text-purple-400 truncate">
-                          Pooja Iyer (IMD)
-                        </span>
-                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30">
-                          Analyst
-                        </span>
-                      </div>
-                      <div className="text-[10px] ts-text-muted truncate">pooja.iyer@imd.gov.in</div>
+                      <div className="text-[10px] ts-text-muted truncate">siddharth.patel@gmail.com • Public Access</div>
                     </div>
                   </button>
                 </div>

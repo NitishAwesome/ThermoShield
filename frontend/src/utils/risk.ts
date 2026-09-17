@@ -1,7 +1,7 @@
 import { RiskLevel } from '../types';
 
 export interface RiskStyle {
-  level: RiskLevel;
+  level: RiskLevel | 'UNAVAILABLE';
   fill: string;
   stroke: string;
   fillOpacity: number;
@@ -15,8 +15,25 @@ export interface RiskStyle {
   emoji: string;
 }
 
-export const getRiskStyle = (level: RiskLevel | string | undefined): RiskStyle => {
-  const norm = level?.toUpperCase() || 'LOW';
+export const getRiskStyle = (level: RiskLevel | string | undefined | null): RiskStyle => {
+  if (!level) {
+    return {
+      level: 'UNAVAILABLE',
+      fill: '#64748b', // Neutral slate gray
+      stroke: '#475569',
+      fillOpacity: 0.20,
+      selectedFillOpacity: 0.50,
+      strokeWidth: 1.5,
+      selectedStrokeWidth: 3.0,
+      badge: 'bg-slate-600 text-white font-bold',
+      badgeBg: 'bg-slate-500/15 border border-slate-500/40 text-slate-700 dark:text-slate-300',
+      text: 'text-slate-600 dark:text-slate-400',
+      textLabel: 'UNAVAILABLE',
+      emoji: '⚪',
+    };
+  }
+
+  const norm = level.toUpperCase().trim();
   switch (norm) {
     case 'LOW':
       return {
@@ -36,8 +53,8 @@ export const getRiskStyle = (level: RiskLevel | string | undefined): RiskStyle =
     case 'MODERATE':
       return {
         level: 'MODERATE',
-        fill: '#D97706', // Rich Golden Amber / Warm Ochre (never washed-out pale yellow)
-        stroke: '#78350F', // Dark contrast boundary for clear map legibility
+        fill: '#D97706', // Rich Golden Amber / Warm Ochre
+        stroke: '#78350F',
         fillOpacity: 0.42,
         selectedFillOpacity: 0.72,
         strokeWidth: 2.0,
@@ -65,7 +82,6 @@ export const getRiskStyle = (level: RiskLevel | string | undefined): RiskStyle =
       };
     case 'EXTREME':
     case 'CRITICAL':
-    default:
       return {
         level: 'EXTREME',
         fill: '#DC2626', // Crimson Red
@@ -80,15 +96,32 @@ export const getRiskStyle = (level: RiskLevel | string | undefined): RiskStyle =
         textLabel: 'EXTREME',
         emoji: '🔴',
       };
+    case 'UNAVAILABLE':
+    default:
+      return {
+        level: 'UNAVAILABLE',
+        fill: '#64748b', // Neutral slate gray
+        stroke: '#475569',
+        fillOpacity: 0.20,
+        selectedFillOpacity: 0.50,
+        strokeWidth: 1.5,
+        selectedStrokeWidth: 3.0,
+        badge: 'bg-slate-600 text-white font-bold',
+        badgeBg: 'bg-slate-500/15 border border-slate-500/40 text-slate-700 dark:text-slate-300',
+        text: 'text-slate-600 dark:text-slate-400',
+        textLabel: 'UNAVAILABLE',
+        emoji: '⚪',
+      };
   }
 };
 
-export const getRiskColor = (level: RiskLevel | string | undefined): string => {
+export const getRiskColor = (level: RiskLevel | string | undefined | null): string => {
   return getRiskStyle(level).fill;
 };
 
-export const getRiskBgColor = (level: RiskLevel | string | undefined): string => {
-  switch (level?.toUpperCase()) {
+export const getRiskBgColor = (level: RiskLevel | string | undefined | null): string => {
+  if (!level) return 'rgba(100, 116, 139, 0.15)';
+  switch (level.toUpperCase().trim()) {
     case 'LOW':
       return 'rgba(16, 185, 129, 0.15)';
     case 'MODERATE':
@@ -98,13 +131,26 @@ export const getRiskBgColor = (level: RiskLevel | string | undefined): string =>
     case 'EXTREME':
     case 'CRITICAL':
       return 'rgba(239, 68, 68, 0.15)';
+    case 'UNAVAILABLE':
     default:
-      return 'rgba(107, 114, 128, 0.15)';
+      return 'rgba(100, 116, 139, 0.15)';
   }
 };
 
-export const getRiskBadgeStyles = (level: RiskLevel | string | undefined) => {
-  switch (level?.toUpperCase()) {
+export const getRiskBadgeStyles = (level: RiskLevel | string | undefined | null) => {
+  if (!level) {
+    return {
+      bg: 'bg-slate-500/10 border-slate-500/30 text-slate-700 dark:text-slate-300',
+      badge: 'bg-slate-600 text-white dark:text-slate-100 font-medium',
+      text: 'text-slate-600 dark:text-slate-400',
+      glow: 'shadow-none',
+      border: 'border-slate-500/30',
+      dot: 'bg-slate-400 dark:bg-slate-500',
+      label: 'Unavailable',
+    };
+  }
+
+  switch (level.toUpperCase().trim()) {
     case 'LOW':
       return {
         bg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-400',
@@ -146,30 +192,31 @@ export const getRiskBadgeStyles = (level: RiskLevel | string | undefined) => {
         dot: 'bg-red-500 animate-ping',
         label: 'Extreme Risk',
       };
+    case 'UNAVAILABLE':
     default:
       return {
-        bg: 'bg-slate-800 border-slate-700 text-slate-400',
-        badge: 'bg-slate-700 text-slate-300 font-medium',
-        text: 'text-slate-400',
+        bg: 'bg-slate-500/10 border-slate-500/30 text-slate-700 dark:text-slate-300',
+        badge: 'bg-slate-600 text-white dark:text-slate-100 font-medium',
+        text: 'text-slate-600 dark:text-slate-400',
         glow: 'shadow-none',
-        border: 'border-slate-700',
-        dot: 'bg-slate-500',
-        label: 'Unknown',
+        border: 'border-slate-500/30',
+        dot: 'bg-slate-400 dark:bg-slate-500',
+        label: 'Unavailable',
       };
   }
 };
 
 export const formatTemperature = (val: number | null | undefined): string => {
-  if (val === null || val === undefined || isNaN(val)) return 'N/A';
+  if (val === null || val === undefined || isNaN(val)) return '—';
   return `${val.toFixed(1)}°C`;
 };
 
 export const formatSpeed = (val: number | null | undefined): string => {
-  if (val === null || val === undefined || isNaN(val)) return 'N/A';
+  if (val === null || val === undefined || isNaN(val)) return '—';
   return `${val.toFixed(1)} m/s`;
 };
 
 export const formatPercent = (val: number | null | undefined): string => {
-  if (val === null || val === undefined || isNaN(val)) return 'N/A';
+  if (val === null || val === undefined || isNaN(val)) return '—';
   return `${Math.round(val)}%`;
 };
