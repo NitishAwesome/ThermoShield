@@ -12,11 +12,12 @@ import {
 } from 'react-leaflet';
 import { AlertCircle, Info, FlaskConical, Globe, Flame, Layers } from 'lucide-react';
 import L from 'leaflet';
-import { RiskLevel, MapLocationRisk, ThermalZone, HeatRiskArea, GlobalHeatStation } from '../types';
+import { RiskLevel, MapLocationRisk, ThermalZone, HeatRiskArea, GlobalHeatStation, StateHeatAlertProperties } from '../types';
 import { getRiskColor, getRiskStyle } from '../utils/risk';
 import { Card, CardHeader, CardContent, Badge } from './ui';
 import { useTranslation } from '../context/LanguageContext';
 import { WORLD_HEAT_DIFFUSION_SEEDS, HeatmapSeedPoint } from '../data/globalHeatHotspots';
+import { INDIA_STATE_HEAT_ALERTS_GEOJSON, getStateCategoryStyle } from '../data/stateHeatAlerts';
 
 // ─────────────────────────────────────────────
 // Fix leaflet default marker icon in React
@@ -59,6 +60,11 @@ interface RiskMapProps {
   showHeatmapOverlay?: boolean;
   onToggleHeatmap?: (enabled: boolean) => void;
   scope?: 'world' | 'national' | 'wards';
+
+  // State-Wise Heatmap Alerts
+  showStateAlerts?: boolean;
+  selectedStateCode?: string;
+  onSelectState?: (state: StateHeatAlertProperties) => void;
 }
 
 // ─────────────────────────────────────────────
@@ -273,7 +279,72 @@ const createGlobalStationDotIcon = (level: RiskLevel, isSelected: boolean) => {
 };
 
 // ─────────────────────────────────────────────
+// State-Wise Heat Alert Badge Marker
+// ─────────────────────────────────────────────
+const createStateBadgeIcon = (code: string, category: 'RED' | 'ORANGE' | 'YELLOW' | 'GREEN', temp: number, isSelected: boolean) => {
+  const cStyle = getStateCategoryStyle(category, isSelected);
+  return L.divIcon({
+    className: 'custom-state-badge',
+    html: `
+      <div style="
+        background: rgba(15, 23, 42, 0.94);
+        color: #fff;
+        border: 2px solid ${cStyle.fillColor};
+        border-radius: 8px;
+        padding: 3px 7px;
+        font-size: 11px;
+        font-weight: 800;
+        white-space: nowrap;
+        box-shadow: ${cStyle.glowShadow || '0 3px 10px rgba(0,0,0,0.6)'};
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transform: translate(-50%, -50%);
+        pointer-events: auto;
+        cursor: pointer;
+      ">
+        <span style="font-family: monospace; letter-spacing: 0.5px;">${code}</span>
+        <span style="color: #fdba74; font-family: monospace; font-size: 11px;">${temp.toFixed(1)}°C</span>
+        <span style="
+          background: ${cStyle.fillColor};
+          color: ${category === 'YELLOW' ? '#0f172a' : '#fff'};
+          padding: 1px 5px;
+          border-radius: 4px;
+          font-size: 9px;
+          font-weight: 900;
+          letter-spacing: 0.3px;
+        ">
+          ${category}
+        </span>
+      </div>
+    `,
+    iconSize: [0, 0],
+  });
+};
+
+const createStateDotIcon = (category: 'RED' | 'ORANGE' | 'YELLOW' | 'GREEN', isSelected: boolean) => {
+  const cStyle = getStateCategoryStyle(category, isSelected);
+  return L.divIcon({
+    className: 'custom-state-dot-marker',
+    html: `
+      <div style="
+        width: 14px;
+        height: 14px;
+        background: ${cStyle.fillColor};
+        border: 2.5px solid rgba(255,255,255,0.95);
+        border-radius: 50%;
+        box-shadow: 0 0 10px ${cStyle.fillColor}, 0 2px 6px rgba(0,0,0,0.6);
+        transform: translate(-50%, -50%);
+        cursor: pointer;
+      "></div>
+    `,
+    iconSize: [0, 0],
+  });
+};
+
+// ─────────────────────────────────────────────
 // World Heatmap Canvas Layer Component (Smooth Thermal Heat Diffusion)
+
 // ─────────────────────────────────────────────
 const WorldHeatmapCanvas: React.FC<{
   points: HeatmapSeedPoint[];
@@ -451,6 +522,9 @@ export const RiskMap: React.FC<RiskMapProps> = ({
   showHeatmapOverlay = true,
   onToggleHeatmap,
   scope = 'wards',
+  showStateAlerts = false,
+  selectedStateCode,
+  onSelectState,
 }) => {
   const { t } = useTranslation();
   const currentRiskColor = getRiskColor(riskLevel);
@@ -615,6 +689,101 @@ export const RiskMap: React.FC<RiskMapProps> = ({
               wards={adminWards}
               visible={heatmapVisible}
             />
+
+            {/* ── Official Survey of India State-Wise GIS Heatmap Alert Layer ── */}
+            {showStateAlerts && (
+              <>
+                <GeoJSON
+                  key={`state_alerts_geojson_${selectedStateCode || 'all'}`}
+                  data={INDIA_STATE_HEAT_ALERTS_GEOJSON as any}
+                  style={(feature: any) => {
+                    const p = feature?.properties as StateHeatAlertProperties;
+                    const isSelected = selectedStateCode === p?.stateCode;
+                    const cStyle = getStateCategoryStyle(p?.alertCategory || 'GREEN', isSelected);
+                    return {
+                      color: cStyle.strokeColor,
+                      fillColor: cStyle.fillColor,
+                      fillOpacity: cStyle.fillOpacity,
+                      weight: cStyle.weight,
+                    };
+                  }}
+                  onEachFeature={(feature: any, layer: any) => {
+                    const p = feature?.properties as StateHeatAlertProperties;
+                    if (!p) return;
+
+                    layer.on({
+                      mouseover: (e: any) => {
+                        const l = e.target;
+                        l.setStyle({ weight: 3.5, fillOpacity: 0.72 });
+                        if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                          l.bringToFront();
+                        }
+                      },
+                      mouseout: (e: any) => {
+                        const isSelected = selectedStateCode === p.stateCode;
+                        const cStyle = getStateCategoryStyle(p.alertCategory, isSelected);
+                        e.target.setStyle({
+                          weight: cStyle.weight,
+                          fillOpacity: cStyle.fillOpacity,
+                          color: cStyle.strokeColor,
+                        });
+                      },
+                      click: (e: any) => {
+                        handleFeatureClick(e, () => {
+                          onSelectState?.(p);
+                        });
+                      },
+                    });
+
+                    const cStyle = getStateCategoryStyle(p.alertCategory, false);
+                    layer.bindPopup(`
+                      <div style="font-family: system-ui, -apple-system, sans-serif; min-width: 250px; font-size: 12px; color: #0f172a; padding: 2px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">
+                          <div>
+                            <div style="font-weight: 800; font-size: 14px; color: #0f172a;">${p.stateName}</div>
+                            <div style="font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase;">Capital: ${p.capitalCity}</div>
+                          </div>
+                          <span style="background: ${cStyle.fillColor}; color: ${p.alertCategory === 'YELLOW' ? '#0f172a' : '#fff'}; padding: 2px 7px; border-radius: 6px; font-size: 10px; font-weight: 800;">
+                            ${p.alertCategory} ALERT
+                          </span>
+                        </div>
+                        <div style="font-size: 11px; font-weight: 700; color: #334155; margin-bottom: 8px;">
+                          IMD: ${p.imdClassification}
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #f8fafc; padding: 6px; border-radius: 6px; margin-bottom: 8px; font-size: 11px;">
+                          <div><strong>Max Temp:</strong> <span style="color: #ea580c; font-weight: 800;">${p.temperatureC}°C</span></div>
+                          <div><strong>Heat Index:</strong> <strong>${p.apparentTemperatureC}°C</strong></div>
+                          <div><strong>Wet-Bulb:</strong> <strong>${p.wetBulbC}°C</strong></div>
+                          <div><strong>Est WBGT:</strong> <strong>${p.wbgtC}°C</strong></div>
+                        </div>
+                        <div style="font-size: 11px; margin-bottom: 6px;">
+                          <strong style="color: #475569;">Key Districts:</strong> ${p.affectedDistricts.slice(0, 4).join(', ')}
+                        </div>
+                        <div style="font-size: 10px; color: #64748b; line-height: 1.3;">
+                          ${p.authorityName}
+                        </div>
+                      </div>
+                    `);
+                  }}
+                />
+
+                {/* State Centroid Badges */}
+                {INDIA_STATE_HEAT_ALERTS_GEOJSON.features.map((f) => {
+                  const p = f.properties;
+                  const isSelected = selectedStateCode === p.stateCode;
+                  return (
+                    <Marker
+                      key={`state_centroid_${p.stateCode}`}
+                      position={[p.centroid[1], p.centroid[0]]}
+                      icon={showBadges
+                        ? createStateBadgeIcon(p.stateCode, p.alertCategory, p.temperatureC, isSelected)
+                        : createStateDotIcon(p.alertCategory, isSelected)}
+                      eventHandlers={{ click: (e: any) => handleFeatureClick(e, () => onSelectState?.(p)) }}
+                    />
+                  );
+                })}
+              </>
+            )}
 
             {/* ── Mumbai Administrative Ward References Layer ── */}
             {adminWards && adminWards.length > 0 && adminWards.map((ward) => {
@@ -936,46 +1105,94 @@ export const RiskMap: React.FC<RiskMapProps> = ({
             {/* Legend Part 1: Risk Severity */}
             <div className="p-3 rounded-xl ts-card-subtle border ts-border">
               <div className="font-bold ts-text-primary text-[11px] uppercase tracking-wider mb-2">
-                Heat Risk Classification & Operational Meaning
+                {showStateAlerts ? 'IMD State Heatwave Warning Criteria' : 'Heat Risk Classification & Operational Meaning'}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <div className="flex items-start space-x-2">
-                  <span className="text-base leading-none">🟢</span>
-                  <div>
-                    <div className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">LOW</div>
-                    <div className="text-[11px] ts-text-subtle">Conditions currently within lower-risk range</div>
+              {showStateAlerts ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div className="flex items-start space-x-2">
+                    <span className="text-base leading-none">🔴</span>
+                    <div>
+                      <div className="font-bold text-red-600 dark:text-red-400 text-xs">RED ALERT (Severe Heat Wave)</div>
+                      <div className="text-[11px] ts-text-subtle">T ≥ 42°C or departure ≥ 6.4°C. Mandatory labor halt.</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-2">
+                    <span className="text-base leading-none">🟠</span>
+                    <div>
+                      <div className="font-bold text-orange-600 dark:text-orange-400 text-xs">ORANGE ALERT (Heat Wave)</div>
+                      <div className="text-[11px] ts-text-subtle">T ≥ 40°C or high humidity stress. High risk for vulnerable.</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-2">
+                    <span className="text-base leading-none">🟡</span>
+                    <div>
+                      <div className="font-bold text-amber-600 dark:text-amber-400 text-xs">YELLOW WATCH (Hot Day / Warm Night)</div>
+                      <div className="text-[11px] ts-text-subtle">Moderate thermal strain; monitor vulnerable populations.</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-2">
+                    <span className="text-base leading-none">🟢</span>
+                    <div>
+                      <div className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">GREEN (Normal)</div>
+                      <div className="text-[11px] ts-text-subtle">Comfortable / seasonal meteorological envelope.</div>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-start space-x-2">
-                  <span className="text-base leading-none">🟡</span>
-                  <div>
-                    <div className="font-bold text-amber-600 dark:text-amber-400 text-xs">MODERATE</div>
-                    <div className="text-[11px] ts-text-subtle">Increased caution recommended</div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div className="flex items-start space-x-2">
+                    <span className="text-base leading-none">🟢</span>
+                    <div>
+                      <div className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">LOW</div>
+                      <div className="text-[11px] ts-text-subtle">Conditions currently within lower-risk range</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-2">
+                    <span className="text-base leading-none">🟡</span>
+                    <div>
+                      <div className="font-bold text-amber-600 dark:text-amber-400 text-xs">MODERATE</div>
+                      <div className="text-[11px] ts-text-subtle">Increased caution recommended</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-2">
+                    <span className="text-base leading-none">🟠</span>
+                    <div>
+                      <div className="font-bold text-orange-600 dark:text-orange-400 text-xs">HIGH</div>
+                      <div className="text-[11px] ts-text-subtle">Significant physiological heat stress</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-2">
+                    <span className="text-base leading-none">🔴</span>
+                    <div>
+                      <div className="font-bold text-red-600 dark:text-red-400 text-xs">EXTREME</div>
+                      <div className="text-[11px] ts-text-subtle">Severe thermal conditions — emergency actions</div>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-start space-x-2">
-                  <span className="text-base leading-none">🟠</span>
-                  <div>
-                    <div className="font-bold text-orange-600 dark:text-orange-400 text-xs">HIGH</div>
-                    <div className="text-[11px] ts-text-subtle">Significant physiological heat stress</div>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <span className="text-base leading-none">🔴</span>
-                  <div>
-                    <div className="font-bold text-red-600 dark:text-red-400 text-xs">EXTREME</div>
-                    <div className="text-[11px] ts-text-subtle">Severe thermal conditions — emergency actions</div>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Legend Part 2: Methodology */}
             <div className="p-3 rounded-xl ts-card-subtle border ts-border">
               <div className="font-bold ts-text-primary text-[11px] uppercase tracking-wider mb-2">
-                {isCitizenView ? 'How Zones Are Calculated' : 'Hyperlocal GIS Intelligence Pipeline'}
+                {showStateAlerts
+                  ? 'Official Survey of India GIS Pipeline'
+                  : isCitizenView ? 'How Zones Are Calculated' : 'Hyperlocal GIS Intelligence Pipeline'}
               </div>
-              {isCitizenView ? (
+              {showStateAlerts ? (
+                <div className="text-[11px] ts-text-muted leading-relaxed space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 rounded bg-slate-500/10 font-mono text-[10px]">Survey of India Borders (37 States/UTs)</span>
+                    <span>→</span>
+                    <span className="px-1.5 py-0.5 rounded bg-slate-500/10 font-mono text-[10px]">IMD Alert Class</span>
+                    <span>→</span>
+                    <span className="px-1.5 py-0.5 rounded bg-slate-500/10 font-mono text-[10px]">SDMA Action Directives</span>
+                  </div>
+                  <div className="text-[10.5px] ts-text-subtle leading-tight">
+                    Full national coverage across all 37 Indian States and Union Territories with calibrated Rothfusz Heat Index and Stull Wet-Bulb metrics.
+                  </div>
+                </div>
+              ) : isCitizenView ? (
                 <div className="text-[11px] ts-text-muted leading-relaxed space-y-1.5">
                   <div className="flex items-center gap-1.5">
                     <span className="px-1.5 py-0.5 rounded bg-slate-500/10 font-mono text-[10px]">Open-Meteo Weather</span>

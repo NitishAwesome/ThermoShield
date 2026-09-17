@@ -698,7 +698,52 @@ export interface WardsForecastSummaryResponse {
   wards: WardForecastSummary[];
 }
 
+export interface StateHeatAlertProperties {
+  id: string;
+  stateCode: string;
+  stateName: string;
+  capitalCity: string;
+  alertCategory: 'RED' | 'ORANGE' | 'YELLOW' | 'GREEN';
+  riskLevel: RiskLevel;
+  imdClassification: string;
+  temperatureC: number;
+  humidityPercent: number;
+  apparentTemperatureC: number;
+  wetBulbC: number;
+  wbgtC: number;
+  vulnerabilityScore: number;
+  riskScore: number;
+  alertTitle: string;
+  alertHeadline: string;
+  affectedDistricts: string[];
+  affectedPopulationMillion: number;
+  actionAdvisories: string[];
+  authorityName: string;
+  issuedAt: string;
+  validUntil: string;
+  centroid: [number, number]; // [lon, lat]
+}
+
+export interface StateHeatAlertFeature {
+  type: 'Feature';
+  properties: StateHeatAlertProperties;
+  geometry: {
+    type: 'Polygon' | 'MultiPolygon';
+    coordinates: any;
+  };
+}
+
+export interface StateHeatAlertCollection {
+  type: 'FeatureCollection';
+  crs?: {
+    type: string;
+    properties: { name: string };
+  };
+  features: StateHeatAlertFeature[];
+}
+
 export * from './notifications';
 export * from './provenance';
+
 
 

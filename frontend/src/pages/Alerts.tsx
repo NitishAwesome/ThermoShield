@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { ThermalResponse } from '../types';
@@ -20,6 +20,7 @@ import { Card, CardHeader, CardContent, Button, EmptyState } from '../components
 import { useTranslation } from '../context/LanguageContext';
 import { translateCivicAdvisory } from '../utils/translationHelpers';
 import { DataRealityBadge, FallbackModeBanner } from '../components/provenance';
+import { ALL_STATE_HEAT_ALERTS, getStateCategoryStyle, getNationalAlertStatistics } from '../data/stateHeatAlerts';
 
 // Focused Citizen Alert Components
 import { CurrentAlertStatus } from '../components/alerts/CurrentAlertStatus';
@@ -37,6 +38,22 @@ export const Alerts: React.FC = () => {
   const [thermalData, setThermalData] = useState<ThermalResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [selectedStateCategoryFilter, setSelectedStateCategoryFilter] = useState<'ALL' | 'RED' | 'ORANGE' | 'YELLOW' | 'GREEN'>('ALL');
+  const [stateSearchText, setStateSearchText] = useState<string>('');
+  const nationalAlertStats = useMemo(() => getNationalAlertStatistics(), []);
+
+  const filteredStates = useMemo(() => {
+    return ALL_STATE_HEAT_ALERTS.filter((s) => {
+      const matchCat = selectedStateCategoryFilter === 'ALL' || s.alertCategory === selectedStateCategoryFilter;
+      const matchSearch =
+        !stateSearchText ||
+        s.stateName.toLowerCase().includes(stateSearchText.toLowerCase()) ||
+        s.capitalCity.toLowerCase().includes(stateSearchText.toLowerCase()) ||
+        s.affectedDistricts.some((d) => d.toLowerCase().includes(stateSearchText.toLowerCase()));
+      return matchCat && matchSearch;
+    });
+  }, [selectedStateCategoryFilter, stateSearchText]);
 
   const fetchAlerts = async () => {
     const cached = getCachedData(coords.lat, coords.lon);
@@ -228,7 +245,190 @@ export const Alerts: React.FC = () => {
             </Card>
           )}
 
-          {/* 6. ALERT PREFERENCES */}
+          {/* 6. NATIONAL STATE-WISE HEATWAVE ADVISORIES (37 STATES & UNION TERRITORIES) */}
+          <div className="space-y-4 pt-4 border-t ts-border">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <ShieldAlert className="w-4 h-4 text-red-500" />
+                  <span className="text-xs font-black uppercase tracking-wider text-red-500 font-mono">
+                    Official Survey of India & IMD Directive
+                  </span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black ts-text-primary mt-1">
+                  National State-Wise Heatwave Warnings
+                </h2>
+                <p className="text-xs ts-text-muted mt-0.5">
+                  Official meteorological alert statuses across all 37 Indian States and Union Territories with SDMA guidelines.
+                </p>
+              </div>
+
+              <Link
+                to="/citizen/heatmap"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 font-bold text-xs transition-colors self-start sm:self-auto border border-orange-500/30"
+              >
+                <span>View On Interactive GIS Heatmap</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            {/* National KPI summary pills */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] font-extrabold uppercase text-red-500">Severe Heat Wave</div>
+                  <div className="text-base font-black text-red-600 dark:text-red-400 font-mono">
+                    {nationalAlertStats.redCount} States (Red)
+                  </div>
+                </div>
+                <span className="text-lg">🔴</span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] font-extrabold uppercase text-orange-500">Heat Wave</div>
+                  <div className="text-base font-black text-orange-600 dark:text-orange-400 font-mono">
+                    {nationalAlertStats.orangeCount} States (Orange)
+                  </div>
+                </div>
+                <span className="text-lg">🟠</span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] font-extrabold uppercase text-yellow-600 dark:text-yellow-400">Hot Day / Night</div>
+                  <div className="text-base font-black text-yellow-600 dark:text-yellow-400 font-mono">
+                    {nationalAlertStats.yellowCount} States (Yellow)
+                  </div>
+                </div>
+                <span className="text-lg">🟡</span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] font-extrabold uppercase text-emerald-500">Normal Conditions</div>
+                  <div className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                    {nationalAlertStats.greenCount} States (Green)
+                  </div>
+                </div>
+                <span className="text-lg">🟢</span>
+              </div>
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs scrollbar-none">
+                {(['ALL', 'RED', 'ORANGE', 'YELLOW', 'GREEN'] as const).map((cat) => {
+                  const isSel = selectedStateCategoryFilter === cat;
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setSelectedStateCategoryFilter(cat)}
+                      className={`px-3 py-1 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap ${
+                        isSel
+                          ? cat === 'RED'
+                            ? 'bg-red-600 text-white shadow-sm'
+                            : cat === 'ORANGE'
+                            ? 'bg-orange-600 text-white shadow-sm'
+                            : cat === 'YELLOW'
+                            ? 'bg-yellow-500 text-slate-950 shadow-sm'
+                            : cat === 'GREEN'
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'bg-orange-500 text-white shadow-sm'
+                          : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary'
+                      }`}
+                    >
+                      {cat === 'ALL' ? 'All 37 States/UTs' : `${cat} ALERT`}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="relative min-w-[220px]">
+                <input
+                  type="text"
+                  value={stateSearchText}
+                  onChange={(e) => setStateSearchText(e.target.value)}
+                  placeholder="Search state, district, capital..."
+                  className="w-full px-3.5 py-1.5 rounded-xl bg-slate-500/10 border ts-border text-xs ts-text-primary placeholder:text-slate-500 focus:outline-none focus:border-orange-500"
+                />
+                {stateSearchText && (
+                  <button
+                    type="button"
+                    onClick={() => setStateSearchText('')}
+                    className="absolute right-2.5 top-1.5 text-xs text-slate-400 hover:text-slate-200"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* State Warning Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {filteredStates.map((st) => {
+                const cStyle = getStateCategoryStyle(st.alertCategory);
+                return (
+                  <div
+                    key={st.stateCode}
+                    className={`p-4 rounded-2xl ts-card border transition-all ${
+                      st.alertCategory === 'RED'
+                        ? 'border-red-500/40 bg-red-500/5'
+                        : st.alertCategory === 'ORANGE'
+                        ? 'border-orange-500/30 bg-orange-500/5'
+                        : 'ts-border'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between border-b ts-border pb-2 mb-2.5">
+                      <div>
+                        <div className="font-extrabold text-sm ts-text-primary flex items-center gap-1.5">
+                          <span>{st.stateName}</span>
+                          <span className="font-mono text-xs text-slate-400">({st.stateCode})</span>
+                        </div>
+                        <div className="text-[10.5px] ts-text-subtle">
+                          Capital: {st.capitalCity} • {st.authorityName.split('(')[0]}
+                        </div>
+                      </div>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold ${cStyle.badgeBg}`}>
+                        {st.alertCategory} ALERT
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center p-2 rounded-xl bg-slate-500/10 mb-2.5 font-mono text-xs">
+                      <div>
+                        <span className="text-[10px] ts-text-subtle block">Max Temp</span>
+                        <strong className="text-orange-500">{st.temperatureC}°C</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] ts-text-subtle block">Heat Index</span>
+                        <strong className="text-amber-500">{st.apparentTemperatureC}°C</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] ts-text-subtle block">Wet-Bulb</span>
+                        <strong className="text-rose-500">{st.wetBulbC}°C</strong>
+                      </div>
+                    </div>
+
+                    <p className="text-xs ts-text-muted leading-relaxed mb-2">
+                      <strong className="text-slate-300">IMD Classification:</strong> {st.imdClassification}
+                    </p>
+
+                    <div className="text-[11px] ts-text-subtle mb-2">
+                      <strong className="text-slate-300">Key Monitored Districts:</strong> {st.affectedDistricts.join(', ')}
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-500/5 border border-slate-500/10 text-[11px] space-y-1">
+                      <span className="font-bold text-slate-300 block">Priority Advisory:</span>
+                      <p className="text-slate-400 leading-snug">{st.actionAdvisories[0]}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 7. ALERT PREFERENCES */}
           <AlertPreferencesCTA
             locationName={locationName}
             coords={coords}
