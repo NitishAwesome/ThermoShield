@@ -1,12 +1,59 @@
 from datetime import datetime
 
 from sqlalchemy import (
-    Column, Integer, String, Float, ForeignKey, DateTime, Boolean
+    Column, Integer, String, Float, ForeignKey, DateTime, Boolean, Text, UniqueConstraint
 )
 
 from sqlalchemy.orm import relationship
 
 from .connection import Base
+
+
+class HealthDataset(Base):
+    """Immutable, aggregate ward/day surveillance snapshot. No patient identifiers."""
+    __tablename__ = "health_datasets"
+    id = Column(Integer, primary_key=True)
+    area_id = Column(String(80), nullable=False, index=True)
+    source_name = Column(String(200), nullable=False)
+    source_url = Column(String(1000), nullable=False)
+    data_kind = Column(String(30), nullable=False)
+    outcome_scope = Column(String(30), nullable=False)
+    checksum = Column(String(64), nullable=False)
+    records_json = Column(Text, nullable=False)
+    model_json = Column(Text, nullable=True)
+    report_json = Column(Text, nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    __table_args__ = (UniqueConstraint("area_id", "checksum", name="uq_health_dataset_content"),)
+
+
+class RegionalSubscription(Base):
+    __tablename__ = "regional_subscriptions"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    area_id = Column(String(80), nullable=False, index=True)
+    sms_enabled = Column(Boolean, nullable=False, default=False)
+    whatsapp_enabled = Column(Boolean, nullable=False, default=False)
+    consent_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    __table_args__ = (UniqueConstraint("user_id", "area_id", name="uq_regional_subscription"),)
+
+
+class RegionalDelivery(Base):
+    __tablename__ = "regional_deliveries"
+    id = Column(Integer, primary_key=True)
+    subscription_id = Column(Integer, ForeignKey("regional_subscriptions.id"), nullable=False)
+    area_id = Column(String(80), nullable=False, index=True)
+    channel = Column(String(20), nullable=False)
+    fingerprint = Column(String(64), nullable=False, unique=True)
+    risk_level = Column(String(20), nullable=False)
+    forecast_date = Column(String(10), nullable=False)
+    message = Column(Text, nullable=False)
+    status = Column(String(30), nullable=False, default="PENDING")
+    provider_sid = Column(String(80), nullable=True, unique=True)
+    error = Column(String(300), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 # --------------------------------------------------
 # USER MODEL

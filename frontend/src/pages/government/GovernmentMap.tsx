@@ -1990,6 +1990,10 @@ export const GovernmentMap: React.FC = () => {
 
         {/* Authority Action Shortcuts for Selected Area */}
         <div className="mt-4 pt-4 border-t ts-border flex items-center justify-end gap-3 flex-wrap">
+          {gisLayerMode === 'official_wards' && selectedWard && <Link
+            to={`/gov/health-impact?ward=${encodeURIComponent(selectedWard.id)}`}
+            className="px-3.5 py-2 rounded-xl border ts-border text-xs font-bold ts-text-primary"
+          >Review ward mortality & hospital outlook</Link>}
           {gisLayerMode === 'official_wards' && selectedWard && (
             <Link
               to={`/gov/action-plan?ward=${selectedWard.id}`}

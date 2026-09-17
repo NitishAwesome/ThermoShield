@@ -8,6 +8,8 @@ early-warning alerts upon detecting critical state transitions or threshold brea
 
 import asyncio
 import logging
+import os
+import sys
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
@@ -15,7 +17,8 @@ from app.database.connection import SessionLocal
 from app.services.weather import get_weather
 from app.services.thermal import calculate_thermal_stress
 from app.services.risk import predict_risk
-from app.services.alert_engine import dispatch_automatic_early_warning, get_engine_status_summary
+from app.services.alert_engine import get_engine_status_summary
+from app.services.regional_alerts import evaluate_subscribed_regions
 
 logger = logging.getLogger(__name__)
 
@@ -91,17 +94,9 @@ class BackgroundMonitorDaemon:
             risk_level = risk_pred.get("risk_level", "MODERATE")
             risk_score = risk_pred.get("risk_score", 50.0)
 
-            # Proactive dispatch evaluation
-            dispatch_res = dispatch_automatic_early_warning(
-                db=db,
-                location_name=name,
-                location_id=None,
-                risk_level=risk_level,
-                risk_score=risk_score,
-                temperature_c=temp,
-                wbgt_c=wbgt_c,
-                heat_index_c=heat_index_c
-            )
+            # Regional dispatch is handled once per cycle using explicit ward subscriptions.
+            # These national reference points are monitoring telemetry, not recipient lists.
+            dispatch_res = {"status": "MONITOR_ONLY", "dispatched_count": 0}
 
             return {
                 "location": name,
@@ -119,7 +114,7 @@ class BackgroundMonitorDaemon:
                 "error": str(e)
             }
 
-    async def run_evaluation_cycle(self) -> List[Dict[str, Any]]:
+    async def run_evaluation_cycle(self, *, allow_dispatch: bool = True) -> List[Dict[str, Any]]:
         """Executes one complete evaluation cycle across all monitored civic areas."""
         cycle_results = []
         db = SessionLocal()
@@ -133,6 +128,8 @@ class BackgroundMonitorDaemon:
                     cycle_results.append({"location": area.get("name"), "error": str(eval_err)})
                 # Small pause between Open-Meteo queries to respect rate limits
                 await asyncio.sleep(0.5)
+            if allow_dispatch:
+                cycle_results.extend(await evaluate_subscribed_regions(db))
         finally:
             db.close()
 

@@ -201,8 +201,9 @@ export const GovernmentHeatActionPlan: React.FC = () => {
           pulse: false,
         };
       case 'PREPARE_WITHIN_3_DAYS':
+      case 'PREPARE_WITHIN_5_DAYS':
         return {
-          title: 'PREPARE WITHIN 3 DAYS',
+          title: state === 'PREPARE_WITHIN_5_DAYS' ? 'PREPARE WITHIN 5 DAYS' : 'PREPARE WITHIN 3 DAYS',
           subtitle: 'Multi-day forecast shows thermal accumulation. Coordinate inter-departmental readiness.',
           color: 'bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-300',
           badge: 'bg-amber-500 text-white',

@@ -63,10 +63,10 @@ const CHANNELS: Channel[] = [
     id: 'whatsapp',
     Icon: MessageSquare,
     label: 'WhatsApp Alert Bot',
-    status: 'planned',
-    statusLabel: 'Planned',
+    status: 'conditional',
+    statusLabel: 'Configurable',
     description: 'Citizen messaging via WhatsApp Business API for regional heat advisories.',
-    note: 'Scheduled pending WhatsApp Business Service Provider (BSP) credentials.',
+    note: 'Enable a ward subscription below. Live delivery requires a configured sender and approved template; otherwise messages are simulated.',
   },
 ];
 

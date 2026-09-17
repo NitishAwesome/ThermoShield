@@ -623,6 +623,7 @@ export type HeatActionTriggerState =
   | 'ACTION_REVIEW_REQUIRED_NOW'
   | 'PREPARE_WITHIN_24_HOURS'
   | 'PREPARE_WITHIN_3_DAYS'
+  | 'PREPARE_WITHIN_5_DAYS'
   | 'MONITOR_NORMAL_BASELINE';
 
 export interface HeatActionItem {

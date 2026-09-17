@@ -210,6 +210,9 @@ def get_sms_provider() -> SMSProvider:
     Factory function returning the active SMSProvider.
     Uses Twilio if credentials are found in the environment; otherwise defaults to DemoSMSProvider.
     """
+    if (os.getenv("ENVIRONMENT", "").lower() in ("test", "testing")
+            or os.getenv("REGIONAL_DELIVERY_MODE", "demo").lower() != "live"):
+        return DemoSMSProvider()
     _load_env_credentials()
 
     account_sid = (os.getenv("TWILIO_ACCOUNT_SID") or "").strip()

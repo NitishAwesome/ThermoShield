@@ -1,5 +1,7 @@
 # ThermoShield
 
+The SIH completion branch adds aggregate health-data ingestion, mortality/admission modelling, five-future-day outlooks and consented regional SMS/WhatsApp delivery. See [implementation and validation guide](docs/SIH_COMPLETION.md) for setup, demo steps and remaining real-world dependencies.
+
 > **Impact-Based Extreme Heat Early Warning & Human Thermal Stress Intelligence Platform**
 >
 > ThermoShield converts live biometeorological conditions into physical human heat strain, machine-learning-driven civic health-risk insights, regional geospatial risk mapping, actionable public safety guidance, and interactive municipal heat action intervention simulations.
