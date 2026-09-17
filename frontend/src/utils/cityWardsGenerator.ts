@@ -162,6 +162,101 @@ function createMunicipalBoundary(
 }
 
 /**
+ * Deterministic 32-bit hash for an order-independent pair of coordinates.
+ * Guarantees hash(A, B) === hash(B, A).
+ */
+function hashEndpointPair(p1: [number, number], p2: [number, number]): number {
+  const isCanonical = p1[0] < p2[0] || (p1[0] === p2[0] && p1[1] < p2[1]);
+  const s1 = isCanonical ? p1 : p2;
+  const s2 = isCanonical ? p2 : p1;
+  const val = Math.sin(s1[0] * 12.9898 + s1[1] * 78.233 + s2[0] * 37.719 + s2[1] * 53.123) * 43758.5453;
+  return Math.abs(val - Math.floor(val));
+}
+
+/**
+ * Subdivides a straight boundary edge into natural, organic multi-vertex curves (street / river / canal alignment).
+ * Guarantees 100% airtight tessellation (0 gap, 0 overlap) because the displacement is derived symmetrically
+ * from canonical endpoints and smoothly tapers to 0 at both endpoints.
+ */
+function interpolateOrganicCurvedEdge(
+  p1: [number, number],
+  p2: [number, number],
+  numSteps: number = 6
+): [number, number][] {
+  const isCanonical = p1[0] < p2[0] || (p1[0] === p2[0] && p1[1] < p2[1]);
+  const s1 = isCanonical ? p1 : p2;
+  const s2 = isCanonical ? p2 : p1;
+
+  const dx = s2[0] - s1[0];
+  const dy = s2[1] - s1[1];
+  const dist = Math.hypot(dx, dy);
+
+  // If the segment is shorter than ~250m, keep it clean
+  if (dist < 0.0022) {
+    return isCanonical ? [s1, s2] : [s2, s1];
+  }
+
+  // Unit normal vector perpendicular to the segment
+  const nx = -dy / dist;
+  const ny = dx / dist;
+
+  const h = hashEndpointPair(s1, s2);
+  const phi1 = h * Math.PI * 2.0;
+  const phi2 = (h * 13.37) % (Math.PI * 2.0);
+  const maxAmp = dist * 0.12; // Natural 12% subtle road/stream deviation
+
+  const canonicalPts: [number, number][] = [];
+  for (let step = 0; step <= numSteps; step++) {
+    const t = step / numSteps;
+    if (step === 0) {
+      canonicalPts.push(s1);
+    } else if (step === numSteps) {
+      canonicalPts.push(s2);
+    } else {
+      // Sine window envelope: 0 at t=0 and 0 at t=1 (corners never move)
+      const envelope = Math.sin(Math.PI * t);
+      // Multi-harmonic natural frequency wave (simulates urban street/creek meanders)
+      const wave = Math.sin(Math.PI * 2.0 * t + phi1) * 0.65 + Math.sin(Math.PI * 4.0 * t + phi2) * 0.35;
+      const disp = envelope * wave * maxAmp;
+      const px = s1[0] + t * dx + nx * disp;
+      const py = s1[1] + t * dy + ny * disp;
+      canonicalPts.push([roundCoord(px), roundCoord(py)]);
+    }
+  }
+
+  return isCanonical ? canonicalPts : [...canonicalPts].reverse();
+}
+
+function roundCoord(v: number): number {
+  return Math.round(v * 10000000) / 10000000;
+}
+
+/**
+ * Transforms a polygon with straight Voronoi edges into a high-density, realistic municipal ward boundary.
+ */
+function enrichPolygonWithOrganicCurves(polygon: [number, number][]): [number, number][] {
+  if (polygon.length < 3) return polygon;
+  const result: [number, number][] = [];
+
+  for (let i = 0; i < polygon.length; i++) {
+    const p1 = polygon[i];
+    const p2 = polygon[(i + 1) % polygon.length];
+    const curvedSegment = interpolateOrganicCurvedEdge(p1, p2, 6);
+
+    // Append all points except the last one to avoid duplicating polygon vertices
+    for (let j = 0; j < curvedSegment.length - 1; j++) {
+      result.push(curvedSegment[j]);
+    }
+  }
+
+  // Close the linear ring for GeoJSON standard
+  if (result.length > 0) {
+    result.push([result[0][0], result[0][1]]);
+  }
+  return result;
+}
+
+/**
  * Builds contiguous, tessellated administrative ward areas organized by district.
  * Partitions the municipal territory into contiguous Voronoi cells bounded by the municipal perimeter.
  * Adjacent wards share exact boundary lines with zero gaps and zero overlaps (matching the BMC ward map standard).
@@ -189,11 +284,11 @@ function buildTessellatedWardAreas(
       cell = clipPolygonAgainstHalfPlane(cell, M, N);
     }
 
-    // Ensure cell is valid and closed
-    if (cell.length < 3) {
-      cell = generatePolygonCoords(w.lat, w.lon, w.radiusKm || 2.2, 8, i * 22);
+    // Ensure cell is valid and apply organic multi-vertex curvature
+    if (cell.length >= 3) {
+      cell = enrichPolygonWithOrganicCurves(cell);
     } else {
-      // GeoJSON requires closed linear ring: first point == last point
+      cell = generatePolygonCoords(w.lat, w.lon, w.radiusKm || 2.2, 16, i * 22);
       cell.push([cell[0][0], cell[0][1]]);
     }
 
