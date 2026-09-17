@@ -147,14 +147,20 @@ def test_api_action_plan_endpoints():
     assert data_eval["risk_level"] == "EXTREME"
 
     # 4. POST /api/action-plan/decision
+    login_res = client.post("/auth/login", json={"email": "aarav.sharma@health.gov.in", "password": "demo12345"})
+    token = login_res.json()["access_token"]
     decision_payload = {
         "area_id": "ward_f_south",
         "action_key": "review_work_restrictions",
         "decision_status": "Action Initiated Externally",
-        "officer_name": "Chief Disaster Commissioner",
+        "officer_name": "Dr. Aarav Sharma",
         "officer_notes": "Issued mandatory 12-3pm work cessation directive via Municipal circular #401."
     }
-    res_dec = client.post("/api/action-plan/decision", json=decision_payload)
+    res_dec = client.post(
+        "/api/action-plan/decision",
+        headers={"Authorization": f"Bearer {token}"},
+        json=decision_payload
+    )
     assert res_dec.status_code == 200
     data_dec = res_dec.json()
     assert data_dec["status"] == "success"

@@ -17,6 +17,8 @@ import {
   MousePointerClick,
   Globe,
   Flame,
+  Building2,
+  Layers,
 } from 'lucide-react';
 import { RiskMap } from '../components/RiskMap';
 import { LocationSearch } from '../components/LocationSearch';
@@ -25,12 +27,14 @@ import { DataRealityBadge, FallbackModeBanner } from '../components/provenance';
 import { useLocation } from '../context/LocationContext';
 import { useProfile } from '../context/ProfileContext';
 import { api } from '../services/api';
-import { ThermalResponse, RiskLevel, ThermalZone, MapLocationRisk, GlobalHeatStation, HeatRiskArea, StateHeatAlertProperties } from '../types';
+import { ThermalResponse, RiskLevel, ThermalZone, MapLocationRisk, GlobalHeatStation, HeatRiskArea, StateHeatAlertProperties, WardForecastSummary } from '../types';
 import { MUMBAI_PROTOTYPE_ZONES } from '../data/thermalZones';
+import { MUMBAI_ADMIN_WARDS } from '../data/mumbaiWards';
 import { GLOBAL_HEAT_STATIONS } from '../data/globalHeatHotspots';
 import { ALL_STATE_HEAT_ALERTS, getStateCategoryStyle, getStateAlertByName, getNationalAlertStatistics } from '../data/stateHeatAlerts';
 import { getOrGenerateCityWards } from '../utils/cityWardsGenerator';
 import { getRiskStyle } from '../utils/risk';
+
 
 // Popular Indian reference regions for rapid citizen exploration
 const REGIONAL_PRESETS = [
@@ -73,7 +77,10 @@ export const CitizenHeatMap: React.FC = () => {
   const [thermalData, setThermalData] = useState<ThermalResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [wardsForecastSummary, setWardsForecastSummary] = useState<WardForecastSummary[]>([]);
+  const [selectedWard, setSelectedWard] = useState<HeatRiskArea | null>(null);
   const [selectedZone, setSelectedZone] = useState<ThermalZone | null>(null);
+  const [showPrototypeZones, setShowPrototypeZones] = useState<boolean>(false);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState<boolean>(false);
 
   // Check if active session location differs from permanent profile home
@@ -101,6 +108,52 @@ export const CitizenHeatMap: React.FC = () => {
   useEffect(() => {
     fetchThermalData(coords.lat, coords.lon);
   }, [coords.lat, coords.lon]);
+
+  // Load live ward risk calculations from canonical forecast service
+  useEffect(() => {
+    let isMounted = true;
+    api.getWardsForecastSummary()
+      .then((res) => {
+        if (isMounted && res?.wards) {
+          setWardsForecastSummary(res.wards);
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not load live ward forecast summary for citizen heat map:', err);
+      });
+    return () => { isMounted = false; };
+  }, []);
+
+  // Shared Ward-Risk Truth: Map live calculated risk across all 24 Mumbai administrative ward references
+  const effectiveAdminWards = useMemo(() => {
+    if (wardsForecastSummary.length === 0) {
+      return MUMBAI_ADMIN_WARDS;
+    }
+    return MUMBAI_ADMIN_WARDS.map((w) => {
+      const fcMatch = wardsForecastSummary.find((s) => s.ward_id === w.id);
+      if (!fcMatch) return w;
+      const dayData = fcMatch.forecast_days.find((d) => d.day_index === 0) || fcMatch.forecast_days[0];
+      if (!dayData) return w;
+      return {
+        ...w,
+        weather: {
+          ...w.weather,
+          temperatureC: dayData.temperature_c,
+          humidityPercent: (dayData as any).humidity ?? w.weather.humidityPercent,
+          windSpeedMps: (dayData as any).wind_speed_ms ?? w.weather.windSpeedMps,
+        },
+        thermal: {
+          ...w.thermal,
+          estimatedWbgtC: dayData.wbgt_c,
+        },
+        risk: {
+          score: dayData.risk_score,
+          level: dayData.risk_level as any,
+        },
+        attentionReason: `Current calculated risk: ${dayData.risk_level}`,
+      };
+    });
+  }, [wardsForecastSummary]);
 
   const handleReturnToHome = () => {
     if (profile.city) {
@@ -136,22 +189,32 @@ export const CitizenHeatMap: React.FC = () => {
     }
   }, [setLocation]);
 
-  // Weather and thermal readings with safe fallbacks
-  const tempC = thermalData?.weather?.temperature ?? 33.5;
-  const humidity = thermalData?.weather?.humidity ?? 65;
-  const windMps = thermalData?.weather?.wind_speed ?? 2.4;
-  const wbgtC = thermalData?.thermal?.indices?.wbgt_c ?? 29.2;
-  const heatIndexC = thermalData?.thermal?.indices?.heat_index_c ?? 38.1;
-  const rawRiskLevel = thermalData?.thermal?.risk_assessment?.level || 'MODERATE';
-  const riskLevel = (['LOW', 'MODERATE', 'HIGH', 'EXTREME', 'CRITICAL'].includes(rawRiskLevel)
-    ? rawRiskLevel
-    : 'MODERATE') as RiskLevel;
+  // Canonical Telemetry State
+  const isFallback = Boolean(
+    thermalData?.weather?.is_fallback ||
+    thermalData?.weather?.source_status === 'OFFLINE_FALLBACK'
+  );
 
-  const [selectedWard, setSelectedWard] = useState<HeatRiskArea | null>(null);
+  const isDataAvailable = Boolean(
+    thermalData?.weather &&
+    !error &&
+    thermalData?.weather?.source_status !== 'UNAVAILABLE'
+  );
+
+  // Weather and thermal readings with safe nullability (never fake numbers)
+  const tempC = isDataAvailable ? thermalData?.weather?.temperature ?? null : null;
+  const humidity = isDataAvailable ? thermalData?.weather?.humidity ?? null : null;
+  const windMps = isDataAvailable ? thermalData?.weather?.wind_speed ?? null : null;
+  const wbgtC = isDataAvailable ? thermalData?.thermal?.indices?.wbgt_c ?? null : null;
+  const heatIndexC = isDataAvailable ? thermalData?.thermal?.indices?.heat_index_c ?? null : null;
+  const rawRiskLevel = isDataAvailable ? thermalData?.thermal?.risk_assessment?.level : null;
+  const riskLevel = rawRiskLevel && ['LOW', 'MODERATE', 'HIGH', 'EXTREME', 'CRITICAL'].includes(rawRiskLevel)
+    ? (rawRiskLevel as RiskLevel)
+    : null;
 
   // Dynamically generate or load official wards for current monitored city
   const activeCityWards = useMemo(() => {
-    return getOrGenerateCityWards(locationName, coords.lat, coords.lon, tempC, humidity);
+    return getOrGenerateCityWards(locationName, coords.lat, coords.lon, tempC ?? 33.5, humidity ?? 65);
   }, [locationName, coords.lat, coords.lon, tempC, humidity]);
 
   useEffect(() => {
@@ -164,13 +227,17 @@ export const CitizenHeatMap: React.FC = () => {
     }
   }, [activeCityWards]);
 
-  const isFallback = Boolean(
-    thermalData?.weather?.is_fallback ||
-    thermalData?.weather?.source_status === 'OFFLINE_FALLBACK'
-  );
-
   // Derive human-friendly advice based on WBGT
-  const getHumanAdvice = (wbgt: number) => {
+  const getHumanAdvice = (wbgt: number | null, level: RiskLevel | null) => {
+    if (wbgt === null || level === null) {
+      return {
+        headline: 'Thermal Analysis Temporarily Unavailable',
+        action: 'Current meteorological observations could not be loaded for this location. Heat risk calculations are paused until telemetry resumes.',
+        color: 'text-slate-400',
+        bg: 'bg-slate-500/10 border-slate-500/30',
+        icon: <Info className="w-5 h-5 flex-shrink-0 mt-0.5 text-slate-400" />,
+      };
+    }
     if (wbgt >= 32) {
       return {
         headline: 'Extreme Heat Stress Warning',
@@ -207,19 +274,21 @@ export const CitizenHeatMap: React.FC = () => {
     };
   };
 
-  const advice = getHumanAdvice(wbgtC);
+  const advice = getHumanAdvice(wbgtC, riskLevel);
 
   // Map locations for surrounding reference
-  const mapLocations: MapLocationRisk[] = [
-    {
-      latitude: coords.lat,
-      longitude: coords.lon,
-      risk_score: thermalData?.thermal?.risk_assessment?.score
-        ? Math.round(thermalData.thermal.risk_assessment.score * 100)
-        : 55,
-      risk_level: riskLevel,
-    },
-  ];
+  const mapLocations: MapLocationRisk[] = isDataAvailable
+    ? [
+        {
+          latitude: coords.lat,
+          longitude: coords.lon,
+          risk_score: thermalData?.thermal?.risk_assessment?.score != null
+            ? Math.round(thermalData.thermal.risk_assessment.score * 100)
+            : null,
+          risk_level: riskLevel,
+        },
+      ]
+    : [];
 
   return (
     <div className="space-y-6 pb-12 animate-fadeIn max-w-7xl mx-auto px-2 sm:px-4">
@@ -242,7 +311,11 @@ export const CitizenHeatMap: React.FC = () => {
                 <MapPin className="w-4 h-4" />
                 <span>Citizen Heat Safety Portal</span>
               </span>
-              <DataRealityBadge tier="CALCULATED" size="xs" customLabel="Heat Stress Model" />
+              <DataRealityBadge
+                tier={!isDataAvailable ? 'UNAVAILABLE' : isFallback ? 'OFFLINE_FALLBACK' : 'CALCULATED'}
+                size="xs"
+                customLabel={!isDataAvailable ? 'Telemetry Unavailable' : 'Heat Stress Model'}
+              />
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-black ts-text-primary tracking-tight font-sans mt-2">
@@ -447,9 +520,11 @@ export const CitizenHeatMap: React.FC = () => {
             <Thermometer className="w-4 h-4 text-orange-500" />
           </div>
           <div className="mt-2 font-mono font-black text-2xl ts-text-primary">
-            {tempC.toFixed(1)}°C
+            {tempC != null ? `${tempC.toFixed(1)}°C` : '—'}
           </div>
-          <div className="text-[10.5px] ts-text-muted mt-0.5">Live atmospheric observation</div>
+          <div className="text-[10.5px] ts-text-muted mt-0.5">
+            {isDataAvailable ? 'Live atmospheric observation' : 'Telemetry unavailable'}
+          </div>
         </div>
 
         {/* Relative Humidity */}
@@ -459,7 +534,7 @@ export const CitizenHeatMap: React.FC = () => {
             <Droplets className="w-4 h-4 text-cyan-500" />
           </div>
           <div className="mt-2 font-mono font-black text-2xl text-cyan-400">
-            {humidity}%
+            {humidity != null ? `${Math.round(humidity)}%` : '—'}
           </div>
           <div className="text-[10.5px] ts-text-muted mt-0.5">Moisture trapping index</div>
         </div>
@@ -471,7 +546,7 @@ export const CitizenHeatMap: React.FC = () => {
             <Sun className="w-4 h-4 text-amber-500" />
           </div>
           <div className="mt-2 font-mono font-black text-2xl text-amber-400">
-            {heatIndexC.toFixed(1)}°C
+            {heatIndexC != null ? `${heatIndexC.toFixed(1)}°C` : '—'}
           </div>
           <div className="text-[10.5px] ts-text-muted mt-0.5">Rothfusz biometric model</div>
         </div>
@@ -483,7 +558,7 @@ export const CitizenHeatMap: React.FC = () => {
             <HeartPulse className="w-4 h-4 text-rose-500" />
           </div>
           <div className="mt-2 font-mono font-black text-2xl text-rose-400">
-            {wbgtC.toFixed(1)}°C
+            {wbgtC != null ? `${wbgtC.toFixed(1)}°C` : '—'}
           </div>
           <div className="text-[10.5px] ts-text-muted mt-0.5">Estimated WBGT thermal metric</div>
         </div>
@@ -495,7 +570,7 @@ export const CitizenHeatMap: React.FC = () => {
             <Wind className="w-4 h-4 text-teal-500" />
           </div>
           <div className="mt-2 font-mono font-black text-2xl text-teal-400">
-            {windMps.toFixed(1)} m/s
+            {windMps != null ? `${windMps.toFixed(1)} m/s` : '—'}
           </div>
           <div className="text-[10.5px] ts-text-muted mt-0.5">Convective cooling factor</div>
         </div>
@@ -513,6 +588,33 @@ export const CitizenHeatMap: React.FC = () => {
       {/* ========================================================================= */}
       {/* 4. INTERACTIVE RISK MAP (CITIZEN VIEW)                                    */}
       {/* ========================================================================= */}
+      {/* Layer Control: 24 Ward Boundaries (Default) + Optional Prototype Zones */}
+      <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-2xl ts-card border ts-border text-xs">
+        <div className="flex items-center space-x-2">
+          <Building2 className="w-4 h-4 text-orange-500 flex-shrink-0" />
+          <span className="font-bold ts-text-primary">
+            Primary Heat Map Layer: 24 Mumbai Administrative Ward References
+          </span>
+          <span className="text-[10.5px] ts-text-subtle hidden sm:inline">
+            • Shared calculated ward-level biometeorological risk
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowPrototypeZones(!showPrototypeZones)}
+          className={`px-3 py-1.5 rounded-xl font-semibold transition-all flex items-center space-x-1.5 cursor-pointer text-xs ${
+            showPrototypeZones
+              ? 'bg-purple-600 text-white shadow-sm'
+              : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary'
+          }`}
+          title="Toggle optional microclimate demonstration polygons"
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>Prototype Microclimate Illustration</span>
+          <span className="text-[10px] opacity-75">({showPrototypeZones ? 'ON' : 'OFF'})</span>
+        </button>
+      </div>
+
       <RiskMap
         scope={viewScope === 'world' ? 'world' : viewScope === 'national' ? 'national' : 'wards'}
         center={
@@ -522,10 +624,11 @@ export const CitizenHeatMap: React.FC = () => {
         }
         zoom={viewScope === 'world' ? 3 : viewScope === 'national' ? 5 : 11}
         locationName={viewScope === 'national' && selectedState ? `${selectedState.stateName}, India` : locationName}
-        temperature={viewScope === 'national' && selectedState ? selectedState.temperatureC : tempC}
-        humidity={viewScope === 'national' && selectedState ? selectedState.humidityPercent : humidity}
-        wbgt={viewScope === 'national' && selectedState ? selectedState.wbgtC : wbgtC}
-        riskLevel={viewScope === 'national' && selectedState ? selectedState.riskLevel : riskLevel}
+        temperature={viewScope === 'national' && selectedState ? selectedState.temperatureC : (tempC ?? undefined)}
+        humidity={viewScope === 'national' && selectedState ? selectedState.humidityPercent : (humidity ?? undefined)}
+        wbgt={viewScope === 'national' && selectedState ? selectedState.wbgtC : (wbgtC ?? undefined)}
+        riskLevel={viewScope === 'national' && selectedState ? selectedState.riskLevel : (riskLevel ?? undefined)}
+        riskScore={thermalData?.thermal?.risk_assessment?.score}
         showStateAlerts={viewScope === 'national'}
         selectedStateCode={selectedState?.stateCode}
         onSelectState={(st) => setSelectedState(st)}
@@ -621,36 +724,72 @@ export const CitizenHeatMap: React.FC = () => {
         </div>
       )}
 
-      {/* Selected Administrative Ward Details (if citizen selects a ward on map) */}
+      {/* Selected Administrative Ward Details Card */}
       {selectedWard && viewScope === 'local' && (
-        <div className="p-5 rounded-2xl ts-card border border-orange-500/30 bg-orange-500/5 space-y-2 text-xs">
-          <div className="flex items-center justify-between">
-            <span className="font-bold text-orange-400 uppercase text-[11px] font-mono">
-              Selected Administrative Ward ({selectedWard.wardCode})
-            </span>
-            <span className={`px-2.5 py-0.5 rounded-full text-[10.5px] font-bold ${getRiskStyle(selectedWard.risk.level).badge}`}>
-              {getRiskStyle(selectedWard.risk.level).emoji} {selectedWard.risk.level} ({selectedWard.risk.score}/100)
-            </span>
+        <div className="p-5 rounded-2xl ts-card border border-orange-500/30 bg-orange-500/5 space-y-3 text-xs animate-fadeIn">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center space-x-2">
+              <span className="font-bold text-orange-400 uppercase text-[11px] font-mono">
+                Selected Administrative Ward ({selectedWard.wardCode})
+              </span>
+              <span className={`px-2.5 py-0.5 rounded-full text-[10.5px] font-bold ${getRiskStyle(selectedWard.risk.level).badge}`}>
+                {getRiskStyle(selectedWard.risk.level).emoji} {selectedWard.risk.level} ({selectedWard.risk.score}/100)
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedWard(null)}
+              className="text-xs ts-text-muted hover:ts-text-primary cursor-pointer"
+            >
+              Dismiss
+            </button>
           </div>
-          <h3 className="text-base font-black ts-text-primary">{selectedWard.name}</h3>
-          <p className="ts-text-muted">{selectedWard.attentionReason || selectedWard.demographicsNote}</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 font-mono">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <span className="ts-text-subtle text-[10px] block">Temperature:</span>
-              <strong className="text-orange-400">{selectedWard.weather.temperatureC.toFixed(1)}°C</strong>
+              <h3 className="text-base font-black ts-text-primary">{selectedWard.name}</h3>
+              <p className="text-xs ts-text-muted mt-0.5">
+                {selectedWard.attentionReason || selectedWard.demographicsNote}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleMapClick(selectedWard.centroid.latitude, selectedWard.centroid.longitude)}
+              className="px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs transition-all flex items-center gap-1.5 self-start sm:self-auto cursor-pointer whitespace-nowrap shadow-sm"
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              <span>Monitor This Ward</span>
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t ts-border font-mono text-xs">
+            <div>
+              <span className="ts-text-subtle text-[10.5px] block">Air Temperature:</span>
+              <strong className="text-orange-400 text-sm">{selectedWard.weather.temperatureC.toFixed(1)}°C</strong>
             </div>
             <div>
-              <span className="ts-text-subtle text-[10px] block">Est. WBGT:</span>
-              <strong className="text-rose-400">{selectedWard.thermal.estimatedWbgtC.toFixed(1)}°C</strong>
+              <span className="ts-text-subtle text-[10.5px] block">Estimated WBGT:</span>
+              <strong className="text-rose-400 text-sm">{selectedWard.thermal.estimatedWbgtC.toFixed(1)}°C</strong>
             </div>
             <div>
-              <span className="ts-text-subtle text-[10px] block">Heat Index:</span>
-              <strong className="text-amber-400">{selectedWard.thermal.heatIndexC.toFixed(1)}°C</strong>
+              <span className="ts-text-subtle text-[10.5px] block">Humidity:</span>
+              <strong className="ts-text-primary text-sm">{selectedWard.weather.humidityPercent}%</strong>
             </div>
             <div>
-              <span className="ts-text-subtle text-[10px] block">Microclimate UHI:</span>
-              <strong className="ts-text-primary">+{selectedWard.microclimateOffsetC ?? 0}°C</strong>
+              <span className="ts-text-subtle text-[10.5px] block">Heat Index:</span>
+              <strong className="text-amber-400 text-sm">{selectedWard.thermal.heatIndexC.toFixed(1)}°C</strong>
             </div>
+          </div>
+          <div className="p-2.5 rounded-xl bg-slate-500/10 border ts-border text-[11.5px] ts-text-muted flex items-start gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <span>
+              <strong className="ts-text-primary">Safety Directive: </strong>
+              {selectedWard.risk.level === 'EXTREME'
+                ? 'Dangerous heat stress conditions. Limit outdoor exposure, stay in shaded or air-cooled locations, and hydrate with electrolytes.'
+                : selectedWard.risk.level === 'HIGH'
+                ? 'High physiological heat burden. Drink fluids regularly and take frequent breaks in shade if working outdoors.'
+                : selectedWard.risk.level === 'MODERATE'
+                ? 'Moderate heat conditions. Maintain regular hydration and avoid prolonged sun exposure during peak afternoon hours.'
+                : 'Low thermal stress. Conditions are within normal limits; standard hydration is recommended.'}
+            </span>
           </div>
         </div>
       )}
@@ -660,7 +799,7 @@ export const CitizenHeatMap: React.FC = () => {
         <div className="p-5 rounded-2xl ts-card border border-purple-500/30 bg-purple-500/5 space-y-2 text-xs">
           <div className="flex items-center justify-between">
             <span className="font-bold text-purple-400 uppercase text-[11px] font-mono">
-              Selected Prototype Urban Thermal Zone
+              Selected Prototype Urban Thermal Zone (Demonstration)
             </span>
             <Badge variant="brand" size="sm">Prototype Demonstration Zone</Badge>
           </div>
@@ -681,6 +820,9 @@ export const CitizenHeatMap: React.FC = () => {
               <span className="ts-text-subtle text-[10px] block">District:</span>
               <strong className="ts-text-primary">{selectedZone.district}</strong>
             </div>
+          </div>
+          <div className="text-[10px] text-amber-400 font-mono pt-1">
+            Scientific demonstration illustration only — not live physical sensors.
           </div>
         </div>
       )}
@@ -710,8 +852,13 @@ export const CitizenHeatMap: React.FC = () => {
             </div>
 
             <div className="p-3 rounded-xl ts-card-subtle border ts-border">
-              <strong className="ts-text-primary block mb-0.5">Prototype Urban Zones:</strong>
-              The demonstration polygons in Greater Mumbai illustrate how building density, corrugated roofing, and sea breezes alter localized thermal stress — not live sensor data.
+              <strong className="ts-text-primary block mb-0.5">Mumbai Administrative Ward References:</strong>
+              The 24 ward polygons display live calculated heat risk synchronized with municipal monitoring. Polygons are colored using the centralized heat risk scale (Low, Moderate, High, Extreme).
+            </div>
+
+            <div className="p-3 rounded-xl ts-card-subtle border ts-border">
+              <strong className="ts-text-primary block mb-0.5">Prototype Microclimate Layer:</strong>
+              The optional demonstration layer illustrates modelled urban heat island (UHI) offsets for scientific research and education — not live physical sensors.
             </div>
           </div>
         </div>

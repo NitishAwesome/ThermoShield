@@ -1,23 +1,17 @@
 import React, { useMemo } from 'react';
 import {
   HeartPulse,
-  UserCheck,
   Sparkles,
   ArrowRight,
-  ShieldCheck,
   AlertTriangle,
-  Flame,
-  CheckCircle2,
-  Info,
-  Clock,
-  MapPin,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { User, UserProfile } from '../types';
-import { Badge, Button } from './ui';
+import { Badge } from './ui';
 import { getRiskColor } from '../utils/risk';
 import { useTranslation } from '../context/LanguageContext';
 import { translateRiskLevel } from '../utils/translationHelpers';
+import { deriveTelemetryState } from '../utils/telemetryState';
 
 interface PersonalizedDashboardSummaryProps {
   user: User | null;
@@ -33,7 +27,6 @@ export const PersonalizedDashboardSummary: React.FC<PersonalizedDashboardSummary
   thermalData,
 }) => {
   const { t } = useTranslation();
-  const isCitizen = !profile.role || profile.role === 'user';
   const displayName = profile.fullName || user?.name || t('role.citizen', 'Citizen');
   const firstName = displayName.split(' ')[0];
 
@@ -45,7 +38,20 @@ export const PersonalizedDashboardSummary: React.FC<PersonalizedDashboardSummary
     return t('dashboard.goodEvening', 'Good evening');
   }, [t]);
 
-  const generalRiskLevel = (thermalData?.thermal?.risk_assessment?.level || 'LOW').toUpperCase();
+  // Derive canonical telemetry status
+  const telemetry = useMemo(() => {
+    return deriveTelemetryState({ thermalData });
+  }, [thermalData]);
+
+  const isWeatherAvailable = Boolean(
+    telemetry.isAvailable &&
+    thermalData?.thermal?.risk_assessment?.level &&
+    thermalData?.weather?.temperature !== undefined &&
+    thermalData?.weather?.temperature !== null
+  );
+
+  const rawGeneralLevel = thermalData?.thermal?.risk_assessment?.level;
+  const generalRiskLevel = isWeatherAvailable && rawGeneralLevel ? rawGeneralLevel.toUpperCase() : null;
   const wbgt = thermalData?.thermal?.indices?.wbgt_c;
   const temp = thermalData?.weather?.temperature;
 
@@ -55,7 +61,7 @@ export const PersonalizedDashboardSummary: React.FC<PersonalizedDashboardSummary
     let adjustmentPoints = 0;
 
     // Age factor
-    if (profile.age !== null && profile.age > 0) {
+    if (profile.age !== null && profile.age !== undefined && profile.age > 0) {
       if (profile.age >= 65) {
         adjustmentPoints += 20;
         factors.push(t('dashboard.factorSeniorVuln', { age: profile.age }));
@@ -94,6 +100,17 @@ export const PersonalizedDashboardSummary: React.FC<PersonalizedDashboardSummary
       factors.push(t('dashboard.factorNoCooling'));
     }
 
+    // If weather data is unavailable, NO risk calculation is valid
+    if (!isWeatherAvailable || !generalRiskLevel) {
+      return {
+        personalRiskLevel: 'UNAVAILABLE' as const,
+        factors,
+        advisory: 'Your profile is saved, but current personal heat risk cannot be calculated until weather data is available.',
+        isHigherThanGeneral: false,
+        isCalculated: false,
+      };
+    }
+
     let personalRiskLevel = generalRiskLevel;
     if (adjustmentPoints >= 35) {
       if (generalRiskLevel === 'LOW') personalRiskLevel = 'MODERATE';
@@ -118,11 +135,33 @@ export const PersonalizedDashboardSummary: React.FC<PersonalizedDashboardSummary
       factors,
       advisory,
       isHigherThanGeneral: personalRiskLevel !== generalRiskLevel,
+      isCalculated: true,
     };
-  }, [profile, generalRiskLevel, t]);
+  }, [profile, generalRiskLevel, isWeatherAvailable, t]);
 
-  // If user has not completed basic profile
-  const hasBasicProfile = profile.fullName && profile.age !== null && profile.age > 0;
+  const hasBasicProfile = Boolean(profile.fullName && profile.age !== null && profile.age !== undefined && profile.age > 0);
+  const monitoredCity = locationName.split(',')[0].trim();
+  const profileCity = profile.city?.trim();
+  const showProfileCity = Boolean(profileCity && profileCity.toLowerCase() !== monitoredCity.toLowerCase());
+
+  // Weather source label with provenance
+  const weatherSourceDisplay = useMemo(() => {
+    if (!isWeatherAvailable || temp === undefined || temp === null) {
+      return 'Unavailable';
+    }
+    const tempStr = `${temp.toFixed(1)}°C`;
+    const wbgtStr = wbgt !== undefined && wbgt !== null ? `, WBGT ${wbgt.toFixed(1)}°C` : '';
+    if (telemetry.isFallback) {
+      return `Offline Fallback (${tempStr}${wbgtStr})`;
+    }
+    if (telemetry.state === 'STALE_CACHED') {
+      return `Stale Cached (${tempStr}${wbgtStr})`;
+    }
+    if (telemetry.state === 'CACHED') {
+      return `Cached Data (${tempStr}${wbgtStr})`;
+    }
+    return `Live Data (${tempStr}${wbgtStr})`;
+  }, [isWeatherAvailable, temp, wbgt, telemetry]);
 
   return (
     <div className="rounded-2xl ts-card-elevated border border-orange-500/25 p-4 sm:p-5 shadow-md relative overflow-hidden transition-all">
@@ -140,22 +179,34 @@ export const PersonalizedDashboardSummary: React.FC<PersonalizedDashboardSummary
 
           <div className="flex items-center space-x-3 flex-wrap gap-y-2 pt-0.5">
             <h2 className="text-xl sm:text-2xl font-black ts-text-primary">
-              {t('dashboard.personalExposure')}:{' '}
-              <span
-                style={{ color: getRiskColor(personalAssessment.personalRiskLevel) }}
-                className="tracking-tight"
-              >
-                {translateRiskLevel(personalAssessment.personalRiskLevel, t)} {t('common.risk', 'Risk')}
-              </span>
+              {t('dashboard.personalExposure', 'Personal Exposure')}:{' '}
+              {personalAssessment.isCalculated ? (
+                <span
+                  style={{ color: getRiskColor(personalAssessment.personalRiskLevel) }}
+                  className="tracking-tight"
+                >
+                  {translateRiskLevel(personalAssessment.personalRiskLevel, t)} {t('common.risk', 'Risk')}
+                </span>
+              ) : (
+                <span className="text-slate-500 dark:text-slate-400 tracking-tight font-semibold">
+                  Currently Unavailable
+                </span>
+              )}
             </h2>
 
-            <Badge
-              riskLevel={personalAssessment.personalRiskLevel}
-              size="sm"
-              showDot
-            >
-              {hasBasicProfile ? t('dashboard.profileTailored') : t('dashboard.generalBaseline')}
-            </Badge>
+            {personalAssessment.isCalculated ? (
+              <Badge
+                riskLevel={personalAssessment.personalRiskLevel}
+                size="sm"
+                showDot
+              >
+                {hasBasicProfile ? t('dashboard.profileTailored') : t('dashboard.generalBaseline')}
+              </Badge>
+            ) : (
+              <Badge variant="neutral" size="sm" showDot>
+                Unavailable
+              </Badge>
+            )}
 
             {personalAssessment.isHigherThanGeneral && (
               <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 flex items-center space-x-1">
@@ -165,19 +216,29 @@ export const PersonalizedDashboardSummary: React.FC<PersonalizedDashboardSummary
             )}
           </div>
 
-          {/* Transparent Basis Notice */}
+          {/* Transparent Basis Notice — Explicitly disambiguated locations */}
           <div className="text-[11px] ts-text-subtle flex items-center space-x-2 pt-0.5 flex-wrap gap-y-1">
             <span className="font-semibold text-orange-500/90">{t('dashboard.basedOn', 'Based on')}:</span>
-            <span>{locationName.split(',')[0]}</span>
+            <span><strong>Monitored location:</strong> {monitoredCity}</span>
+            {showProfileCity && (
+              <>
+                <span>•</span>
+                <span><strong>Profile home:</strong> {profileCity}</span>
+              </>
+            )}
+            {hasBasicProfile && (
+              <>
+                <span>•</span>
+                <span><strong>Age:</strong> {profile.age} {t('common.years', 'yrs')}</span>
+              </>
+            )}
             <span>•</span>
-            <span>{hasBasicProfile ? `${profile.age} ${t('common.years', 'yrs')} · ${profile.city}` : t('role.citizen', 'Citizen')}</span>
-            <span>•</span>
-            <span>{t('dashboard.currentWeather', 'Current weather')} ({temp ? `${temp.toFixed(1)}°C` : t('riskCard.liveTelemetry')}{wbgt ? `, WBGT ${wbgt.toFixed(1)}°C` : ''})</span>
+            <span><strong>Weather source:</strong> {weatherSourceDisplay}</span>
             {personalAssessment.factors.length > 0 && (
               <>
                 <span>•</span>
-                <span className="text-orange-700 dark:text-orange-400 font-medium">
-                  {personalAssessment.factors.slice(0, 2).join(', ')}
+                <span className={personalAssessment.isCalculated ? 'text-orange-700 dark:text-orange-400 font-medium' : 'text-slate-600 dark:text-slate-400 font-medium'}>
+                  <strong>Saved factors:</strong> {personalAssessment.factors.slice(0, 2).join(', ')}
                 </span>
               </>
             )}

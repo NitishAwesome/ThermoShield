@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
-import { ThermalResponse, RiskResponse } from '../types';
+import { ThermalResponse, RiskResponse, RiskLevel } from '../types';
 import { LocationSearch } from '../components/LocationSearch';
 import { LoadingState } from '../components/LoadingState';
 import {
@@ -113,10 +113,13 @@ export const RiskDetails: React.FC = () => {
   const risk = thermalData?.thermal?.risk_assessment;
   const indices = thermalData?.thermal?.indices;
   const weather = thermalData?.weather;
-  const level = (risk?.level || 'LOW').toUpperCase();
+  const level: RiskLevel | null = (risk?.level as RiskLevel) || null;
 
   // Calm Risk Badge Title
   const getActionBadge = () => {
+    if (!level) {
+      return { text: 'Unavailable', variant: 'neutral' as const };
+    }
     if (level === 'LOW') {
       return { text: t('riskCard.lowRisk'), variant: 'low' as const };
     }
@@ -180,17 +183,17 @@ export const RiskDetails: React.FC = () => {
                   {t('riskDetails.todayRiskSummary')}
                 </span>
                 <h2 className="text-xl sm:text-2xl md:text-3xl font-black ts-text-primary font-sans mt-1">
-                  {t('riskDetails.todayHeatRisk')}: {level}
+                  {t('riskDetails.todayHeatRisk')}: {level || 'Unavailable'}
                 </h2>
                 <p className="text-xs sm:text-sm ts-text-muted mt-1 max-w-2xl leading-relaxed">
                   {toPlainLanguage(risk?.reason) ||
-                    t('riskDetails.safeBaseline')}
+                    (level ? t('riskDetails.safeBaseline') : 'Heat risk calculations are paused while weather telemetry is inactive.')}
                 </p>
               </div>
 
               <div className="flex items-center space-x-3 flex-shrink-0">
                 <Badge riskLevel={level} size="lg" showDot showIcon>
-                  {level} {t('alerts.title')}
+                  {level ? `${level} ${t('alerts.title')}` : 'Unavailable'}
                 </Badge>
               </div>
             </div>

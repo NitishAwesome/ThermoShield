@@ -612,8 +612,8 @@ export const GovernmentDispatch: React.FC = () => {
                           <td className="py-2 px-3 font-mono">{r.temperature?.toFixed(1) || '--'}</td>
                           <td className="py-2 px-3 font-mono">{r.wbgt?.toFixed(1) || '--'}</td>
                           <td className="py-2 px-3">
-                            <Badge riskLevel={r.risk_level || 'LOW'} size="sm">
-                              {r.risk_level || 'LOW'}
+                            <Badge riskLevel={r.risk_level || null} size="sm">
+                              {r.risk_level || '—'}
                             </Badge>
                           </td>
                           <td className="py-2 px-3 font-mono text-[10px]">{r.dispatch?.transition || 'Baseline'}</td>

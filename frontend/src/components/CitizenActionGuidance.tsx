@@ -36,7 +36,8 @@ export const CitizenActionGuidance: React.FC<CitizenActionGuidanceProps> = ({
   className = '',
 }) => {
   const { t } = useTranslation();
-  const level = (riskAssessment?.level || 'LOW').toUpperCase();
+  const hasRisk = Boolean(riskAssessment && riskAssessment.level);
+  const level = hasRisk ? riskAssessment!.level.toUpperCase() : 'UNAVAILABLE';
   const isHighRisk = level === 'HIGH' || level === 'EXTREME' || level === 'CRITICAL';
 
   // Dynamic practical action list derived from real heat stress conditions

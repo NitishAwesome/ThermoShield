@@ -42,7 +42,7 @@ export const CitizenSafetyActions: React.FC<CitizenSafetyActionsProps> = ({
   className = '',
 }) => {
   const { t } = useTranslation();
-  const level = (riskLevel || 'LOW').toUpperCase();
+  const level = riskLevel ? (riskLevel as string).toUpperCase() : null;
   const isExtreme = level === 'EXTREME' || level === 'CRITICAL';
   const isHigh = level === 'HIGH';
   const isModerate = level === 'MODERATE';
@@ -194,6 +194,21 @@ export const CitizenSafetyActions: React.FC<CitizenSafetyActionsProps> = ({
       ];
     }
 
+    // Unavailable / Null Risk Level
+    if (!level) {
+      return [
+        {
+          id: 'hydration',
+          icon: Droplets,
+          iconColor: 'text-blue-600 dark:text-blue-400',
+          iconBg: 'bg-blue-500/10 dark:bg-blue-400/10',
+          title: 'Standard Hydration Baseline',
+          description: 'Maintain regular fluid intake (standard 250 mL/hr). Specific environmental heat alerts are paused while weather telemetry is inactive.',
+          footerNote: '✓ Telemetry inactive — general hydration advised',
+        },
+      ];
+    }
+
     // Default / Low Risk (4 practical actions)
     return [
       {
@@ -219,9 +234,9 @@ export const CitizenSafetyActions: React.FC<CitizenSafetyActionsProps> = ({
         icon: Shirt,
         iconColor: 'text-purple-600 dark:text-purple-400',
         iconBg: 'bg-purple-500/10 dark:bg-purple-400/10',
-        title: 'Comfortable Outdoor Schedules',
-        description: 'Conditions are safe for standard school sports, outdoor walks, and field errands. Dress in comfortable, breathable clothing.',
-        footerNote: 'No severe work-rest restrictions required',
+        title: 'Light Cotton Attire',
+        description: 'Comfortable seasonal cotton attire is suitable for standard indoor and outdoor daily activities.',
+        footerNote: 'Standard thermal comfort',
       },
       {
         id: 'ventilation',
@@ -250,11 +265,11 @@ export const CitizenSafetyActions: React.FC<CitizenSafetyActionsProps> = ({
           </h3>
         </div>
         <Badge
-          variant={isExtreme ? 'extreme' : isHigh ? 'high' : isModerate ? 'moderate' : 'low'}
+          variant={isExtreme ? 'extreme' : isHigh ? 'high' : isModerate ? 'moderate' : !level ? 'neutral' : 'low'}
           size="sm"
           className="self-start sm:self-auto font-bold"
         >
-          {level} Risk Guidance ({actions.length} Directives)
+          {!level ? 'Guidance Paused' : `${level} Risk Guidance`} ({actions.length} Directives)
         </Badge>
       </div>
 

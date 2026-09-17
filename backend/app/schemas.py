@@ -7,6 +7,14 @@ class UserCreate(BaseModel):
     phone_number: str
     email: EmailStr
     role: str = "user"
+    organization: str | None = None
+    department: str | None = None
+    designation: str | None = None
+    official_id: str | None = None
+    jurisdiction_id: str | None = "IN"
+    jurisdiction_type: str | None = "COUNTRY"
+    permissions: str | None = ""
+    account_status: str = "APPROVED"
 
 class UserResponse(BaseModel):
     id: int
@@ -14,6 +22,16 @@ class UserResponse(BaseModel):
     phone_number: str
     email: EmailStr
     role: str
+    organization: str | None = None
+    department: str | None = None
+    designation: str | None = None
+    official_id: str | None = None
+    jurisdiction_id: str | None = "IN"
+    jurisdiction_type: str | None = "COUNTRY"
+    permissions: str | None = ""
+    account_status: str | None = "APPROVED"
+    portal_type: str = "CITIZEN"
+    jurisdiction_name: str | None = None
 
     class Config:
         from_attributes = True
@@ -242,4 +260,46 @@ class HeatActionDecisionUpdateRequest(BaseModel):
     officer_name: str | None = None
     officer_notes: str | None = None
     notes: str | None = None
+
+
+class HAPAuditLogResponse(BaseModel):
+    id: int
+    action_id: str
+    jurisdiction_id: str
+    action_key: str
+    recommended_action: str | None = None
+    created_by: str
+    approved_by: str | None = None
+    status: str
+    reason_comment: str | None = None
+    risk_snapshot_score: float | None = None
+    risk_snapshot_level: str | None = None
+    activated_at: datetime | None = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class JurisdictionContextResponse(BaseModel):
+    user_id: int
+    name: str
+    email: str | None = None
+    role: str
+    organization: str | None = None
+    department: str | None = None
+    designation: str | None = None
+    official_id: str | None = None
+    jurisdiction_id: str
+    jurisdiction_name: str
+    jurisdiction_type: str
+    parent_id: str | None = None
+    permissions: List[str] = []
+    account_status: str
+    subordinate_jurisdiction_ids: List[str] = []
+    can_activate_hap: bool = False
+    is_national: bool = False
+    is_state: bool = False
+    is_municipal: bool = False
+    portal_type: str = "AUTHORITY"
 

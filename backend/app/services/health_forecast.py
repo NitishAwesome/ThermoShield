@@ -219,6 +219,7 @@ def _synthetic_ward_fallback_forecast(profile: Dict[str, Any]) -> List[Dict[str,
             "wind_speed_ms": 2.5,
             "solar_radiation_wm2": 500.0,
             "wbgt_c": calc_wbgt,
+            "heat_index_c": round(calc_t + 4.0, 1),
             "risk_level": r_level,
             "risk_score": round(r_score, 1),
             "health_concern": concern_meta["level"],
@@ -483,6 +484,8 @@ async def get_all_wards_forecast_summary() -> List[Dict[str, Any]]:
                 },
                 "source_status": "OFFLINE_FALLBACK",
                 "source_name": "Regional Baseline Fallback",
+                "data_timestamp": datetime.utcnow().isoformat() + "Z",
+                "cache_age_seconds": 0.0,
             })
             continue
 
@@ -523,7 +526,9 @@ async def get_all_wards_forecast_summary() -> List[Dict[str, Any]]:
                     solar_radiation=peak["solar_radiation"]
                 )
                 indices = thermal_res.get("indices", {})
-                wbgt = round(indices.get("wbgt_c", 28.0), 1)
+                wbgt = round(indices.get("wbgt_c", 28.0), 1) if indices.get("wbgt_c") is not None else 28.0
+                raw_hi = indices.get("heat_index_c")
+                heat_index = round(float(raw_hi), 1) if raw_hi is not None else round(float(peak["temperature"]) + 3.0, 1)
                 thermal_score = round(thermal_res.get("risk_assessment", {}).get("score", 0.6) * 100.0, 1)
 
                 # Predict ML risk score & level
@@ -551,6 +556,7 @@ async def get_all_wards_forecast_summary() -> List[Dict[str, Any]]:
                     "wind_speed_ms": round(peak["wind_speed"], 2),
                     "solar_radiation_wm2": round(peak["solar_radiation"], 1),
                     "wbgt_c": wbgt,
+                    "heat_index_c": heat_index,
                     "risk_level": risk_level,
                     "risk_score": round(risk_score, 1),
                     "health_concern": concern_meta["level"],
@@ -578,6 +584,8 @@ async def get_all_wards_forecast_summary() -> List[Dict[str, Any]]:
                 },
                 "source_status": weather_data.get("source_status", "LIVE"),
                 "source_name": weather_data.get("source_name", "Open-Meteo Global API"),
+                "data_timestamp": weather_data.get("data_timestamp") or weather_data.get("weather", {}).get("time"),
+                "cache_age_seconds": weather_data.get("cache_age_seconds", 0.0),
             })
         except Exception as inner_exc:
             logger.error(f"Error processing forecast for ward {ward_id} ({ward_code}): {inner_exc}. Preserving ward via fallback.")
@@ -603,6 +611,8 @@ async def get_all_wards_forecast_summary() -> List[Dict[str, Any]]:
                 },
                 "source_status": "OFFLINE_FALLBACK",
                 "source_name": "Regional Baseline Fallback",
+                "data_timestamp": datetime.utcnow().isoformat() + "Z",
+                "cache_age_seconds": 0.0,
             })
 
     return results

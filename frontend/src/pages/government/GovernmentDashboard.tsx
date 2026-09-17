@@ -23,6 +23,7 @@ import {
   RefreshCw,
   Sparkles,
   Shield,
+  ShieldCheck,
   Info,
   Calendar,
 } from 'lucide-react';
@@ -34,7 +35,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from '../../context/LanguageContext';
 import { api } from '../../services/api';
 import { translateRiskLevel } from '../../utils/translationHelpers';
-import { ThermalResponse, WeatherResponse, ForecastResponse, RiskLevel, HealthImpactForecastResponse } from '../../types';
+import { ThermalResponse, WeatherResponse, ForecastResponse, RiskLevel, HealthImpactForecastResponse, JurisdictionContextResponse } from '../../types';
 import { DataRealityBadge, FallbackModeBanner } from '../../components/provenance';
 
 export const GovernmentDashboard: React.FC = () => {
@@ -42,6 +43,7 @@ export const GovernmentDashboard: React.FC = () => {
   const { user } = useAuth();
   const { t } = useTranslation();
 
+  const [jurisdictionContext, setJurisdictionContext] = useState<JurisdictionContextResponse | null>(null);
   const [thermalData, setThermalData] = useState<ThermalResponse | null>(null);
   const [weatherData, setWeatherData] = useState<WeatherResponse | null>(null);
   const [forecastData, setForecastData] = useState<ForecastResponse | null>(null);
@@ -55,12 +57,13 @@ export const GovernmentDashboard: React.FC = () => {
     const fetchDashboardData = async () => {
       setIsLoading(true);
       try {
-        const [thermalRes, weatherRes, forecastRes, telemetryRes, healthFcRes] = await Promise.allSettled([
+        const [thermalRes, weatherRes, forecastRes, telemetryRes, healthFcRes, jurRes] = await Promise.allSettled([
           api.getThermal(coords.lat, coords.lon),
           api.getWeather(coords.lat, coords.lon),
           api.getForecast(coords.lat, coords.lon),
           api.getAlertEngineStatus(),
           api.getHealthImpactForecast({ lat: coords.lat, lon: coords.lon }),
+          api.getJurisdictionUserContext(),
         ]);
 
         if (!isMounted) return;
@@ -70,6 +73,7 @@ export const GovernmentDashboard: React.FC = () => {
         if (forecastRes.status === 'fulfilled') setForecastData(forecastRes.value);
         if (telemetryRes.status === 'fulfilled') setEngineTelemetry(telemetryRes.value);
         if (healthFcRes.status === 'fulfilled') setHealthForecast(healthFcRes.value);
+        if (jurRes.status === 'fulfilled') setJurisdictionContext(jurRes.value);
 
         setLastUpdatedTime(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
       } catch (e) {
@@ -85,9 +89,9 @@ export const GovernmentDashboard: React.FC = () => {
     };
   }, [coords.lat, coords.lon]);
 
-  const currentRiskLevel: RiskLevel = thermalData?.thermal?.risk_assessment?.level || 'HIGH';
-  const currentTemp = weatherData?.weather?.temperature ?? thermalData?.thermal?.input_summary?.temperature_c ?? 34;
-  const feelsLike = weatherData?.weather?.apparent_temperature ?? thermalData?.thermal?.indices?.heat_index_c ?? 39;
+  const currentRiskLevel: RiskLevel | null = (thermalData?.thermal?.risk_assessment?.level as RiskLevel) || null;
+  const currentTemp = weatherData?.weather?.temperature ?? thermalData?.thermal?.input_summary?.temperature_c ?? null;
+  const feelsLike = weatherData?.weather?.apparent_temperature ?? thermalData?.thermal?.indices?.heat_index_c ?? null;
 
   // Derived Trend Evolution using existing evaluator
   const evolution = useMemo(() => {
@@ -95,7 +99,7 @@ export const GovernmentDashboard: React.FC = () => {
     return evaluateRiskEvolution(
       dailyFc,
       weatherData?.weather,
-      currentRiskLevel
+      currentRiskLevel || 'LOW'
     );
   }, [forecastData, weatherData, currentRiskLevel]);
 
@@ -109,7 +113,10 @@ export const GovernmentDashboard: React.FC = () => {
 
   // Plain-Language Command Interpretation
   const getCommandInterpretation = () => {
-    const level = (currentRiskLevel || 'HIGH').toUpperCase();
+    if (!currentRiskLevel) {
+      return 'Weather telemetry is currently unavailable for this jurisdiction. Real-time heat risk calculations and command directives are paused.';
+    }
+    const level = currentRiskLevel.toUpperCase();
     if (level === 'EXTREME' || level === 'CRITICAL') {
       return 'Heat stress conditions are currently severe across monitored sectors. Immediate public health precautions and hydration measures are recommended.';
     }
@@ -136,6 +143,60 @@ export const GovernmentDashboard: React.FC = () => {
         />
       )}
 
+      {/* AUTHENTIC OFFICIAL IDENTITY & OPERATIONAL JURISDICTION BAR */}
+      {user && (
+        <div className="rounded-2xl ts-card p-4 border ts-border shadow-md bg-gradient-to-r from-slate-900/90 via-slate-800/80 to-slate-900/90 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-orange-400 shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2 flex-wrap">
+                <span className="font-black text-sm ts-text-primary tracking-tight">
+                  {user.name || user.email}
+                </span>
+                {user.official_id && (
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-700/60 text-slate-300 border border-slate-600/50">
+                    {user.official_id}
+                  </span>
+                )}
+                <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center space-x-1" title="Simulated Government Workflow Account (Judging Persona)">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  <span>Demo Authority Persona</span>
+                </span>
+              </div>
+              <div className="text-xs ts-text-muted mt-0.5 flex items-center space-x-2 flex-wrap">
+                <span>{user.designation || 'Government Decision Officer'}</span>
+                <span>•</span>
+                <span>{user.department || user.organization || 'Disaster Management'}</span>
+                {user.organization && user.department && (
+                  <>
+                    <span>•</span>
+                    <span>{user.organization}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Assigned Scope & Hierarchy Badge */}
+          <div className="flex items-center gap-2 text-xs">
+            <div className="px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-300 flex items-center space-x-1.5">
+              <MapPin className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+              <div>
+                <span className="font-bold text-[11px] block text-orange-200">
+                  Assigned Scope: {jurisdictionContext?.jurisdiction_name || user.jurisdiction_name || user.jurisdiction_id || 'Jurisdiction Managed'}
+                </span>
+                <span className="text-[10px] text-orange-400 font-mono">
+                  Level: {jurisdictionContext?.jurisdiction_type || user.jurisdiction_type || 'OFFICIAL'}
+                  {jurisdictionContext?.subordinate_jurisdiction_ids?.length ? ` • ${jurisdictionContext.subordinate_jurisdiction_ids.length} Sub-jurisdictions` : ''}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* SECTION 1 — GOVERNMENT COMMAND HEADER */}
       <div className="rounded-3xl ts-card p-6 sm:p-8 border ts-border shadow-xl relative overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b ts-border">
@@ -146,9 +207,23 @@ export const GovernmentDashboard: React.FC = () => {
                 <span>Government Command Center</span>
               </span>
               <DataRealityBadge
-                tier={isFallback ? 'OFFLINE_FALLBACK' : 'LIVE'}
+                tier={
+                  isLoading && !weatherData && !thermalData
+                    ? 'LOADING'
+                    : !weatherData && !thermalData
+                    ? 'UNAVAILABLE'
+                    : isFallback
+                    ? 'OFFLINE_FALLBACK'
+                    : 'LIVE'
+                }
                 size="sm"
-                customLabel={isFallback ? 'Offline Baseline' : 'Live Regional Data'}
+                customLabel={
+                  !weatherData && !thermalData && !isLoading
+                    ? 'Telemetry Unavailable'
+                    : isFallback
+                    ? 'Offline Baseline'
+                    : 'Live Regional Data'
+                }
               />
               <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-slate-500/15 text-slate-700 dark:text-slate-300 border border-slate-500/30">
                 Updated {lastUpdatedTime}
@@ -158,7 +233,7 @@ export const GovernmentDashboard: React.FC = () => {
               Government Command Center
             </h1>
             <p className="text-xs sm:text-sm ts-text-muted mt-1 max-w-3xl leading-relaxed">
-              Heat risk overview for your monitored area
+              Operational heat-health intelligence for {jurisdictionContext?.jurisdiction_name || user?.jurisdiction_name || locationName}
             </p>
           </div>
 
@@ -176,8 +251,8 @@ export const GovernmentDashboard: React.FC = () => {
           <div className="flex items-center space-x-2">
             <MapPin className="w-3.5 h-3.5 text-orange-500" />
             <span>
-              <strong className="ts-text-primary font-bold">Monitoring Jurisdiction:</strong>{' '}
-              {locationName}
+              <strong className="ts-text-primary font-bold">Operational Jurisdiction:</strong>{' '}
+              {jurisdictionContext?.jurisdiction_name || user?.jurisdiction_name || locationName}
             </span>
           </div>
           <div className="flex items-center space-x-2 font-mono text-[11px]">
@@ -203,7 +278,7 @@ export const GovernmentDashboard: React.FC = () => {
             </div>
             <div className="mt-2">
               <Badge riskLevel={currentRiskLevel} size="lg" showDot showIcon>
-                {translateRiskLevel(currentRiskLevel, t)}
+                {currentRiskLevel ? translateRiskLevel(currentRiskLevel, t) : 'Unavailable'}
               </Badge>
             </div>
             <div className="text-[11px] ts-text-muted mt-2">
@@ -216,7 +291,7 @@ export const GovernmentDashboard: React.FC = () => {
               Current Temperature
             </div>
             <div className="text-2xl sm:text-3xl font-black ts-text-primary font-mono mt-1">
-              {currentTemp.toFixed(1)}°C
+              {currentTemp != null ? `${currentTemp.toFixed(1)}°C` : '—'}
             </div>
             <div className="text-[11px] ts-text-muted mt-1">
               Ambient dry bulb
@@ -228,7 +303,7 @@ export const GovernmentDashboard: React.FC = () => {
               Feels Like
             </div>
             <div className="text-2xl sm:text-3xl font-black text-amber-500 font-mono mt-1">
-              {feelsLike.toFixed(1)}°C
+              {feelsLike != null ? `${feelsLike.toFixed(1)}°C` : '—'}
             </div>
             <div className="text-[11px] ts-text-muted mt-1">
               Thermal sensation index
@@ -392,22 +467,9 @@ export const GovernmentDashboard: React.FC = () => {
               </div>
             ))
           ) : (
-            // Fallback preview while loading
-            [
-              { label: 'Tomorrow', level: 'HIGH', temp: 35.0, wbgt: 30.5 },
-              { label: 'Day 2', level: 'EXTREME', temp: 36.5, wbgt: 32.8 },
-              { label: 'Day 3', level: 'HIGH', temp: 34.8, wbgt: 30.2 },
-              { label: 'Day 4', level: 'MODERATE', temp: 33.2, wbgt: 28.0 },
-              { label: 'Day 5', level: 'LOW', temp: 31.5, wbgt: 26.2 },
-            ].map((d, i) => (
-              <div key={i} className="p-3 rounded-2xl ts-card-subtle border ts-border space-y-1">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span>{d.label}</span>
-                  <span className="text-[10px] text-orange-500">{d.level}</span>
-                </div>
-                <div className="text-xs font-mono font-bold ts-text-primary">{d.temp}°C</div>
-              </div>
-            ))
+            <div className="col-span-full p-4 rounded-2xl ts-card-subtle border ts-border text-center text-xs ts-text-muted">
+              {isLoading ? 'Loading 5-day predictive health forecast...' : '5-day predictive health impact forecast is temporarily unavailable.'}
+            </div>
           )}
         </div>
 

@@ -30,9 +30,10 @@ from app.routers.personal_risk import router as personal_risk_router
 from app.routers.copilot import router as copilot_router
 from app.services.firebase_service import update_live_risk
 
-from fastapi import FastAPI, Query, Depends, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Query, Depends, HTTPException, BackgroundTasks, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from pydantic import BaseModel, Field
 
 
 from app.services.location import search_location, reverse_location
@@ -50,8 +51,15 @@ from app.services.alert_engine import (
 )
 
 from sqlalchemy import text
-from app.database.models import Location, User, Risk, Alert, Intervention
+from app.database.models import Location, User, Risk, Alert, Intervention, HAPActionAuditLog
 from app.database.connection import get_db, engine, Base, init_db
+from app.jurisdiction import (
+    get_jurisdiction,
+    get_subordinate_jurisdiction_ids,
+    is_in_jurisdiction_scope,
+    resolve_area_to_jurisdiction_id,
+    _JURISDICTION_REGISTRY,
+)
 
 from app.services.risk import predict_risk
 from app.services.map_services import (
@@ -66,7 +74,7 @@ from app.services.global_areas import (
 from app.services.intervention import generate_interventions
 from app.services.simulator import simulate_intervention
 from app.services.sms import send_sms, get_sms_delivery_status
-from app.services.email import send_notification_email, is_smtp_configured
+from app.services.email import send_notification_email, is_smtp_configured, get_email_delivery_status
 from app.services.email_templates import generate_action_first_alert_html
 from app.services.alert_engine import dispatch_automatic_early_warning, get_engine_status_summary, init_cooldown_registry_from_db
 from app.services.monitor import monitor_daemon
@@ -103,6 +111,8 @@ from app.schemas import (
     SendTestSMSResponse,
     HeatActionEvaluateRequest,
     HeatActionDecisionUpdateRequest,
+    HAPAuditLogResponse,
+    JurisdictionContextResponse,
 )
 
 
@@ -167,7 +177,13 @@ app = FastAPI(
 
 
 def _seed_demo_accounts_if_needed():
-    """Ensure standard judging demo personas exist with valid hashed password 'demo12345'."""
+    """Ensure standard judging demo personas exist with valid hashed password 'demo12345' in dev/demo environments."""
+    env = os.getenv("ENVIRONMENT", "development").strip().lower()
+    enable_demo = os.getenv("ENABLE_DEMO_ACCOUNTS", "true" if env != "production" else "false").strip().lower()
+    if env == "production" or enable_demo not in ("true", "1", "yes"):
+        logger.info("Demo account seeding skipped (production mode or ENABLE_DEMO_ACCOUNTS disabled).")
+        return
+
     db = next(get_db())
     try:
         demo_accounts = [
@@ -175,25 +191,127 @@ def _seed_demo_accounts_if_needed():
                 "name": "Dr. Aarav Sharma",
                 "email": "aarav.sharma@health.gov.in",
                 "phone_number": "+91 9811223344",
-                "role": "official",
+                "role": "municipal_hap_officer",
+                "organization": "Municipal Corporation of Greater Mumbai (MCGM)",
+                "department": "Public Health & Disaster Management",
+                "designation": "Municipal HAP Nodal Officer",
+                "official_id": "MCGM-HAP-2026-01",
+                "jurisdiction_id": "IN-MH-MCGM",
+                "jurisdiction_type": "MUNICIPAL_CORPORATION",
+                "permissions": "VIEW_JURISDICTION,VIEW_PARENT_CONTEXT,VIEW_NATIONAL_CONTEXT,VIEW_SUBORDINATE_REGIONS,ANALYZE_RISK,RECOMMEND_HAP_ACTION,APPROVE_HAP_ACTION,ACTIVATE_HAP,CLOSE_HAP_ACTION,SEND_PUBLIC_ADVISORY,DISPATCH_RESPONDER,EXPORT_REPORT",
+                "account_status": "APPROVED",
+            },
+            {
+                "name": "Pooja Iyer (IMD)",
+                "email": "pooja.iyer@imd.gov.in",
+                "phone_number": "+91 9833445566",
+                "role": "national_analyst",
+                "organization": "India Meteorological Department (IMD)",
+                "department": "National Heat Hazard Analysis Cell",
+                "designation": "Lead Climate Analyst",
+                "official_id": "IMD-CLIM-4421",
+                "jurisdiction_id": "IN",
+                "jurisdiction_type": "COUNTRY",
+                "permissions": "VIEW_JURISDICTION,VIEW_NATIONAL_CONTEXT,VIEW_SUBORDINATE_REGIONS,ANALYZE_RISK,RECOMMEND_HAP_ACTION,EXPORT_REPORT",
+                "account_status": "APPROVED",
+            },
+            {
+                "name": "Sunil More (SDMA)",
+                "email": "coordinator.mh@maharashtra.gov.in",
+                "phone_number": "+91 9822339900",
+                "role": "state_coordinator",
+                "organization": "Maharashtra State Disaster Management Authority",
+                "department": "Heatwave Action Coordination",
+                "designation": "State Disaster Management Officer",
+                "official_id": "MH-SDMA-8812",
+                "jurisdiction_id": "IN-MH",
+                "jurisdiction_type": "STATE_UT",
+                "permissions": "VIEW_JURISDICTION,VIEW_PARENT_CONTEXT,VIEW_NATIONAL_CONTEXT,VIEW_SUBORDINATE_REGIONS,ANALYZE_RISK,RECOMMEND_HAP_ACTION,EXPORT_REPORT",
+                "account_status": "APPROVED",
+            },
+            {
+                "name": "Vipul Patil (DM Office)",
+                "email": "collector.nagpur@maharashtra.gov.in",
+                "phone_number": "+91 9855667788",
+                "role": "district_authority",
+                "organization": "District Collectorate, Nagpur",
+                "department": "Revenue & Disaster Relief",
+                "designation": "District Disaster Management Officer",
+                "official_id": "NGP-COLL-552",
+                "jurisdiction_id": "IN-MH-DIST-NAGPUR",
+                "jurisdiction_type": "DISTRICT",
+                "permissions": "VIEW_JURISDICTION,VIEW_PARENT_CONTEXT,VIEW_SUBORDINATE_REGIONS,ANALYZE_RISK,RECOMMEND_HAP_ACTION,ACTIVATE_HAP,APPROVE_HAP_ACTION,DISPATCH_RESPONDER,EXPORT_REPORT",
+                "account_status": "APPROVED",
+            },
+            {
+                "name": "Mahesh Kulkarni (Ward K/E)",
+                "email": "ward.ke@mcgm.gov.in",
+                "phone_number": "+91 9877889900",
+                "role": "ward_officer",
+                "organization": "BMC Ward K/East Office",
+                "department": "Ward Administration (Andheri East)",
+                "designation": "Assistant Municipal Commissioner",
+                "official_id": "BMC-WKE-104",
+                "jurisdiction_id": "IN-MH-MCGM-KE",
+                "jurisdiction_type": "ADMINISTRATIVE_WARD",
+                "permissions": "VIEW_JURISDICTION,VIEW_PARENT_CONTEXT,ACKNOWLEDGE_TASK,DISPATCH_RESPONDER,RECOMMEND_HAP_ACTION",
+                "account_status": "APPROVED",
+            },
+            {
+                "name": "Ananya Deshmukh (Analyst)",
+                "email": "analyst@thermoshield.demo",
+                "phone_number": "+91 9866554433",
+                "role": "analyst",
+                "organization": "Urban Climate Resilience Think Tank",
+                "department": "Thermal Modeling Research",
+                "designation": "Senior Biometeorology Analyst",
+                "official_id": "UCR-RES-209",
+                "jurisdiction_id": "IN-MH-MCGM",
+                "jurisdiction_type": "MUNICIPAL_CORPORATION",
+                "permissions": "VIEW_JURISDICTION,VIEW_NATIONAL_CONTEXT,VIEW_SUBORDINATE_REGIONS,ANALYZE_RISK,RECOMMEND_HAP_ACTION,RUN_SCENARIO,EXPORT_REPORT",
+                "account_status": "APPROVED",
+            },
+            {
+                "name": "Devendra Rao (System Admin)",
+                "email": "admin@thermoshield.gov.in",
+                "phone_number": "+91 9899001122",
+                "role": "system_admin",
+                "organization": "ThermoShield GovTech Infrastructure",
+                "department": "Platform Operations & Security",
+                "designation": "Chief Systems Administrator",
+                "official_id": "SYS-ADM-001",
+                "jurisdiction_id": "IN",
+                "jurisdiction_type": "COUNTRY",
+                "permissions": "MANAGE_JURISDICTION_USERS,VIEW_JURISDICTION",
+                "account_status": "APPROVED",
             },
             {
                 "name": "Rajesh Verma (NDRF)",
                 "email": "rajesh.verma@disastermgmt.gov.in",
                 "phone_number": "+91 9822334455",
                 "role": "responder",
-            },
-            {
-                "name": "Pooja Iyer (IMD)",
-                "email": "pooja.iyer@imd.gov.in",
-                "phone_number": "+91 9833445566",
-                "role": "analyst",
+                "organization": "National Disaster Response Force (NDRF)",
+                "department": "Quick Response Battalion",
+                "designation": "Team Commander",
+                "official_id": "NDRF-QR-771",
+                "jurisdiction_id": "IN-MH-MCGM",
+                "jurisdiction_type": "MUNICIPAL_CORPORATION",
+                "permissions": "VIEW_JURISDICTION,ACKNOWLEDGE_TASK",
+                "account_status": "APPROVED",
             },
             {
                 "name": "Siddharth Patel",
                 "email": "siddharth.patel@gmail.com",
                 "phone_number": "+91 9844556677",
                 "role": "user",
+                "organization": None,
+                "department": None,
+                "designation": None,
+                "official_id": None,
+                "jurisdiction_id": "IN",
+                "jurisdiction_type": "COUNTRY",
+                "permissions": "VIEW_JURISDICTION",
+                "account_status": "APPROVED",
             },
         ]
         demo_hash = hash_password("demo12345")
@@ -205,11 +323,31 @@ def _seed_demo_accounts_if_needed():
                     email=account["email"],
                     phone_number=account["phone_number"],
                     role=account["role"],
+                    organization=account.get("organization"),
+                    department=account.get("department"),
+                    designation=account.get("designation"),
+                    official_id=account.get("official_id"),
+                    jurisdiction_id=account.get("jurisdiction_id", "IN"),
+                    jurisdiction_type=account.get("jurisdiction_type", "COUNTRY"),
+                    permissions=account.get("permissions", ""),
+                    account_status=account.get("account_status", "APPROVED"),
                     password_hash=demo_hash
                 )
                 db.add(user)
-            elif existing.password_hash == "UNSET_PASSWORD_RESET_REQUIRED":
-                existing.password_hash = demo_hash
+            else:
+                # Update existing persona with official role & jurisdiction metadata
+                existing.name = account["name"]
+                existing.role = account["role"]
+                existing.organization = account.get("organization")
+                existing.department = account.get("department")
+                existing.designation = account.get("designation")
+                existing.official_id = account.get("official_id")
+                existing.jurisdiction_id = account.get("jurisdiction_id", "IN")
+                existing.jurisdiction_type = account.get("jurisdiction_type", "COUNTRY")
+                existing.permissions = account.get("permissions", "")
+                existing.account_status = account.get("account_status", "APPROVED")
+                if existing.password_hash == "UNSET_PASSWORD_RESET_REQUIRED" or not existing.password_hash:
+                    existing.password_hash = demo_hash
         db.commit()
     except Exception as err:
         db.rollback()
@@ -230,8 +368,18 @@ async def on_startup():
         finally:
             db.close()
         # Start proactive autonomous background monitoring daemon
-        monitor_daemon.start()
-        logger.info("ThermoShield autonomous monitoring daemon initialized on startup.")
+        env = (os.getenv("ENVIRONMENT") or "").strip().lower()
+        is_test = (
+            env in ("test", "testing")
+            or os.getenv("DISABLE_BACKGROUND_MONITOR", "").strip().lower() in ("true", "1", "yes")
+            or "PYTEST_CURRENT_TEST" in os.environ
+            or "pytest" in sys.modules
+        )
+        if not is_test:
+            monitor_daemon.start()
+            logger.info("ThermoShield autonomous monitoring daemon initialized on startup.")
+        else:
+            logger.info("ThermoShield background monitoring daemon startup suppressed in TEST environment.")
     except Exception as e:
         logger.warning(f"Database initialization warning: {e}")
 
@@ -685,9 +833,43 @@ def delete_risk_api(
 )
 def create_alert_api(
     alert_data: AlertCreate,
-    current_user: User = Depends(require_admin_or_official),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    status_norm = (current_user.account_status or "APPROVED").strip().upper()
+    if status_norm != "APPROVED":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access forbidden: account status is '{current_user.account_status}'. Only APPROVED accounts can issue alerts."
+        )
+
+    from app.auth.router import get_default_permissions_for_role
+    if current_user.permissions is not None:
+        user_perms = [p.strip().upper() for p in current_user.permissions.split(",") if p.strip()]
+    else:
+        user_perms = get_default_permissions_for_role(current_user.role or "user")
+
+    can_alert = any(p in user_perms for p in ("SEND_PUBLIC_ADVISORY", "ACTIVATE_HAP"))
+    if not can_alert:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Permission denied: role '{current_user.role}' lacks SEND_PUBLIC_ADVISORY or ACTIVATE_HAP permission."
+        )
+
+    # Validate location scope
+    if alert_data.location_id:
+        from app.database.models import Location
+        loc = db.query(Location).filter(Location.id == alert_data.location_id).first()
+        if loc:
+            loc_jurisdiction_id = resolve_area_to_jurisdiction_id(loc.name)
+            user_scope = current_user.jurisdiction_id or "IN"
+            if not is_in_jurisdiction_scope(user_scope, loc_jurisdiction_id):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Jurisdiction scope violation: User scope '{user_scope}' cannot broadcast alerts for '{loc.name}' ({loc_jurisdiction_id})."
+                )
+
+    logger.info(f"Official {current_user.email} created alert for location_id {alert_data.location_id}")
     return create_alert(
         db,
         alert_data
@@ -742,19 +924,11 @@ def get_alerts_delivery_status():
     Preserves truthfulness across SMS, Email, and WhatsApp channels.
     """
     sms_status = get_sms_delivery_status()
-    smtp_ok = is_smtp_configured()
-    sender_email = (os.getenv("MAIL_USERNAME") or "").strip()
+    email_status = get_email_delivery_status()
 
     return {
         "sms": sms_status,
-        "email": {
-            "status": "OPERATIONAL" if smtp_ok else "NOT_CONFIGURED",
-            "display_status": "Operational (SMTP Direct)" if smtp_ok else "Not Configured (Simulation Mode)",
-            "configured": smtp_ok,
-            "sender": sender_email if smtp_ok else "Not Configured",
-            "can_deliver": smtp_ok,
-            "channel": "Email Dispatch (SMTP)"
-        },
+        "email": email_status,
         "whatsapp": {
             "status": "PLANNED",
             "display_status": "Planned Integration",
@@ -873,9 +1047,29 @@ def get_location_alerts_api(
 @app.delete("/alerts/{alert_id}")
 def delete_alert_api(
     alert_id: int,
-    current_user: User = Depends(require_admin_or_official),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    status_norm = (current_user.account_status or "APPROVED").strip().upper()
+    if status_norm != "APPROVED":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access forbidden: account status is '{current_user.account_status}'."
+        )
+
+    from app.auth.router import get_default_permissions_for_role
+    if current_user.permissions is not None:
+        user_perms = [p.strip().upper() for p in current_user.permissions.split(",") if p.strip()]
+    else:
+        user_perms = get_default_permissions_for_role(current_user.role or "user")
+
+    can_manage = any(p in user_perms for p in ("SEND_PUBLIC_ADVISORY", "ACTIVATE_HAP", "MANAGE_JURISDICTION_USERS"))
+    if not can_manage:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Permission denied: role '{current_user.role}' lacks authority to revoke alerts."
+        )
+
     deleted = delete_alert(
         db,
         alert_id
@@ -887,6 +1081,7 @@ def delete_alert_api(
             detail="Alert not found"
         )
 
+    logger.info(f"Official {current_user.email} deleted alert_id {alert_id}")
     return {
         "message": "Alert deleted successfully"
     }
@@ -957,12 +1152,12 @@ def send_alert_email_direct_api(
         html_body=html_body
     )
 
-    if res.get("status") == "error":
+    if res.get("status") in ("error", "FAILED"):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to dispatch email alert: {res.get('message')}"
         )
-    elif res.get("status") == "skipped":
+    elif res.get("status") in ("skipped", "DISABLED") and res.get("provider") != "TEST_ADAPTER":
         raise HTTPException(
             status_code=400,
             detail=(
@@ -1110,9 +1305,43 @@ def subscribe_citizen_alerts(
 )
 def create_intervention_api(
     intervention_data: InterventionCreate,
-    current_user: User = Depends(require_admin_or_official),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    status_norm = (current_user.account_status or "APPROVED").strip().upper()
+    if status_norm != "APPROVED":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access forbidden: account status is '{current_user.account_status}'. Only APPROVED accounts can deploy interventions."
+        )
+
+    from app.auth.router import get_default_permissions_for_role
+    if current_user.permissions is not None:
+        user_perms = [p.strip().upper() for p in current_user.permissions.split(",") if p.strip()]
+    else:
+        user_perms = get_default_permissions_for_role(current_user.role or "user")
+
+    can_intervene = any(p in user_perms for p in ("DISPATCH_RESPONDER", "ACTIVATE_HAP"))
+    if not can_intervene:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Permission denied: role '{current_user.role}' lacks DISPATCH_RESPONDER or ACTIVATE_HAP permission."
+        )
+
+    # Validate location scope
+    if intervention_data.location_id:
+        from app.database.models import Location
+        loc = db.query(Location).filter(Location.id == intervention_data.location_id).first()
+        if loc:
+            loc_jurisdiction_id = resolve_area_to_jurisdiction_id(loc.name)
+            user_scope = current_user.jurisdiction_id or "IN"
+            if not is_in_jurisdiction_scope(user_scope, loc_jurisdiction_id):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Jurisdiction scope violation: User scope '{user_scope}' cannot deploy interventions in '{loc.name}' ({loc_jurisdiction_id})."
+                )
+
+    logger.info(f"Official {current_user.email} dispatched intervention for location_id {intervention_data.location_id}")
     return create_intervention(
         db,
         intervention_data
@@ -1188,9 +1417,29 @@ def get_location_interventions_api(
 )
 def delete_intervention_api(
     intervention_id: int,
-    current_user: User = Depends(require_admin_or_official),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    status_norm = (current_user.account_status or "APPROVED").strip().upper()
+    if status_norm != "APPROVED":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access forbidden: account status is '{current_user.account_status}'."
+        )
+
+    from app.auth.router import get_default_permissions_for_role
+    if current_user.permissions is not None:
+        user_perms = [p.strip().upper() for p in current_user.permissions.split(",") if p.strip()]
+    else:
+        user_perms = get_default_permissions_for_role(current_user.role or "user")
+
+    can_manage = any(p in user_perms for p in ("DISPATCH_RESPONDER", "ACTIVATE_HAP", "MANAGE_JURISDICTION_USERS"))
+    if not can_manage:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Permission denied: role '{current_user.role}' lacks authority to revoke interventions."
+        )
+
     deleted = delete_intervention(
         db,
         intervention_id
@@ -1202,6 +1451,7 @@ def delete_intervention_api(
             detail="Intervention not found"
         )
 
+    logger.info(f"Official {current_user.email} deleted intervention_id {intervention_id}")
     return {
         "message": "Intervention deleted successfully"
     }
@@ -1611,7 +1861,15 @@ async def risk(
 
         if alert is not None:
             try:
-                alert.status = "SENT"
+                report_status = dispatch_report.get("status")
+                if report_status == "SIMULATED":
+                    alert.status = "SIMULATED"
+                elif dispatch_report.get("dispatched_count", 0) > 0:
+                    alert.status = "SENT"
+                elif report_status == "DISABLED":
+                    alert.status = "DISABLED"
+                else:
+                    alert.status = "PENDING"
                 db.commit()
             except Exception as err:
                 logger.warning(f"Failed to update alert status: {err}")
@@ -1988,44 +2246,292 @@ def get_action_decisions_api():
 @app.post("/api/action-plan/decision")
 def update_action_decision_api(
     payload: HeatActionDecisionUpdateRequest,
-    current_user: Optional[User] = Depends(get_current_user_optional)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
-    Records an authority decision on a Heat Action recommendation:
-    Allowed states: 'Reviewed', 'Acknowledged', 'Deferred', 'Action Initiated Externally'
+    Records an authority decision on a Heat Action recommendation.
+    Enforces:
+      1. Authenticated user with APPROVED account status.
+      2. Role/Permission check:
+         - Initiating/Activating operational actions requires ACTIVATE_HAP or APPROVE_HAP_ACTION.
+         - Analysts and System Admins cannot activate HAP actions by default.
+      3. Operational Jurisdiction Scope Check:
+         - Target area must resolve to an authorized jurisdiction within current_user.jurisdiction_id scope.
+         - Reject cross-jurisdiction attempts with HTTP 403 Forbidden.
+      4. Persistent Audit Trail:
+         - Records action into HAPActionAuditLog table.
     """
+    # 1. Account status check
+    status_norm = (current_user.account_status or "APPROVED").strip().upper()
+    if status_norm != "APPROVED":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access forbidden: account status is '{current_user.account_status}'. Only APPROVED accounts can perform operational actions."
+        )
+
+    # 2. Decision status validation
     status_val = payload.decision_status or payload.decision or "Reviewed"
-    valid_states = ["Reviewed", "Acknowledged", "Deferred", "Action Initiated Externally", "RECOMMENDED_FOR_REVIEW"]
+    valid_states = ["Reviewed", "Acknowledged", "Deferred", "Action Initiated Externally", "Active", "RECOMMENDED_FOR_REVIEW"]
     if status_val not in valid_states:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid decision_status '{status_val}'. Must be one of: {', '.join(valid_states)}"
         )
 
+    # 3. Jurisdiction Scope Check
     clean_area = (payload.area_id or "general").strip().lower()
+    target_jurisdiction_id = resolve_area_to_jurisdiction_id(clean_area)
+    user_scope_id = current_user.jurisdiction_id or "IN"
+
+    if not is_in_jurisdiction_scope(user_scope_id, target_jurisdiction_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Jurisdiction scope violation: User operational jurisdiction is '{user_scope_id}', "
+                f"which does not have operational authority over target '{clean_area}' (resolved: '{target_jurisdiction_id}')."
+            )
+        )
+
+    # 4. Permission Check
+    from app.auth.router import get_default_permissions_for_role
+    if current_user.permissions is not None:
+        user_perms = [p.strip().upper() for p in current_user.permissions.split(",") if p.strip()]
+    else:
+        user_perms = get_default_permissions_for_role(current_user.role or "user")
+
+    is_activation = status_val in ("Action Initiated Externally", "Active")
+    if is_activation:
+        has_activate_perm = any(p in user_perms for p in ("ACTIVATE_HAP", "APPROVE_HAP_ACTION"))
+        if not has_activate_perm:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission denied: role '{current_user.role}' lacks ACTIVATE_HAP / APPROVE_HAP_ACTION permission."
+            )
+    else:
+        has_review_perm = any(p in user_perms for p in ("RECOMMEND_HAP_ACTION", "ACKNOWLEDGE_TASK", "VIEW_JURISDICTION", "ANALYZE_RISK"))
+        if not has_review_perm:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission denied: role '{current_user.role}' lacks authority to record action recommendations."
+            )
+
+    # 5. In-memory & DB Audit Trail
     clean_action = payload.action_key.strip()
     key = f"{clean_area}:{clean_action}"
-
-    officer_name = payload.officer_name
-    if not officer_name and current_user:
-        officer_name = getattr(current_user, "name", None) or getattr(current_user, "email", "Civic Administrator")
+    officer_name = payload.officer_name or getattr(current_user, "name", "Civic Administrator")
 
     record = {
         "key": key,
         "area_id": clean_area,
+        "jurisdiction_id": target_jurisdiction_id,
         "action_key": clean_action,
         "decision_status": status_val,
-        "officer_name": officer_name or "Disaster Management Officer",
+        "officer_name": officer_name,
         "officer_notes": payload.officer_notes or payload.notes or "",
         "updated_at": datetime.utcnow().isoformat() + "Z"
     }
     HEAT_ACTION_DECISIONS[key] = record
 
+    # Persistent DB Audit Log
+    try:
+        audit_log = HAPActionAuditLog(
+            action_id=f"act_{int(time.time())}_{key.replace(':', '_')}",
+            jurisdiction_id=target_jurisdiction_id,
+            action_key=clean_action,
+            recommended_action=clean_action,
+            created_by=current_user.email,
+            approved_by=current_user.email if is_activation else None,
+            status=status_val,
+            reason_comment=payload.officer_notes or payload.notes or "Operational decision recorded via Authority portal",
+            activated_at=datetime.utcnow() if is_activation else None,
+        )
+        db.add(audit_log)
+        db.commit()
+    except Exception as db_err:
+        db.rollback()
+        logger.warning(f"Failed to persist HAPActionAuditLog: {db_err}")
+
     return {
         "status": "success",
-        "message": f"Action '{clean_action}' for area '{clean_area}' marked as '{payload.decision_status}'",
+        "message": f"Action '{clean_action}' for jurisdiction '{target_jurisdiction_id}' marked as '{status_val}'",
+        "decision_status": status_val,
+        "officer_notes": payload.officer_notes or payload.notes or "",
         "decision": record
     }
+
+
+@app.get("/api/jurisdiction/user-context", response_model=JurisdictionContextResponse)
+def get_user_jurisdiction_context_api(current_user: User = Depends(get_current_user)):
+    """
+    Returns the operational jurisdiction context for the currently authenticated account.
+    """
+    juris_id = current_user.jurisdiction_id or "IN"
+    node = get_jurisdiction(juris_id)
+    juris_name = node.name if node else juris_id
+    juris_type = node.type.value if node else (current_user.jurisdiction_type or "COUNTRY")
+    subordinates = get_subordinate_jurisdiction_ids(juris_id)
+    
+    from app.auth.router import get_default_permissions_for_role
+    user_perms = [p.strip().upper() for p in (current_user.permissions or "").split(",") if p.strip()]
+    if not user_perms:
+        user_perms = get_default_permissions_for_role(current_user.role or "user")
+
+    can_activate = any(p in user_perms for p in ("ACTIVATE_HAP", "APPROVE_HAP_ACTION"))
+    is_nat = juris_id == "IN" or juris_type == "COUNTRY"
+    is_st = juris_type == "STATE_UT"
+    is_muni = juris_type in ("MUNICIPAL_CORPORATION", "ADMINISTRATIVE_WARD")
+
+    return JurisdictionContextResponse(
+        user_id=current_user.id,
+        name=current_user.name,
+        email=current_user.email,
+        role=current_user.role,
+        organization=current_user.organization,
+        department=current_user.department,
+        designation=current_user.designation,
+        official_id=current_user.official_id,
+        jurisdiction_id=juris_id,
+        jurisdiction_name=juris_name,
+        jurisdiction_type=juris_type,
+        parent_id=node.parent_id if node else None,
+        permissions=user_perms,
+        account_status=current_user.account_status or "APPROVED",
+        subordinate_jurisdiction_ids=subordinates,
+        can_activate_hap=can_activate,
+        is_national=is_nat,
+        is_state=is_st,
+        is_municipal=is_muni,
+        portal_type="AUTHORITY" if (current_user.role or "").lower() not in ("user", "citizen") else "CITIZEN",
+    )
+
+
+@app.get("/api/jurisdiction/{jurisdiction_id}")
+def get_jurisdiction_details_api(jurisdiction_id: str):
+    """
+    Retrieves canonical details and child jurisdictions for a given jurisdiction ID.
+    """
+    node = get_jurisdiction(jurisdiction_id)
+    if not node:
+        raise HTTPException(status_code=404, detail=f"Jurisdiction '{jurisdiction_id}' not found.")
+    subordinates = get_subordinate_jurisdiction_ids(node.id)
+    return {
+        "id": node.id,
+        "name": node.name,
+        "type": node.type.value,
+        "parent_id": node.parent_id,
+        "state_id": node.state_id,
+        "district_ids": node.district_ids,
+        "child_ids": node.child_ids,
+        "aliases": node.aliases,
+        "centroid": node.centroid,
+        "has_municipal_detail": node.has_municipal_detail,
+        "subordinate_count": len(subordinates),
+    }
+
+
+class UserStatusUpdateRequest(BaseModel):
+    account_status: str = Field(..., description="APPROVED, SUSPENDED, PENDING, or REJECTED")
+    notes: Optional[str] = None
+    permissions: Optional[str] = None
+
+
+@app.post("/api/jurisdiction/users/{user_id}/status")
+def update_user_jurisdiction_status_api(
+    user_id: int,
+    payload: UserStatusUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Configurable hierarchical approval/suspension endpoint.
+    Allows an administrator or authorized official to manage user account status.
+    Enforces:
+      1. Approver account_status must be APPROVED.
+      2. Approver must hold MANAGE_JURISDICTION_USERS permission (or admin role).
+      3. Approver jurisdiction scope must encompass target user's jurisdiction:
+         is_in_jurisdiction_scope(current_user.jurisdiction_id, target_user.jurisdiction_id).
+    """
+    approver_status = (current_user.account_status or "APPROVED").strip().upper()
+    if approver_status != "APPROVED":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Only APPROVED accounts can perform administrative approvals."
+        )
+
+    from app.auth.router import get_default_permissions_for_role
+    if current_user.permissions is not None:
+        user_perms = [p.strip().upper() for p in current_user.permissions.split(",") if p.strip()]
+    else:
+        user_perms = get_default_permissions_for_role(current_user.role or "user")
+
+    is_admin_role = (current_user.role or "").strip().lower() in ("system_admin", "admin")
+    if not is_admin_role and "MANAGE_JURISDICTION_USERS" not in user_perms:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Requires MANAGE_JURISDICTION_USERS permission."
+        )
+
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail=f"User {user_id} not found.")
+
+    target_scope = target_user.jurisdiction_id or "IN"
+    approver_scope = current_user.jurisdiction_id or "IN"
+
+    if not is_in_jurisdiction_scope(approver_scope, target_scope):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Jurisdiction approval violation: Approver jurisdiction '{approver_scope}' "
+                f"cannot govern target user's jurisdiction '{target_scope}'."
+            )
+        )
+
+    clean_status = payload.account_status.strip().upper()
+    valid_statuses = ("APPROVED", "SUSPENDED", "PENDING", "REJECTED")
+    if clean_status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid account_status. Must be one of: {valid_statuses}")
+
+    target_user.account_status = clean_status
+    if payload.permissions is not None:
+        target_user.permissions = payload.permissions
+    db.commit()
+    db.refresh(target_user)
+
+    logger.info(
+        f"Admin {current_user.email} ({approver_scope}) updated user {target_user.email} "
+        f"({target_scope}) status to {clean_status}"
+    )
+    return {
+        "status": "success",
+        "user_id": target_user.id,
+        "email": target_user.email,
+        "account_status": target_user.account_status,
+        "jurisdiction_id": target_user.jurisdiction_id,
+        "permissions": target_user.permissions,
+        "notes": payload.notes or ""
+    }
+
+
+@app.get("/api/action-plan/audit-logs", response_model=List[HAPAuditLogResponse])
+def get_hap_audit_logs_api(
+    jurisdiction_id: Optional[str] = Query(None),
+    area_id: Optional[str] = Query(None),
+    limit: int = Query(50, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Retrieves persistent HAP action decision audit logs with optional jurisdiction or area filter.
+    """
+    query = db.query(HAPActionAuditLog).order_by(HAPActionAuditLog.created_at.desc())
+    filter_val = jurisdiction_id or area_id
+    if filter_val:
+        target_id = resolve_area_to_jurisdiction_id(filter_val)
+        query = query.filter(HAPActionAuditLog.jurisdiction_id == target_id)
+    logs = query.limit(limit).all()
+    return logs
 
 
 @app.get("/api/action-plan/{area_id}")
@@ -2173,6 +2679,62 @@ async def get_wards_forecast_summary_api():
         "count": total_wards,  # preserved for backwards compatibility
         "wards": summaries,
     }
+
+
+# ==============================================================================
+# NATIONAL HEAT RISK INTELLIGENCE & ADMINISTRATIVE DRILL-DOWN (PRE-SIH-26)
+# ==============================================================================
+
+@app.get(
+    "/api/heat-risk/national",
+    tags=["National GIS"],
+    summary="India-Wide National Heat Risk Overview",
+)
+async def get_national_heat_risk_api(
+    day: int = Query(0, ge=0, le=4, description="Forecast day horizon (0=Live/Now, 1=Tomorrow, ..., 4=Day+4)"),
+):
+    """
+    Returns India-wide heat-risk intelligence across all 35 States/UTs
+    derived from a 2.5° meteorological sampling grid constrained to the Indian landmass.
+    State colors follow the Conservative Peak Severity planning rule.
+    """
+    from app.services.national_heat import get_national_heat_risk
+    return await get_national_heat_risk(forecast_day=day)
+
+
+@app.get(
+    "/api/heat-risk/states/{state_id}",
+    tags=["National GIS"],
+    summary="State-Level Heat Risk & District Summaries",
+)
+async def get_state_heat_risk_api(
+    state_id: str,
+    day: int = Query(0, ge=0, le=4, description="Forecast day horizon (0=Live/Now, 1=Tomorrow, ..., 4=Day+4)"),
+):
+    """
+    Returns drill-down intelligence for a specific State and its constituent districts.
+    For Maharashtra, provides all 34-36 districts with municipal handoff to Mumbai.
+    """
+    from app.services.national_heat import get_state_heat_risk
+    return await get_state_heat_risk(state_id=state_id, forecast_day=day)
+
+
+@app.get(
+    "/api/heat-risk/districts/{district_id}",
+    tags=["National GIS"],
+    summary="District-Level Heat Risk & Municipal Integration Status",
+)
+async def get_district_heat_risk_api(
+    district_id: str,
+    day: int = Query(0, ge=0, le=4, description="Forecast day horizon (0=Live/Now, 1=Tomorrow, ..., 4=Day+4)"),
+):
+    """
+    Returns drill-down intelligence for a specific District.
+    If Mumbai is requested, indicates handoff to the 24 BMC administrative wards.
+    Other districts display planning-level thermal risk with explicit notice of unintegrated municipal geometry.
+    """
+    from app.services.national_heat import get_district_heat_risk
+    return await get_district_heat_risk(district_id=district_id, forecast_day=day)
 
 
 # ==============================================================================

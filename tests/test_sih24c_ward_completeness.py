@@ -61,8 +61,10 @@ def test_wards_summary_endpoint_returns_24_wards():
         }
     }
 
-    with patch("backend.app.services.health_forecast.get_weather", new_callable=AsyncMock) as mock_get_weather:
+    with patch("backend.app.services.health_forecast.get_weather", new_callable=AsyncMock) as mock_get_weather, \
+         patch("app.services.health_forecast.get_weather", new_callable=AsyncMock) as mock_get_weather2:
         mock_get_weather.return_value = mock_weather
+        mock_get_weather2.return_value = mock_weather
         response = client.get("/api/forecast/wards-summary")
 
     assert response.status_code == 200
@@ -100,7 +102,8 @@ def test_single_ward_failure_resilience_and_accounting():
                 }
             }
 
-        with patch("backend.app.services.health_forecast.get_weather", side_effect=mock_selective_weather):
+        with patch("backend.app.services.health_forecast.get_weather", side_effect=mock_selective_weather), \
+             patch("app.services.health_forecast.get_weather", side_effect=mock_selective_weather):
             results = await get_all_wards_forecast_summary()
 
         assert len(results) == 24, "Ward count must remain exactly 24 even if one ward fails"

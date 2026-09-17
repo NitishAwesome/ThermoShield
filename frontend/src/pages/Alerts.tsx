@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
-import { ThermalResponse } from '../types';
+import { ThermalResponse, RiskLevel } from '../types';
 import { LocationSearch } from '../components/LocationSearch';
 import { LoadingState } from '../components/LoadingState';
 import {
@@ -88,12 +88,14 @@ export const Alerts: React.FC = () => {
   const activity = thermalData?.thermal?.activity_guidance;
   const vulnerable = thermalData?.thermal?.vulnerable_population;
   const advisories = thermalData?.thermal?.advisories || [];
-  const level = (risk?.level || 'LOW').toUpperCase();
+  const level: RiskLevel | null = (risk?.level as RiskLevel) || null;
   const weatherTime = thermalData?.weather?.time;
 
   const formattedTimestamp = weatherTime
     ? new Date(weatherTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : 'Live telemetry';
+    : thermalData?.weather
+    ? 'Recent telemetry'
+    : 'Telemetry inactive';
 
   const isFallback = Boolean(
     thermalData?.weather?.is_fallback ||
@@ -109,9 +111,25 @@ export const Alerts: React.FC = () => {
             Public Safety & Heat Warnings
           </span>
           <DataRealityBadge
-            tier={isFallback ? 'OFFLINE_FALLBACK' : 'CALCULATED'}
+            tier={
+              isLoading && !thermalData
+                ? 'LOADING'
+                : !thermalData && !isLoading
+                ? 'UNAVAILABLE'
+                : isFallback
+                ? 'OFFLINE_FALLBACK'
+                : 'CALCULATED'
+            }
             size="xs"
-            customLabel={isFallback ? 'Demonstration Baseline' : 'Calculated Warnings'}
+            customLabel={
+              !thermalData && !isLoading
+                ? 'Telemetry Inactive'
+                : isLoading && !thermalData
+                ? 'Loading Advisories'
+                : isFallback
+                ? 'Demonstration Baseline'
+                : 'Calculated Warnings'
+            }
           />
         </div>
         <h1 className="text-2xl sm:text-3xl font-black ts-text-primary font-sans mt-0.5">

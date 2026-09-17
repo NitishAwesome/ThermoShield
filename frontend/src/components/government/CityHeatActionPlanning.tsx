@@ -28,6 +28,8 @@ export interface CityHeatActionPlanningProps {
   isPrototypeZone?: boolean;
   zoneName?: string;
   className?: string;
+  isReadOnly?: boolean;
+  assignedJurisdiction?: string;
 }
 
 interface ActionRecommendation {
@@ -52,6 +54,8 @@ export const CityHeatActionPlanning: React.FC<CityHeatActionPlanningProps> = ({
   isPrototypeZone = false,
   zoneName,
   className = '',
+  isReadOnly = false,
+  assignedJurisdiction,
 }) => {
   const isExtreme = riskLevel === 'EXTREME' || riskLevel === 'CRITICAL' || wbgt >= 31.0 || temperature >= 40.0;
   const isHigh = riskLevel === 'HIGH' || wbgt >= 29.0 || temperature >= 36.0;
@@ -218,6 +222,17 @@ export const CityHeatActionPlanning: React.FC<CityHeatActionPlanningProps> = ({
             ThermoShield provides intelligent, evidence-grounded recommendation triggers to assist municipal authorities and disaster management officials. ThermoShield does not autonomously execute civic operations, deploy municipal hardware, or actuate power grid changes.
           </div>
         </div>
+
+        {/* Read-Only Context Warning */}
+        {isReadOnly && (
+          <div className="mt-3 p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-xs text-blue-300 flex items-start space-x-2.5 animate-fadeIn">
+            <Info className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+            <div className="leading-relaxed">
+              <strong className="text-blue-200 font-bold">Read-Only Situational Context: </strong>
+              Viewing outside your authorized operational jurisdiction ({assignedJurisdiction || 'Assigned Scope'}). Directives can be inspected for situational awareness, but formal action activation and decision logging are restricted to authorized jurisdiction officials.
+            </div>
+          </div>
+        )}
 
         {/* 5 Recommendation Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">

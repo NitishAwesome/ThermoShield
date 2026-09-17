@@ -5,12 +5,16 @@
 
 export type DataRealityTier = 
   | 'LIVE'
+  | 'CACHED'
+  | 'STALE_CACHED'
   | 'CALCULATED'
   | 'MODELLED'
   | 'SIMULATED'
   | 'PLANNED'
   | 'CANDIDATE_CHANNEL'
-  | 'OFFLINE_FALLBACK';
+  | 'OFFLINE_FALLBACK'
+  | 'UNAVAILABLE'
+  | 'LOADING';
 
 export interface DataRealityMeta {
   tier: DataRealityTier;
@@ -37,6 +41,30 @@ export const DATA_REALITY_METADATA: Record<DataRealityTier, DataRealityMeta> = {
     bgClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
     textClass: 'text-emerald-700 dark:text-emerald-400',
     iconName: 'radio',
+  },
+  CACHED: {
+    tier: 'CACHED',
+    label: 'Cached Observation',
+    badgeLabel: 'Cached Data',
+    shortDesc: 'Recently cached meteorological observation from authoritative API.',
+    detailedDesc: 'Temporarily cached real-time telemetry preserved to ensure rapid performance and prevent upstream API rate-limiting.',
+    colorClass: 'cyan',
+    borderClass: 'border-cyan-500/30 dark:border-cyan-500/30',
+    bgClass: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400',
+    textClass: 'text-cyan-700 dark:text-cyan-400',
+    iconName: 'clock',
+  },
+  STALE_CACHED: {
+    tier: 'STALE_CACHED',
+    label: 'Stale Cached Data',
+    badgeLabel: 'Stale Cached Data',
+    shortDesc: 'Preserved prior observation maintained during telemetry disruption.',
+    detailedDesc: 'Retained earlier observation dataset to maintain situational continuity when upstream weather telemetry is transiently delayed.',
+    colorClass: 'amber',
+    borderClass: 'border-amber-500/40 dark:border-amber-500/40',
+    bgClass: 'bg-amber-500/10 text-amber-800 dark:text-amber-300',
+    textClass: 'text-amber-800 dark:text-amber-300',
+    iconName: 'clock',
   },
   CALCULATED: {
     tier: 'CALCULATED',
@@ -101,7 +129,7 @@ export const DATA_REALITY_METADATA: Record<DataRealityTier, DataRealityMeta> = {
   OFFLINE_FALLBACK: {
     tier: 'OFFLINE_FALLBACK',
     label: 'Offline Demonstration Mode',
-    badgeLabel: 'Fallback Data',
+    badgeLabel: 'Offline Fallback',
     shortDesc: 'Live stream temporarily unavailable; using calibrated regional baseline.',
     detailedDesc: 'Live upstream weather telemetry is currently unreachable or rate-limited. ThermoShield has engaged a deterministic regional baseline dataset to maintain interface responsiveness and safety continuity.',
     colorClass: 'orange',
@@ -109,6 +137,30 @@ export const DATA_REALITY_METADATA: Record<DataRealityTier, DataRealityMeta> = {
     bgClass: 'bg-amber-500/10 text-amber-800 dark:text-amber-300',
     textClass: 'text-amber-800 dark:text-amber-300',
     iconName: 'alert-triangle',
+  },
+  UNAVAILABLE: {
+    tier: 'UNAVAILABLE',
+    label: 'Telemetry Unavailable',
+    badgeLabel: 'Unavailable',
+    shortDesc: 'Weather telemetry is unavailable. Real-time calculations suspended.',
+    detailedDesc: 'External meteorological telemetry is currently disconnected or unresponsive. Calculated thermal stress and ML risk scores are suspended to prevent false safety states.',
+    colorClass: 'slate',
+    borderClass: 'border-slate-400/40 dark:border-slate-600/40',
+    bgClass: 'bg-slate-500/15 text-slate-700 dark:text-slate-300',
+    textClass: 'text-slate-700 dark:text-slate-300',
+    iconName: 'alert-triangle',
+  },
+  LOADING: {
+    tier: 'LOADING',
+    label: 'Loading Telemetry',
+    badgeLabel: 'Connecting',
+    shortDesc: 'Establishing connection to meteorological telemetry engine.',
+    detailedDesc: 'Connecting to live weather services or cached telemetry. Data will display as soon as connection is verified.',
+    colorClass: 'slate',
+    borderClass: 'border-slate-400/40 dark:border-slate-600/40',
+    bgClass: 'bg-slate-500/15 text-slate-700 dark:text-slate-300',
+    textClass: 'text-slate-700 dark:text-slate-300',
+    iconName: 'clock',
   },
 };
 

@@ -201,7 +201,7 @@ class TestSIH25RuntimeHardening(unittest.IsolatedAsyncioTestCase):
                 }.get(k, default)
 
                 res = send_notification_email("citizen@example.com", "Test", "Body")
-                self.assertEqual(res["status"], "error")
+                self.assertIn(res["status"], ("FAILED", "error"))
                 self.assertIn("failed", res["message"].lower())
                 # Ensure password was not leaked in output
                 self.assertNotIn("secretpassword123", str(res))

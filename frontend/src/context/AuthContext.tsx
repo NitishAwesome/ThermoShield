@@ -8,6 +8,7 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  portalType: 'CITIZEN' | 'AUTHORITY';
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (data: RegisterCredentials) => Promise<void>;
   loginWithGoogle: (credential: string, role?: string) => Promise<void>;
@@ -15,6 +16,7 @@ export interface AuthContextType {
   clearError: () => void;
   switchRole: (role: string) => void;
   updateUser: (fields: Partial<User>) => void;
+  refreshUser: () => Promise<User | undefined>;
 }
 
 const TOKEN_STORAGE_KEY = 'thermoshield_token';
@@ -51,6 +53,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       localStorage.removeItem(TOKEN_STORAGE_KEY);
       localStorage.removeItem(USER_STORAGE_KEY);
+      localStorage.removeItem('thermoshield_operational_scope');
+      localStorage.removeItem('thermoshield_viewing_scope');
+      localStorage.removeItem('thermoshield_authority_context');
+
+      // Purge all user-scoped cached profile and auth keys
+      Object.keys(localStorage).forEach((key) => {
+        if (
+          key.startsWith('thermoshield_profile_') ||
+          key.startsWith('thermoshield_auth_') ||
+          key.startsWith('thermoshield_scope_')
+        ) {
+          localStorage.removeItem(key);
+        }
+      });
     } catch (e) {
       console.warn('Failed to clear auth from localStorage', e);
     }
@@ -61,7 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let isMounted = true;
 
     const verifySession = async () => {
-      if (!token || token === 'mock-demo-token') {
+      if (!token) {
         setIsLoading(false);
         return;
       }
@@ -158,48 +174,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const switchRole = useCallback((newRole: string) => {
-    const roleNormalized = newRole.toLowerCase();
-    if (user) {
-      const updated: User = { ...user, role: roleNormalized };
-      setUser(updated);
-      try {
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Failed to save updated role to localStorage', e);
-      }
-    } else {
-      const roleNames: Record<string, string> = {
-        official: 'Dr. Aarav Sharma',
-        responder: 'Rajesh Verma',
-        analyst: 'Pooja Iyer',
-        user: 'Siddharth Patel',
-        citizen: 'Siddharth Patel',
-      };
-      const roleIdMap: Record<string, number> = {
-        official: 101,
-        responder: 102,
-        analyst: 103,
-        user: 104,
-        citizen: 104,
-      };
-      const guestUser: User = {
-        id: roleIdMap[roleNormalized] || 999,
-        name: roleNames[roleNormalized] || 'ThermoShield User',
-        phone_number: '+91 98765 43210',
-        email: `${roleNormalized}@thermoshield.demo`,
-        role: roleNormalized,
-      };
-      setUser(guestUser);
-      setToken('mock-demo-token');
-      try {
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(guestUser));
-        localStorage.setItem(TOKEN_STORAGE_KEY, 'mock-demo-token');
-      } catch (e) {
-        console.warn('Failed to save guest role to localStorage', e);
-      }
-    }
-  }, [user]);
+  // Strict 2-Portal Invariant: A Citizen cannot become an Authority user through client-side UI switching!
+  const switchRole = useCallback((_newRole: string) => {
+    console.warn('Unauthorized role switch prevented: Portal identities are strictly credential-bound.');
+  }, []);
 
   const updateUser = useCallback((fields: Partial<User>) => {
     setUser((prev) => {
@@ -214,6 +192,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
+  const refreshUser = useCallback(async (): Promise<User | undefined> => {
+    if (!token) return undefined;
+    try {
+      const freshUser = await api.getMe();
+      setUser(freshUser);
+      try {
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(freshUser));
+      } catch (e) {
+        console.warn('Failed to persist refreshed user to localStorage', e);
+      }
+      return freshUser;
+    } catch (e) {
+      console.warn('Failed to refresh user:', e);
+      return undefined;
+    }
+  }, [token]);
+
+  const portalType: 'CITIZEN' | 'AUTHORITY' =
+    user?.role && !['user', 'citizen'].includes(user.role.toLowerCase())
+      ? 'AUTHORITY'
+      : 'CITIZEN';
+
   return (
     <AuthContext.Provider
       value={{
@@ -222,6 +222,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!user && !!token,
         isLoading,
         error,
+        portalType,
         login,
         register,
         loginWithGoogle,
@@ -229,6 +230,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         clearError,
         switchRole,
         updateUser,
+        refreshUser,
       }}
     >
       {children}

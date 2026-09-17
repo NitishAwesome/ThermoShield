@@ -80,6 +80,18 @@ export function getEffectiveInitials(
  */
 export function getRoleBadgeLabel(role?: string | null): string {
   switch ((role || '').toLowerCase()) {
+    case 'state_coordinator':
+      return 'State Coordinator';
+    case 'municipal_hap_officer':
+      return 'Municipal HAP Nodal Officer';
+    case 'district_authority':
+      return 'District Magistrate';
+    case 'ward_officer':
+      return 'Ward Officer';
+    case 'national_analyst':
+      return 'National Analyst';
+    case 'system_admin':
+      return 'System Administrator';
     case 'official':
       return 'Health Official';
     case 'responder':
@@ -93,6 +105,19 @@ export function getRoleBadgeLabel(role?: string | null): string {
   }
 }
 
+const AUTHORIZED_GOV_ROLES = [
+  'state_coordinator',
+  'municipal_hap_officer',
+  'district_authority',
+  'ward_officer',
+  'national_analyst',
+  'system_admin',
+  'official',
+  'responder',
+  'analyst',
+  'admin',
+];
+
 /**
  * Resolves complete standardized identity information combining both
  * ProfileContext and AuthContext states.
@@ -101,32 +126,34 @@ export function getEffectiveIdentity(
   profile?: Partial<UserProfile> | null,
   user?: Partial<User> | null
 ): EffectiveIdentity {
-  const role = (profile?.role || user?.role || 'user').toLowerCase();
-  const isCitizen = role === 'user' || role === 'citizen';
+  // Canonical rule: If user is authenticated, user.role and user.portal_type ALWAYS take precedence
+  const userRoleLower = (user?.role || '').toLowerCase();
+  const isAuthority =
+    user?.portal_type === 'AUTHORITY' ||
+    AUTHORIZED_GOV_ROLES.includes(userRoleLower) ||
+    Boolean(user?.organization || user?.jurisdiction_id);
+
+  const role = isAuthority
+    ? (user?.role || profile?.role || 'state_coordinator').toLowerCase()
+    : (user?.role || profile?.role || 'user').toLowerCase();
+
+  const isCitizen = !isAuthority && (role === 'user' || role === 'citizen');
   const displayName = getEffectiveDisplayName(profile, user);
-  const email = profile?.email || user?.email || '';
+  const email = user?.email || profile?.email || '';
   const initials = getEffectiveInitials(displayName, email);
-  const roleBadgeLabel = getRoleBadgeLabel(role);
+  const roleBadgeLabel = isAuthority ? getRoleBadgeLabel(role) : (isCitizen ? 'Citizen' : getRoleBadgeLabel(role));
 
   let homeLocation: string | null = null;
-  if (profile?.city && profile.city.trim()) {
+  // Authority operational scope must NEVER inherit Citizen home location, GPS, or monitored city (Item 15)
+  if (isCitizen && profile?.city && profile.city.trim()) {
     homeLocation = profile.state && profile.state.trim()
       ? `${profile.city.trim()}, ${profile.state.trim()}`
       : profile.city.trim();
   }
 
-  const isDemo =
-    email.includes('demo') ||
-    email.includes('siddharth') ||
-    email.includes('aarav') ||
-    email.includes('rajesh') ||
-    email.includes('pooja');
-
-  const accountTypeLabel = isDemo
-    ? 'Demonstration Profile'
-    : isCitizen
-    ? 'Citizen Safety Account'
-    : 'Authority Account';
+  const accountTypeLabel = isAuthority
+    ? 'Authority Account'
+    : 'Citizen Safety Account';
 
   return {
     displayName,

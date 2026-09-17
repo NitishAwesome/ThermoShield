@@ -256,6 +256,12 @@ def get_cached_weather(key: Tuple[float, float], allow_stale: bool = False) -> O
                 "cache_age_seconds": round(age, 1),
                 "data_timestamp": datetime.utcfromtimestamp(entry["timestamp"]).isoformat() + "Z",
             }
+        else:
+            data = {
+                **data,
+                "cache_age_seconds": round(age, 1),
+                "data_timestamp": data.get("data_timestamp") or datetime.utcfromtimestamp(entry["timestamp"]).isoformat() + "Z",
+            }
         return data
     if allow_stale and age <= STALE_TTL_SECONDS:
         base = dict(entry["data"])
@@ -427,11 +433,15 @@ async def _fetch_from_open_meteo(latitude: float, longitude: float) -> Dict[str,
                         "wind_direction": round(wind_dir, 0),
                         "source_status": "LIVE",
                         "source_name": "Open-Meteo Global API",
+                        "data_timestamp": str(current.get("time", "")) or (datetime.utcnow().isoformat() + "Z"),
+                        "cache_age_seconds": 0.0,
                         "is_fallback": False,
                     },
                     "forecast": forecast_dict,
                     "source_status": "LIVE",
                     "source_name": "Open-Meteo Global API",
+                    "data_timestamp": str(current.get("time", "")) or (datetime.utcnow().isoformat() + "Z"),
+                    "cache_age_seconds": 0.0,
                     "is_fallback": False,
                 }
 

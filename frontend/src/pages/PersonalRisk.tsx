@@ -130,6 +130,7 @@ export const PersonalRisk: React.FC = () => {
   const [uvIndex, setUvIndex] = useState<number>(7.5);
   const [windSpeed, setWindSpeed] = useState<number>(2.8);
   const [isSyncingWeather, setIsSyncingWeather] = useState<boolean>(false);
+  const [weatherSyncFailed, setWeatherSyncFailed] = useState<boolean>(false);
 
   // Calculation Results
   const [result, setResult] = useState<PersonalRiskResult | null>(null);
@@ -192,6 +193,7 @@ export const PersonalRisk: React.FC = () => {
 
   const syncWeatherFromLocation = async () => {
     setIsSyncingWeather(true);
+    setWeatherSyncFailed(false);
     try {
       const thermalRes = await api.getThermal(coords.lat, coords.lon);
       if (thermalRes?.weather) {
@@ -206,12 +208,16 @@ export const PersonalRisk: React.FC = () => {
         if (thermalRes.weather.wind_speed !== undefined) {
           setWindSpeed(thermalRes.weather.wind_speed);
         }
+        setWeatherSyncFailed(false);
+      } else {
+        setWeatherSyncFailed(true);
       }
       if (thermalRes?.thermal?.indices?.wbgt_c) {
         setWbgt(thermalRes.thermal.indices.wbgt_c);
       }
     } catch (err) {
       console.warn('Could not auto-sync weather for personal risk:', err);
+      setWeatherSyncFailed(true);
     } finally {
       setIsSyncingWeather(false);
     }
@@ -595,6 +601,13 @@ export const PersonalRisk: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {weatherSyncFailed && (
+              <div className="mt-2.5 p-2 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-[11px] flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-amber-500" />
+                <span>Live weather telemetry unavailable for this location. Using demonstration baseline scenario numbers.</span>
+              </div>
+            )}
 
             <div className="mt-3 pt-2 border-t border-orange-500/15 text-[11px] text-orange-800 dark:text-orange-300 font-medium truncate">
               Showing conditions for: <strong>{locationName}</strong>

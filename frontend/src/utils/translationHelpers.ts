@@ -627,6 +627,8 @@ export function translateRiskLevel(
       return t('risk.moderate', {}, 'मध्यम');
     case 'low':
       return t('risk.low', {}, 'निम्न');
+    case 'unavailable':
+      return t('common.unavailable', {}, 'Unavailable');
     default:
       if (clean.includes('extreme')) return t('risk.extreme', {}, 'चरम');
       if (clean.includes('critical')) return t('risk.critical', {}, 'गंभीर');

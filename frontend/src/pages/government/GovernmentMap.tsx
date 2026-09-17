@@ -28,6 +28,7 @@ import { ALL_STATE_HEAT_ALERTS, getStateCategoryStyle, getNationalAlertStatistic
 import { getCityMunicipalAuthority, getOrGenerateCityWards, calculateWetBulb, calculateHeatIndex, findNearestMetroHub } from '../../utils/cityWardsGenerator';
 import { getRiskStyle } from '../../utils/risk';
 import { CityHeatActionPlanning } from '../../components/government/CityHeatActionPlanning';
+import { useAuthority } from '../../context/AuthorityContext';
 import {
   Compass,
   MapPin,
@@ -49,6 +50,7 @@ import {
   Globe,
   Flame,
   Landmark,
+  Eye,
 } from 'lucide-react';
 
 const QUICK_GOV_CITIES = [
@@ -69,6 +71,15 @@ const QUICK_GOV_CITIES = [
 export const GovernmentMap: React.FC = () => {
   const { coords, locationName, setCoordsAndName, setLocation, detectMyLocation, isLocating } = useLocation();
   const { t } = useTranslation();
+
+  const {
+    authority,
+    operationalScope,
+    viewingScope,
+    isReadOnly: isAuthorityReadOnly,
+    setViewingScope,
+    resetToOperationalScope,
+  } = useAuthority();
 
   const [gisLayerMode, setGisLayerMode] = useState<'official_wards' | 'state_alerts' | 'global_world' | 'mumbai_zones' | 'national_centroids'>('official_wards');
   const [selectedStateAlert, setSelectedStateAlert] = useState<StateHeatAlertProperties | null>(() => {
@@ -91,6 +102,64 @@ export const GovernmentMap: React.FC = () => {
     });
   }, [stateFilterCategory, stateSearchQuery]);
 
+  // Administrative Jurisdiction & State Hierarchy State
+  const [selectedState, setSelectedState] = useState<{ id: string; name: string; centroid?: { latitude: number; longitude: number } } | null>({
+    id: 'maharashtra',
+    name: 'Maharashtra',
+    centroid: { latitude: 19.7515, longitude: 75.7139 },
+  });
+  const [selectedDistrict, setSelectedDistrict] = useState<{ district_id: string; district_name: string; has_municipal_detail?: boolean } | null>({
+    district_id: 'mumbai',
+    district_name: 'Mumbai',
+    has_municipal_detail: true,
+  });
+  const [stateDistricts, setStateDistricts] = useState<any[]>([
+    { district_id: 'mumbai', district_name: 'Mumbai', has_municipal_detail: true },
+    { district_id: 'pune', district_name: 'Pune', has_municipal_detail: false },
+    { district_id: 'nagpur', district_name: 'Nagpur', has_municipal_detail: false },
+    { district_id: 'thane', district_name: 'Thane', has_municipal_detail: false },
+  ]);
+
+  const drillToState = (state: { id: string; name: string; centroid?: { latitude: number; longitude: number } }) => {
+    setSelectedState(state);
+    setSelectedDistrict(null);
+    setSelectedWard(null);
+    setStateDistricts([]);
+    if (state.centroid) {
+      setCoordsAndName(
+        { lat: state.centroid.latitude, lon: state.centroid.longitude },
+        `${state.name} State Planning View`
+      );
+    }
+    if (setViewingScope) {
+      setViewingScope({
+        id: state.id === 'maharashtra' ? 'IN-MH' : `IN-STATE-${state.id.toUpperCase()}`,
+        name: `${state.name} State Context`,
+        type: 'STATE_UT',
+      });
+    }
+
+    if (state.id === 'maharashtra') {
+      setStateDistricts([
+        { district_id: 'mumbai', district_name: 'Mumbai', has_municipal_detail: true },
+        { district_id: 'pune', district_name: 'Pune', has_municipal_detail: false },
+        { district_id: 'nagpur', district_name: 'Nagpur', has_municipal_detail: false },
+        { district_id: 'thane', district_name: 'Thane', has_municipal_detail: false },
+      ]);
+      setSelectedDistrict({ district_id: 'mumbai', district_name: 'Mumbai', has_municipal_detail: true });
+    } else {
+      setStateDistricts([]);
+      setSelectedDistrict(null);
+    }
+  };
+
+  const drillToDistrict = (district: any) => {
+    setSelectedDistrict(district);
+    if (district.has_municipal_detail) {
+      setCoordsAndName({ lat: 19.0760, lon: 72.8777 }, 'Mumbai, Maharashtra');
+      setGisLayerMode('official_wards');
+    }
+  };
   const [selectedGlobalStation, setSelectedGlobalStation] = useState<GlobalHeatStation | null>(GLOBAL_HEAT_STATIONS[0]); // Default: Dubai
   const [selectedRegionFilter, setSelectedRegionFilter] = useState<string>('all');
   const [selectedZone, setSelectedZone] = useState<ThermalZone | null>(MUMBAI_PROTOTYPE_ZONES[1]);
@@ -329,10 +398,57 @@ export const GovernmentMap: React.FC = () => {
     setCoordsAndName({ lat: station.lat, lon: station.lon }, `${station.name}, ${station.country}`);
   };
 
+  const isViewingOutsideScope = useMemo(() => {
+    if (!authority) return false;
+    if (authority.isNational) return false;
+
+    const officerJid = authority.jurisdictionId;
+    if (!officerJid) return false;
+
+    const currentShortCode = municipalAuthority?.shortCode;
+    if (authority.isMunicipal && officerJid === 'IN-MH-MCGM') {
+      const isMumbai = locationName.toLowerCase().includes('mumbai') || currentShortCode === 'BMC';
+      return !isMumbai;
+    }
+
+    if (authority.isState && officerJid === 'IN-MH') {
+      const isMhCity = ['mumbai', 'pune', 'nagpur', 'thane', 'nashik', 'aurangabad', 'solapur'].some((c) =>
+        locationName.toLowerCase().includes(c)
+      );
+      return !isMhCity;
+    }
+
+    if (viewingScope && viewingScope.id !== operationalScope?.id) {
+      return true;
+    }
+
+    return isAuthorityReadOnly;
+  }, [authority, municipalAuthority, locationName, viewingScope, operationalScope, isAuthorityReadOnly]);
+
+  const handleReturnToAssignedScope = () => {
+    if (resetToOperationalScope) {
+      resetToOperationalScope();
+    }
+    if (authority?.isMunicipal && authority.jurisdictionId === 'IN-MH-MCGM') {
+      setCoordsAndName({ lat: 19.0760, lon: 72.8777 }, 'Mumbai, Maharashtra');
+      setGisLayerMode('official_wards');
+    } else if (authority?.isState && authority.jurisdictionId === 'IN-MH') {
+      setCoordsAndName({ lat: 19.7515, lon: 75.7139 }, 'Maharashtra, India');
+    }
+  };
+
   const handleCitySelect = (city: typeof QUICK_GOV_CITIES[0]) => {
     setCoordsAndName({ lat: city.lat, lon: city.lon }, `${city.name}, ${city.state}`);
     setGisLayerMode('official_wards');
     setSelectedDistrictFilter('ALL');
+    if (setViewingScope) {
+      const targetJid = city.name === 'Mumbai' ? 'IN-MH-MCGM' : `IN-CITY-${city.name.toUpperCase()}`;
+      setViewingScope({
+        id: targetJid,
+        name: `${city.name} (${city.authority})`,
+        type: 'MUNICIPAL_CORPORATION',
+      });
+    }
   };
 
   const handlePriorityClick = (area: AreaRiskItem) => {
@@ -343,6 +459,13 @@ export const GovernmentMap: React.FC = () => {
     });
     setGisLayerMode('official_wards');
     window.scrollTo({ top: 180, behavior: 'smooth' });
+    if (setViewingScope) {
+      setViewingScope({
+        id: `IN-AREA-${area.name.toUpperCase()}`,
+        name: `${area.name} (${area.state})`,
+        type: 'DISTRICT',
+      });
+    }
   };
 
   // Sorted Priority Locations from real application data
@@ -379,6 +502,38 @@ export const GovernmentMap: React.FC = () => {
           compact
           className="mb-2"
         />
+      )}
+
+      {/* READ-ONLY SITUATIONAL CONTEXT BANNER (when viewing outside assigned jurisdiction) */}
+      {isViewingOutsideScope && (
+        <div className="p-4 rounded-2xl bg-amber-500/15 border-2 border-amber-500/40 text-amber-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg animate-fadeIn">
+          <div className="flex items-start sm:items-center space-x-3">
+            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300 shrink-0 mt-0.5 sm:mt-0">
+              <Eye className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <strong className="text-sm font-black text-amber-100">
+                  Read-Only Situational Context Active
+                </strong>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-600/30 text-amber-200 border border-amber-500/40 uppercase tracking-wide">
+                  Operational Actions Locked
+                </span>
+              </div>
+              <p className="text-xs text-amber-200/90 mt-0.5 leading-relaxed">
+                You are currently viewing a geographic area outside your authorized operational jurisdiction ({operationalScope?.name || authority?.jurisdictionName || 'Assigned Scope'}). Operational dispatch and HAP mutations are locked in this view for audit and governance compliance.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleReturnToAssignedScope}
+            className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs whitespace-nowrap cursor-pointer transition-all shadow-md shrink-0 flex items-center space-x-1.5 self-start sm:self-auto"
+          >
+            <ShieldAlert className="w-4 h-4" />
+            <span>Return to Assigned Scope</span>
+          </button>
+        </div>
       )}
 
       {/* SECTION 1 — STREAMLINED MAP COMMAND HEADER */}
@@ -623,6 +778,90 @@ export const GovernmentMap: React.FC = () => {
                     </button>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Hierarchical Administrative Geometry Dropdowns (State / District / Ward Decoupling) */}
+            <div className="pt-2 border-t ts-border">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                {/* State Selector */}
+                <div>
+                  <label className="block text-[10.5px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    State / UT Jurisdiction
+                  </label>
+                  <select
+                    value={selectedState?.id || 'maharashtra'}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const st = {
+                        id: val,
+                        name: val === 'maharashtra' ? 'Maharashtra' : val.charAt(0).toUpperCase() + val.slice(1).replace('_', ' '),
+                        centroid: val === 'maharashtra' ? { latitude: 19.7515, longitude: 75.7139 } : undefined,
+                      };
+                      drillToState(st);
+                    }}
+                    className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-slate-900/60 border ts-border ts-text-primary focus:outline-none focus:border-orange-500"
+                  >
+                    <option value="maharashtra">Maharashtra</option>
+                    <option value="jammu_and_kashmir">Jammu and Kashmir</option>
+                    <option value="gujarat">Gujarat</option>
+                    <option value="delhi">Delhi</option>
+                    <option value="karnataka">Karnataka</option>
+                    <option value="rajasthan">Rajasthan</option>
+                  </select>
+                </div>
+
+                {/* District Selector (Strictly filtered by active state) */}
+                <div>
+                  <label className="block text-[10.5px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    District Administration
+                  </label>
+                  <select
+                    value={selectedDistrict?.district_id || ''}
+                    onChange={(e) => {
+                      const d = stateDistricts.find((dist) => dist.district_id === e.target.value);
+                      if (d) drillToDistrict(d);
+                    }}
+                    disabled={stateDistricts.length === 0 || selectedState?.id !== 'maharashtra'}
+                    className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-slate-900/60 border ts-border ts-text-primary focus:outline-none focus:border-orange-500 disabled:opacity-40"
+                  >
+                    {stateDistricts.length === 0 || selectedState?.id !== 'maharashtra' ? (
+                      <option value="">District-level administrative geometry is not currently integrated for this state.</option>
+                    ) : (
+                      stateDistricts.map((d) => (
+                        <option key={d.district_id} value={d.district_id}>
+                          {d.district_name} {d.has_municipal_detail ? '⭐ (24 Wards)' : ''}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                {/* Ward Selector (Strictly available ONLY in Greater Mumbai) */}
+                <div>
+                  <label className="block text-[10.5px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Municipal Ward Geometry
+                  </label>
+                  <select
+                    value={selectedWard?.id || ''}
+                    onChange={(e) => {
+                      const w = activeCityWards.find((ward) => ward.id === e.target.value);
+                      if (w) setSelectedWard(w);
+                    }}
+                    disabled={!selectedDistrict?.has_municipal_detail || selectedState?.id !== 'maharashtra'}
+                    className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-slate-900/60 border ts-border ts-text-primary focus:outline-none focus:border-orange-500 disabled:opacity-40"
+                  >
+                    {!selectedDistrict?.has_municipal_detail || selectedState?.id !== 'maharashtra' ? (
+                      <option value="">Ward-level administrative geometry is available for Greater Mumbai</option>
+                    ) : (
+                      MUMBAI_ADMIN_WARDS.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          Ward {w.wardCode} — {w.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
               </div>
             </div>
           </div>

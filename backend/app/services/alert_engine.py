@@ -316,6 +316,16 @@ def dispatch_automatic_early_warning(
             html_body=html_body
         )
 
+        res_status = send_res.get("status")
+        if res_status in ("success", "SENT"):
+            db_status = "SENT"
+        elif res_status in ("SIMULATED", "simulated"):
+            db_status = "SIMULATED"
+        elif res_status in ("disabled", "DISABLED", "skipped", "SKIPPED"):
+            db_status = "DISABLED"
+        else:
+            db_status = "FAILED"
+
         # Record in DB if user_id is known
         if user_id and location_id:
             try:
@@ -325,7 +335,7 @@ def dispatch_automatic_early_warning(
                     risk_level=risk_level,
                     risk_score=risk_score,
                     message=f"{transition_type}: {risk_level} heat in {location_name}",
-                    status="SENT" if send_res.get("status") == "success" else "FAILED",
+                    status=db_status,
                     reference_id=f"AUTO-{int(time.time())}"
                 )
                 db.add(alert_record)
@@ -342,6 +352,7 @@ def dispatch_automatic_early_warning(
             "risk_level": risk_level,
             "transition": transition_type,
             "status": send_res.get("status"),
+            "provider": send_res.get("provider"),
             "message": send_res.get("message")
         }
         _RECENT_DISPATCH_LOG.append(audit_entry)
@@ -350,8 +361,17 @@ def dispatch_automatic_early_warning(
 
         dispatched.append(audit_entry)
 
+    overall_status = "success"
+    if dispatched:
+        if all(d.get("status") == "SIMULATED" for d in dispatched):
+            overall_status = "SIMULATED"
+        elif all(d.get("status") == "DISABLED" for d in dispatched):
+            overall_status = "DISABLED"
+    else:
+        overall_status = "all_cooldown_skipped"
+
     return {
-        "status": "success" if dispatched else "all_cooldown_skipped",
+        "status": overall_status,
         "transition": transition_type,
         "dispatched_count": len(dispatched),
         "dispatched": dispatched,

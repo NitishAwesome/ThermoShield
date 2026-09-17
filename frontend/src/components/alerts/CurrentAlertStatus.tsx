@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, MapPin, Clock, AlertTriangle, CheckCircle2, Flame, SunMedium } from 'lucide-react';
+import { Bell, MapPin, Clock, AlertTriangle, AlertCircle, CheckCircle2, Flame, SunMedium } from 'lucide-react';
 import { Card, Badge } from '../ui';
 import { useTranslation } from '../../context/LanguageContext';
 import { translateRiskLevel, translateAlertReason } from '../../utils/translationHelpers';
@@ -31,13 +31,15 @@ export const CurrentAlertStatus: React.FC<CurrentAlertStatusProps> = ({
   className = '',
 }) => {
   const { t } = useTranslation();
-  const level = (riskLevel || 'LOW').toUpperCase();
+  const level = riskLevel ? (riskLevel as string).toUpperCase() : null;
   const isExtreme = level === 'EXTREME' || level === 'CRITICAL';
   const isHigh = level === 'HIGH';
   const isModerate = level === 'MODERATE';
+  const isUnavailable = !level;
   const isActive = isHigh || isExtreme;
 
   const getAlertHeadline = () => {
+    if (isUnavailable) return 'Alert Status Unavailable';
     if (isExtreme) return t('alerts.headlineExtreme', 'Extreme Heat Emergency');
     if (isHigh) return t('alerts.headlineHigh', 'High Heat Alert');
     if (isModerate) return t('alerts.headlineModerate', 'Moderate Heat Advisory');
@@ -45,6 +47,9 @@ export const CurrentAlertStatus: React.FC<CurrentAlertStatusProps> = ({
   };
 
   const getAlertSummary = () => {
+    if (isUnavailable) {
+      return 'Current environmental alert level cannot be determined because weather telemetry is inactive. Warnings are paused until observations resume.';
+    }
     if (isExtreme) {
       return t(
         'alerts.summaryExtreme',
@@ -69,7 +74,9 @@ export const CurrentAlertStatus: React.FC<CurrentAlertStatusProps> = ({
     );
   };
 
-  const borderColorClass = isExtreme
+  const borderColorClass = isUnavailable
+    ? 'border-l-slate-500 bg-slate-500/10'
+    : isExtreme
     ? 'border-l-rose-500 bg-rose-50/40 dark:bg-rose-950/20'
     : isHigh
     ? 'border-l-orange-500 bg-orange-50/40 dark:bg-orange-950/20'
@@ -87,14 +94,18 @@ export const CurrentAlertStatus: React.FC<CurrentAlertStatusProps> = ({
         <div className="flex items-center space-x-2.5">
           <div
             className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
-              isActive
+              isUnavailable
+                ? 'bg-slate-500/15 text-slate-400'
+                : isActive
                 ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
                 : isModerate
                 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
                 : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
             }`}
           >
-            {isActive ? (
+            {isUnavailable ? (
+              <AlertCircle className="w-5 h-5" />
+            ) : isActive ? (
               <Flame className="w-5 h-5 animate-pulse" />
             ) : isModerate ? (
               <SunMedium className="w-5 h-5" />
@@ -116,17 +127,19 @@ export const CurrentAlertStatus: React.FC<CurrentAlertStatusProps> = ({
         <div className="flex items-center gap-2">
           <span
             className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-              isActive
+              isUnavailable
+                ? 'bg-slate-700/60 text-slate-300 border border-slate-600'
+                : isActive
                 ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-200 border border-rose-300 dark:border-rose-700'
                 : isModerate
                 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-300 dark:border-amber-700'
                 : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700'
             }`}
           >
-            {isActive ? t('status.active', 'ACTIVE DANGER') : isModerate ? 'ADVISORY' : 'ROUTINE'}
+            {isUnavailable ? 'UNAVAILABLE' : isActive ? t('status.active', 'ACTIVE DANGER') : isModerate ? 'ADVISORY' : 'ROUTINE'}
           </span>
-          <Badge riskLevel={level} size="md">
-            {translateRiskLevel(level, t)}
+          <Badge riskLevel={level as any} size="md">
+            {level ? translateRiskLevel(level, t) : 'Unavailable'}
           </Badge>
         </div>
       </div>

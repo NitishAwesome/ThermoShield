@@ -1,12 +1,12 @@
 import React from 'react';
 import { ShieldCheck, AlertCircle, AlertTriangle, Flame } from 'lucide-react';
 
-export type RiskSeverity = 'LOW' | 'MODERATE' | 'HIGH' | 'EXTREME' | 'CRITICAL';
+export type RiskSeverity = 'LOW' | 'MODERATE' | 'HIGH' | 'EXTREME' | 'CRITICAL' | 'UNAVAILABLE';
 
 interface BadgeProps {
   children: React.ReactNode;
   variant?: 'default' | 'neutral' | 'brand' | 'low' | 'moderate' | 'high' | 'extreme';
-  riskLevel?: RiskSeverity | string;
+  riskLevel?: RiskSeverity | string | null;
   size?: 'sm' | 'md' | 'lg';
   showDot?: boolean;
   showIcon?: boolean;
@@ -30,6 +30,7 @@ export const Badge: React.FC<BadgeProps> = ({
   else if (normalizedLevel === 'MODERATE') effectiveVariant = 'moderate';
   else if (normalizedLevel === 'HIGH') effectiveVariant = 'high';
   else if (normalizedLevel === 'EXTREME' || normalizedLevel === 'CRITICAL') effectiveVariant = 'extreme';
+  else if (normalizedLevel === 'UNAVAILABLE') effectiveVariant = 'neutral';
 
   const sizeClasses = {
     sm: 'px-2 py-0.5 text-[10px]',

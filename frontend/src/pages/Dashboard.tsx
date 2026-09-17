@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import {
   ThermalResponse,
   RiskResponse,
   WeatherResponse,
+  RiskLevel,
 } from '../types';
 import { LocationSearch } from '../components/LocationSearch';
 import { RiskCard } from '../components/RiskCard';
@@ -16,7 +17,6 @@ import { SevereHeatCheckInCard } from '../components/SevereHeatCheckInCard';
 import { VulnerableFamilyProtectionCard } from '../components/VulnerableFamilyProtectionCard';
 import { AlertBanner } from '../components/AlertBanner';
 import { LoadingState } from '../components/LoadingState';
-import { RoleWelcomeBanner } from '../components/RoleWelcomeBanner';
 import { PersonalizedDashboardSummary } from '../components/PersonalizedDashboardSummary';
 import {
   AlertCircle,
@@ -40,6 +40,7 @@ import { subscribeToLiveRisk, type LiveRisk } from '../services/liveRisk';
 import { useTranslation } from '../context/LanguageContext';
 import { DataRealityBadge, FallbackModeBanner, MethodologyDisclosureModal } from '../components/provenance';
 import { getEffectiveDisplayName } from '../utils/identity';
+import { deriveTelemetryState } from '../utils/telemetryState';
 
 export const Dashboard: React.FC = () => {
   const { t } = useTranslation();
@@ -65,14 +66,17 @@ export const Dashboard: React.FC = () => {
   const [weatherData, setWeatherData] = useState<WeatherResponse | null>(null);
   const [isMethodologyOpen, setIsMethodologyOpen] = useState<boolean>(false);
 
-  const isFallbackMode = Boolean(
-    weatherData?.is_fallback ||
-    weatherData?.weather?.is_fallback ||
-    weatherData?.source_status === 'OFFLINE_FALLBACK' ||
-    thermalData?.weather?.is_fallback ||
-    thermalData?.weather?.source_status === 'OFFLINE_FALLBACK'
-  );
-  const weatherSourceName = weatherData?.source_name || thermalData?.weather?.source_name || 'Regional Baseline Dataset';
+  const telemetry = useMemo(() => {
+    return deriveTelemetryState({
+      isLoading,
+      error,
+      weather: thermalData?.weather || weatherData?.weather,
+      thermalData,
+    });
+  }, [isLoading, error, thermalData, weatherData]);
+
+  const isFallbackMode = telemetry.isFallback;
+  const weatherSourceName = telemetry.sourceName;
 
   const fetchData = async (lat: number, lon: number) => {
     // 1. Instant Cache Check for instantaneous UI rendering
@@ -138,7 +142,7 @@ export const Dashboard: React.FC = () => {
       // If core thermal fails and no thermal data is present, notify user
       if (thermalRes.status === 'rejected' && !updatedThermal && !cached?.thermal) {
         setError(
-          'Unable to connect to ThermoShield telemetry engine. Please ensure backend is running.'
+          'Current weather data is temporarily unavailable. Please try again.'
         );
       } else if (thermalRes.status === 'fulfilled') {
         setError(null);
@@ -146,8 +150,7 @@ export const Dashboard: React.FC = () => {
     } catch (err: any) {
       if (!cached?.thermal) {
         setError(
-          err.message ||
-            'An unexpected error occurred while fetching thermal intelligence.'
+          'Current weather data is temporarily unavailable. Please try again.'
         );
       }
     } finally {
@@ -195,8 +198,10 @@ export const Dashboard: React.FC = () => {
     return unsubscribe;
   }, [riskData?.location?.id]);
 
-  const activeRiskLevel =
-    thermalData?.thermal?.risk_assessment?.level || riskData?.risk?.risk_level || 'LOW';
+  const activeRiskLevel: RiskLevel | null =
+    telemetry.isAvailable
+      ? (thermalData?.thermal?.risk_assessment?.level || riskData?.risk?.risk_level || null)
+      : null;
 
   return (
     <div className="space-y-6 pb-12 animate-fadeIn">
@@ -230,8 +235,9 @@ export const Dashboard: React.FC = () => {
         {/* Live / Fallback Freshness & Reality Indicator */}
         <div className="flex items-center space-x-2 self-start sm:self-auto">
           <DataRealityBadge
-            tier={isFallbackMode ? 'OFFLINE_FALLBACK' : 'LIVE'}
+            tier={telemetry.tier}
             size="sm"
+            customLabel={telemetry.badgeLabel}
             onClick={() => setIsMethodologyOpen(true)}
           />
           <button
@@ -253,9 +259,6 @@ export const Dashboard: React.FC = () => {
         />
       )}
 
-      {/* Citizen Home Introduction & Hero Context Banner */}
-      <RoleWelcomeBanner user={user} initialMode="compact" />
-
       {/* Location Confirmation Banner (Appears only when automatic change is detected) */}
       <LocationConfirmationBanner />
 
@@ -270,15 +273,15 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Error Alert: Shown only if telemetry completely fails */}
-      {error && !thermalData && (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 flex items-center justify-between">
+      {error && !telemetry.isAvailable && (
+        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 flex items-center justify-between">
           <div className="flex items-start space-x-3">
-            <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
+            <AlertCircle className="w-5 h-5 text-amber-500 dark:text-amber-400 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="font-bold text-sm text-red-900 dark:text-red-200">
-                {t('common.error', 'Error')}: Weather Telemetry Inactive
+              <p className="font-bold text-sm text-amber-900 dark:text-amber-200">
+                Weather Telemetry Temporarily Unavailable
               </p>
-              <p className="text-xs text-red-700 dark:text-red-300 mt-0.5">{error}</p>
+              <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">{error}</p>
             </div>
           </div>
           <Button
@@ -307,7 +310,7 @@ export const Dashboard: React.FC = () => {
           {/* ========================================================================= */}
           {/* 2. ACTIVE HEAT ALERT (High Priority when hazard exists)                   */}
           {/* ========================================================================= */}
-          {thermalData?.thermal?.risk_assessment && (
+          {telemetry.isAvailable && thermalData?.thermal?.risk_assessment && (
             <AlertBanner
               riskAssessment={thermalData.thermal.risk_assessment}
               hydration={thermalData.thermal.hydration}
@@ -323,18 +326,26 @@ export const Dashboard: React.FC = () => {
             {/* Today's Heat Risk (Citizen Mode: Plain language, no confusing WBGT or civic metrics) */}
             <RiskCard
               variant="citizen"
-              riskAssessment={thermalData?.thermal?.risk_assessment}
+              riskAssessment={telemetry.isAvailable ? thermalData?.thermal?.risk_assessment : undefined}
               locationName={locationName}
-              temperature={thermalData?.weather?.temperature}
-              humidity={thermalData?.weather?.humidity}
-              windSpeed={thermalData?.weather?.wind_speed}
+              temperature={telemetry.isAvailable ? thermalData?.weather?.temperature : undefined}
+              humidity={telemetry.isAvailable ? thermalData?.weather?.humidity : undefined}
+              windSpeed={telemetry.isAvailable ? thermalData?.weather?.wind_speed : undefined}
+              wbgt={telemetry.isAvailable ? thermalData?.thermal?.indices?.wbgt_c : undefined}
               timestamp={thermalData?.weather?.time}
+              telemetryState={telemetry.state}
+              isFallback={telemetry.isFallback}
+              weatherSourceName={telemetry.sourceName}
             />
 
             {/* Current Local Conditions (Citizen-friendly: Temp, Feels Like, Humidity, Wind, UV) */}
             <WeatherCard
               variant="citizen"
-              weather={thermalData?.weather || weatherData?.weather}
+              weather={telemetry.isAvailable ? (thermalData?.weather || weatherData?.weather) : undefined}
+              locationName={locationName}
+              telemetryState={telemetry.state}
+              isFallback={telemetry.isFallback}
+              weatherSourceName={telemetry.sourceName}
             />
           </div>
 
@@ -342,22 +353,24 @@ export const Dashboard: React.FC = () => {
           {/* 4. WHAT YOU SHOULD DO NOW (Practical immediate actions)                   */}
           {/* ========================================================================= */}
           <CitizenActionGuidance
-            riskAssessment={thermalData?.thermal?.risk_assessment}
-            hydration={thermalData?.thermal?.hydration}
-            activity={thermalData?.thermal?.activity_guidance}
-            vulnerable={thermalData?.thermal?.vulnerable_population}
-            temperature={thermalData?.weather?.temperature}
+            riskAssessment={telemetry.isAvailable ? thermalData?.thermal?.risk_assessment : undefined}
+            hydration={telemetry.isAvailable ? thermalData?.thermal?.hydration : undefined}
+            activity={telemetry.isAvailable ? thermalData?.thermal?.activity_guidance : undefined}
+            vulnerable={telemetry.isAvailable ? thermalData?.thermal?.vulnerable_population : undefined}
+            temperature={telemetry.isAvailable ? thermalData?.weather?.temperature : undefined}
           />
 
           {/* ========================================================================= */}
           {/* 6. SAFER OUTDOOR TIME (Compact summary + CTA to /forecast)                */}
           {/* ========================================================================= */}
-          <SaferOutdoorWindowCard
-            variant="compact"
-            forecast={thermalData?.forecast || weatherData?.forecast}
-            weather={thermalData?.weather || weatherData?.weather}
-            currentRiskLevel={activeRiskLevel}
-          />
+          {telemetry.isAvailable && (
+            <SaferOutdoorWindowCard
+              variant="compact"
+              forecast={thermalData?.forecast || weatherData?.forecast}
+              weather={thermalData?.weather || weatherData?.weather}
+              currentRiskLevel={activeRiskLevel || undefined}
+            />
+          )}
 
           {/* ========================================================================= */}
           {/* 7. PERSONAL HEAT RISK CTA (Lead deeper into /personal-risk)               */}

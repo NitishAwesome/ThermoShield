@@ -41,9 +41,53 @@ class User(Base):
     )
 
     role = Column(
-        String(20),
+        String(50),
         nullable=False,
         default="user"
+    )
+
+    organization = Column(
+        String(150),
+        nullable=True
+    )
+
+    department = Column(
+        String(100),
+        nullable=True
+    )
+
+    designation = Column(
+        String(100),
+        nullable=True
+    )
+
+    official_id = Column(
+        String(50),
+        nullable=True
+    )
+
+    jurisdiction_id = Column(
+        String(50),
+        nullable=True,
+        default="IN"
+    )
+
+    jurisdiction_type = Column(
+        String(30),
+        nullable=True,
+        default="COUNTRY"
+    )
+
+    permissions = Column(
+        String(500),
+        nullable=True,
+        default=""
+    )
+
+    account_status = Column(
+        String(30),
+        nullable=False,
+        default="APPROVED"
     )
 
     password_hash = Column(
@@ -322,6 +366,86 @@ class Intervention(Base):
     after_risk_score = Column(
         Float,
         nullable=False
+    )
+
+    created_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        index=True
+    )
+
+
+# --------------------------------------------------
+# HEAT ACTION PLAN AUDIT LOG MODEL
+# --------------------------------------------------
+
+class HAPActionAuditLog(Base):
+    __tablename__ = "hap_action_audit_logs"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    action_id = Column(
+        String(100),
+        nullable=False,
+        index=True
+    )
+
+    jurisdiction_id = Column(
+        String(50),
+        nullable=False,
+        index=True
+    )
+
+    action_key = Column(
+        String(100),
+        nullable=False
+    )
+
+    recommended_action = Column(
+        String(255),
+        nullable=True
+    )
+
+    created_by = Column(
+        String(100),
+        nullable=False
+    )
+
+    approved_by = Column(
+        String(100),
+        nullable=True
+    )
+
+    status = Column(
+        String(30),
+        nullable=False,
+        default="PENDING_APPROVAL",
+        index=True
+    )
+
+    reason_comment = Column(
+        String(500),
+        nullable=True
+    )
+
+    risk_snapshot_score = Column(
+        Float,
+        nullable=True
+    )
+
+    risk_snapshot_level = Column(
+        String(20),
+        nullable=True
+    )
+
+    activated_at = Column(
+        DateTime,
+        nullable=True
     )
 
     created_at = Column(

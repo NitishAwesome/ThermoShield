@@ -4,3 +4,4 @@ export * from './Button';
 export * from './MetricDisplay';
 export * from './EmptyState';
 export * from './SectionHeader';
+export * from './SearchableCombobox';

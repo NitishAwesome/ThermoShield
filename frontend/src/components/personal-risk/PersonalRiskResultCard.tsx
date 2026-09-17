@@ -27,10 +27,10 @@ export const PersonalRiskResultCard = React.forwardRef<HTMLDivElement, PersonalR
   isHighlighted = false,
 }, ref) => {
   const { t } = useTranslation();
-  const level = (result.risk_level || 'LOW').toUpperCase();
-  const score = Math.min(100, Math.max(0, Math.round(result.risk_score)));
+  const level = result.risk_level ? result.risk_level.toUpperCase() : null;
+  const score = result.risk_score != null ? Math.min(100, Math.max(0, Math.round(result.risk_score))) : null;
 
-  const getPlainExplanation = (lvl: string) => {
+  const getPlainExplanation = (lvl: string | null) => {
     switch (lvl) {
       case 'EXTREME':
       case 'CRITICAL':
@@ -49,11 +49,13 @@ export const PersonalRiskResultCard = React.forwardRef<HTMLDivElement, PersonalR
           'Moderate heat strain. You will feel noticeable discomfort outdoors. Stay hydrated and avoid strenuous physical labor during peak afternoon heat.'
         );
       case 'LOW':
-      default:
         return t(
           'risk.plainLow',
           'Low heat strain. Your body should be able to maintain safe thermal balance under current conditions with normal hydration.'
         );
+      case 'UNAVAILABLE':
+      default:
+        return 'Personal heat strain calculation is currently unavailable because environmental telemetry is inactive.';
     }
   };
 
@@ -117,17 +119,17 @@ export const PersonalRiskResultCard = React.forwardRef<HTMLDivElement, PersonalR
               strokeWidth="10"
               fill="transparent"
               strokeDasharray="327"
-              strokeDashoffset={327 - (327 * score) / 100}
+              strokeDashoffset={score != null ? 327 - (327 * score) / 100 : 327}
               strokeLinecap="round"
               className="transition-all duration-700 ease-out"
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-3xl font-black ts-text-primary font-mono leading-none">
-              {score}
+              {score != null ? score : '—'}
             </span>
             <span className="text-[10px] ts-text-subtle font-semibold uppercase mt-0.5">
-              / 100
+              {score != null ? '/ 100' : 'Not calculated'}
             </span>
           </div>
         </div>

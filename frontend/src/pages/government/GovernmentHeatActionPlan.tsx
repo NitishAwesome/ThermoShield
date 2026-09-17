@@ -22,15 +22,20 @@ import {
   Sparkles,
   Search,
   Filter,
+  Eye,
+  ShieldCheck,
+  MapPin,
 } from 'lucide-react';
 import { Card, Badge, Button } from '../../components/ui';
 import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import {
   HeatActionPlanResponse,
   HeatActionItem,
   HeatActionCategory,
   HeatActionTriggerState,
   RiskLevel,
+  JurisdictionContextResponse,
 } from '../../types';
 
 // Curated municipal ward quick choices
@@ -58,9 +63,11 @@ const CATEGORIES: { key: HeatActionCategory | 'ALL'; label: string; icon: any }[
 
 export const GovernmentHeatActionPlan: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialWard = searchParams.get('ward') || 'ward_f_south';
 
+  const [jurisdictionContext, setJurisdictionContext] = useState<JurisdictionContextResponse | null>(null);
   const [selectedWardId, setSelectedWardId] = useState<string>(initialWard);
   const [plan, setPlan] = useState<HeatActionPlanResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -69,6 +76,12 @@ export const GovernmentHeatActionPlan: React.FC = () => {
   const [notesState, setNotesState] = useState<Record<string, string>>({});
   const [updatingAction, setUpdatingAction] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.getJurisdictionUserContext()
+      .then((ctx) => setJurisdictionContext(ctx))
+      .catch((err) => console.warn('Could not fetch jurisdiction context:', err));
+  }, []);
 
   // Sync ward param with URL
   const loadPlan = async (wardId: string) => {
@@ -139,6 +152,36 @@ export const GovernmentHeatActionPlan: React.FC = () => {
     return plan.recommended_actions.filter((a) => a.category === activeCategory);
   }, [plan, activeCategory]);
 
+  // Compute whether the selected ward is within the officer's jurisdiction
+  const isViewingOutsideScope = useMemo(() => {
+    if (!jurisdictionContext) return false;
+    if (jurisdictionContext.is_national) return false;
+
+    const officerJid = jurisdictionContext.jurisdiction_id;
+
+    // Resolve target ward ID to canonical code
+    let wardCanonical = selectedWardId;
+    if (wardCanonical.startsWith('ward_')) {
+      const code = wardCanonical.replace('ward_', '').replace(/_/g, '').toUpperCase();
+      wardCanonical = `IN-MH-MCGM-${code}`;
+    }
+
+    if (officerJid === wardCanonical) return false;
+    if (jurisdictionContext.subordinate_jurisdiction_ids?.includes(wardCanonical)) return false;
+
+    // MCGM municipal officer (IN-MH-MCGM) covers all 24 wards
+    if (officerJid === 'IN-MH-MCGM' && (wardCanonical.startsWith('IN-MH-MCGM') || selectedWardId.startsWith('ward_'))) {
+      return false;
+    }
+
+    // State coordinator for Maharashtra covers all wards in Maharashtra
+    if (jurisdictionContext.is_state && (wardCanonical.startsWith('IN-MH') || selectedWardId.startsWith('ward_'))) {
+      return false;
+    }
+
+    return true;
+  }, [jurisdictionContext, selectedWardId]);
+
   const getTriggerStateDisplay = (state?: HeatActionTriggerState) => {
     switch (state) {
       case 'ACTION_REVIEW_REQUIRED_NOW':
@@ -180,6 +223,83 @@ export const GovernmentHeatActionPlan: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12">
+      {/* AUTHENTIC OFFICIAL IDENTITY & OPERATIONAL JURISDICTION BAR */}
+      {user && (
+        <div className="rounded-2xl ts-card p-4 border ts-border shadow-md bg-gradient-to-r from-slate-900/90 via-slate-800/80 to-slate-900/90 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-orange-400 shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2 flex-wrap">
+                <span className="font-black text-sm ts-text-primary tracking-tight">
+                  {user.name || user.email}
+                </span>
+                {user.official_id && (
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-700/60 text-slate-300 border border-slate-600/50">
+                    {user.official_id}
+                  </span>
+                )}
+                <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center space-x-1" title="Simulated Government Workflow Account (Judging Persona)">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  <span>Demo Authority Persona</span>
+                </span>
+              </div>
+              <div className="text-xs ts-text-muted mt-0.5 flex items-center space-x-2 flex-wrap">
+                <span>{user.designation || 'Government Decision Officer'}</span>
+                <span>•</span>
+                <span>{user.department || user.organization || 'Disaster Management'}</span>
+                {user.organization && user.department && (
+                  <>
+                    <span>•</span>
+                    <span>{user.organization}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Assigned Scope & Hierarchy Badge */}
+          <div className="flex items-center gap-2 text-xs">
+            <div className="px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-300 flex items-center space-x-1.5">
+              <MapPin className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+              <div>
+                <span className="font-bold text-[11px] block text-orange-200">
+                  Assigned Scope: {jurisdictionContext?.jurisdiction_name || user.jurisdiction_name || user.jurisdiction_id || 'Jurisdiction Managed'}
+                </span>
+                <span className="text-[10px] text-orange-400 font-mono">
+                  Level: {jurisdictionContext?.jurisdiction_type || user.jurisdiction_type || 'OFFICIAL'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* READ-ONLY SITUATIONAL CONTEXT BANNER (when inspecting outside assigned jurisdiction) */}
+      {isViewingOutsideScope && (
+        <div className="p-4 rounded-2xl bg-amber-500/15 border-2 border-amber-500/40 text-amber-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300 shrink-0">
+              <Eye className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <strong className="text-sm font-black text-amber-100 block">
+                  Read-Only Situational Context Active
+                </strong>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-600/30 text-amber-200 border border-amber-500/40 uppercase tracking-wide">
+                  Operational Actions Locked
+                </span>
+              </div>
+              <p className="text-xs text-amber-200/90 mt-0.5">
+                You are inspecting {plan?.area_name || selectedWardId}, which is outside your authorized jurisdiction ({jurisdictionContext?.jurisdiction_name || user?.jurisdiction_name || 'Assigned Area'}). Heat-action plan decisions and task dispatches are disabled in this view for governance and audit compliance.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -215,7 +335,11 @@ export const GovernmentHeatActionPlan: React.FC = () => {
             variant="primary"
             size="sm"
             onClick={() => navigate(`/gov/dispatch?ward=${selectedWardId}`)}
-            className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/20"
+            disabled={isViewingOutsideScope}
+            className={`flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/20 ${
+              isViewingOutsideScope ? 'opacity-40 cursor-not-allowed' : ''
+            }`}
+            title={isViewingOutsideScope ? 'Dispatch disabled in read-only situational context' : undefined}
           >
             <Send className="w-3.5 h-3.5" />
             <span>Dispatch Channels</span>
@@ -526,12 +650,15 @@ export const GovernmentHeatActionPlan: React.FC = () => {
                               <button
                                 key={statusOption}
                                 type="button"
-                                disabled={updatingAction === action.action}
+                                disabled={updatingAction === action.action || isViewingOutsideScope}
                                 onClick={() => handleDecisionUpdate(action.action, statusOption)}
-                                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                                  currentDecision === statusOption
-                                    ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
-                                    : 'ts-card-subtle border ts-border hover:bg-slate-500/10 ts-text-muted'
+                                title={isViewingOutsideScope ? `Decision locked: outside authorized jurisdiction (${jurisdictionContext?.jurisdiction_name})` : undefined}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                                  isViewingOutsideScope
+                                    ? 'opacity-40 cursor-not-allowed bg-slate-800 text-slate-500 border-slate-700'
+                                    : currentDecision === statusOption
+                                    ? 'bg-orange-500 text-white border-orange-500 shadow-sm cursor-pointer'
+                                    : 'ts-card-subtle border ts-border hover:bg-slate-500/10 ts-text-muted cursor-pointer'
                                 }`}
                               >
                                 {statusOption}
@@ -545,12 +672,14 @@ export const GovernmentHeatActionPlan: React.FC = () => {
                           <Button
                             variant="outline"
                             size="sm"
+                            disabled={isViewingOutsideScope}
                             onClick={() =>
                               navigate(
                                 `/gov/dispatch?ward=${selectedWardId}&directive=${encodeURIComponent(action.title)}`
                               )
                             }
-                            className="text-xs py-1 px-2.5 flex items-center gap-1"
+                            className={`text-xs py-1 px-2.5 flex items-center gap-1 ${isViewingOutsideScope ? 'opacity-40 cursor-not-allowed' : ''}`}
+                            title={isViewingOutsideScope ? `Dispatch locked: outside authorized jurisdiction (${jurisdictionContext?.jurisdiction_name})` : undefined}
                           >
                             <Send className="w-3 h-3 text-orange-500" />
                             <span>Dispatch Channel</span>
