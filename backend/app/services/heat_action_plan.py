@@ -342,6 +342,208 @@ MUNICIPAL_WARD_REGISTRY: Dict[str, Dict[str, Any]] = {
     },
 }
 
+# ── Jaipur Municipal Corporation (JMC Heritage & Greater) Wards ──
+JAIPUR_WARD_REGISTRY: Dict[str, Dict[str, Any]] = {
+    "jmc_ward_1": {
+        "name": "Ward 1: Kishanpole & Johari Bazar",
+        "ward_code": "JMC-01",
+        "district": "Heritage Walled City",
+        "latitude": 26.9210,
+        "longitude": 75.8240,
+        "vulnerability_score": 78.0,
+        "population_density": "Extreme (Historic core wholesale & gemstone bazaar)",
+        "baseline_temp": 36.8,
+        "wbgt_offset": 1.6,
+    },
+    "jmc_ward_2": {
+        "name": "Ward 2: Hawamahal & Sireh Deori",
+        "ward_code": "JMC-02",
+        "district": "Heritage Walled City",
+        "latitude": 26.9240,
+        "longitude": 75.8270,
+        "vulnerability_score": 72.0,
+        "population_density": "Very High (Tourism core & pedestrian plazas)",
+        "baseline_temp": 36.5,
+        "wbgt_offset": 1.4,
+    },
+    "jmc_ward_3": {
+        "name": "Ward 3: Ramganj & Ghat Gate",
+        "ward_code": "JMC-03",
+        "district": "Heritage Walled City",
+        "latitude": 26.9230,
+        "longitude": 75.8390,
+        "vulnerability_score": 82.0,
+        "population_density": "Very High (Dense artisan & residential tenements)",
+        "baseline_temp": 37.0,
+        "wbgt_offset": 1.8,
+    },
+    "jmc_ward_4": {
+        "name": "Ward 4: Amer Heritage & Jal Mahal Foothills",
+        "ward_code": "JMC-04",
+        "district": "Heritage Walled City",
+        "latitude": 26.9855,
+        "longitude": 75.8513,
+        "vulnerability_score": 52.0,
+        "population_density": "Moderate (Valley ridge corridor & lake perimeter)",
+        "baseline_temp": 34.8,
+        "wbgt_offset": 0.6,
+    },
+    "jmc_ward_5": {
+        "name": "Ward 5: Civil Lines & Raj Bhavan",
+        "ward_code": "JMC-05",
+        "district": "Central Administrative Corridor",
+        "latitude": 26.9030,
+        "longitude": 75.7870,
+        "vulnerability_score": 38.0,
+        "population_density": "Low-Moderate (Administrative precinct & leafy avenues)",
+        "baseline_temp": 34.2,
+        "wbgt_offset": 0.4,
+    },
+    "jmc_ward_6": {
+        "name": "Ward 6: M.I. Road & Railway Station",
+        "ward_code": "JMC-06",
+        "district": "Central Administrative Corridor",
+        "latitude": 26.9180,
+        "longitude": 75.7950,
+        "vulnerability_score": 68.0,
+        "population_density": "High (Commercial arterial & multi-modal transport)",
+        "baseline_temp": 36.2,
+        "wbgt_offset": 1.2,
+    },
+    "jmc_ward_7": {
+        "name": "Ward 7: Mansarovar Central",
+        "ward_code": "JMC-07",
+        "district": "Jaipur South & Educational Hub",
+        "latitude": 26.8550,
+        "longitude": 75.7650,
+        "vulnerability_score": 50.0,
+        "population_density": "High (Planned mega residential layout)",
+        "baseline_temp": 35.4,
+        "wbgt_offset": 0.8,
+    },
+    "jmc_ward_8": {
+        "name": "Ward 8: Mansarovar South & New Sanganer Road",
+        "ward_code": "JMC-08",
+        "district": "Jaipur South & Educational Hub",
+        "latitude": 26.8400,
+        "longitude": 75.7550,
+        "vulnerability_score": 54.0,
+        "population_density": "High (Multi-storey residential corridor)",
+        "baseline_temp": 35.6,
+        "wbgt_offset": 0.9,
+    },
+    "jmc_ward_9": {
+        "name": "Ward 9: Malviya Nagar & GT Corridor",
+        "ward_code": "JMC-09",
+        "district": "Jaipur South & Educational Hub",
+        "latitude": 26.8520,
+        "longitude": 75.8150,
+        "vulnerability_score": 48.0,
+        "population_density": "Moderate-High (Commercial retail & shopping complexes)",
+        "baseline_temp": 35.5,
+        "wbgt_offset": 0.8,
+    },
+    "jmc_ward_10": {
+        "name": "Ward 10: Jagatpura & Pratap Nagar",
+        "ward_code": "JMC-10",
+        "district": "Jaipur South & Educational Hub",
+        "latitude": 26.8220,
+        "longitude": 75.8480,
+        "vulnerability_score": 56.0,
+        "population_density": "Moderate (University campuses & expansion housing)",
+        "baseline_temp": 35.2,
+        "wbgt_offset": 0.7,
+    },
+    "jmc_ward_11": {
+        "name": "Ward 11: Vaishali Nagar & Chitrakoot",
+        "ward_code": "JMC-11",
+        "district": "Jaipur West & Expansion",
+        "latitude": 26.9050,
+        "longitude": 75.7420,
+        "vulnerability_score": 42.0,
+        "population_density": "Moderate (Planned residential suburb & commercial nodes)",
+        "baseline_temp": 34.8,
+        "wbgt_offset": 0.5,
+    },
+    "jmc_ward_12": {
+        "name": "Ward 12: Jhotwara & Kalwar Road",
+        "ward_code": "JMC-12",
+        "district": "Jaipur West & Expansion",
+        "latitude": 26.9450,
+        "longitude": 75.7500,
+        "vulnerability_score": 70.0,
+        "population_density": "High (Railway corridor & small manufacturing units)",
+        "baseline_temp": 36.1,
+        "wbgt_offset": 1.1,
+    },
+    "jmc_ward_13": {
+        "name": "Ward 13: Vidhyadhar Nagar",
+        "ward_code": "JMC-13",
+        "district": "Jaipur West & Expansion",
+        "latitude": 26.9650,
+        "longitude": 75.7820,
+        "vulnerability_score": 52.0,
+        "population_density": "Moderate-High (Organized residential grid & asphalt boulevards)",
+        "baseline_temp": 35.5,
+        "wbgt_offset": 0.8,
+    },
+    "jmc_ward_14": {
+        "name": "Ward 14: Murlipura & Dahar Ka Balaji",
+        "ward_code": "JMC-14",
+        "district": "Jaipur West & Expansion",
+        "latitude": 26.9580,
+        "longitude": 75.7680,
+        "vulnerability_score": 62.0,
+        "population_density": "High (Mixed residential & freight transit highway)",
+        "baseline_temp": 35.8,
+        "wbgt_offset": 1.0,
+    },
+    "jmc_ward_15": {
+        "name": "Ward 15: Vishwakarma (VKI) Industrial Area",
+        "ward_code": "JMC-15",
+        "district": "Heavy Industrial & Manufacturing Belts",
+        "latitude": 26.9950,
+        "longitude": 75.7750,
+        "vulnerability_score": 85.0,
+        "population_density": "High Industrial (Metal foundries, chemical plants, metal roofing)",
+        "baseline_temp": 37.5,
+        "wbgt_offset": 2.0,
+    },
+    "jmc_ward_16": {
+        "name": "Ward 16: Sanganer Artisan & Textile Belt",
+        "ward_code": "JMC-16",
+        "district": "Heavy Industrial & Manufacturing Belts",
+        "latitude": 26.8150,
+        "longitude": 75.7800,
+        "vulnerability_score": 80.0,
+        "population_density": "Very High (Block printing, dyeing sheds & Muhana Mandi porters)",
+        "baseline_temp": 36.9,
+        "wbgt_offset": 1.5,
+    },
+    "jmc_ward_17": {
+        "name": "Ward 17: Sitapura Industrial Area & JECC",
+        "ward_code": "JMC-17",
+        "district": "Heavy Industrial & Manufacturing Belts",
+        "latitude": 26.7800,
+        "longitude": 75.8300,
+        "vulnerability_score": 76.0,
+        "population_density": "High Industrial (Export promotion zone & garment factories)",
+        "baseline_temp": 37.1,
+        "wbgt_offset": 1.7,
+    },
+    "jmc_ward_18": {
+        "name": "Ward 18: Transport Nagar & Agra Road Gateway",
+        "ward_code": "JMC-18",
+        "district": "Heavy Industrial & Manufacturing Belts",
+        "latitude": 26.9050,
+        "longitude": 75.8550,
+        "vulnerability_score": 74.0,
+        "population_density": "High (Truck freight yards & valley pass corridor)",
+        "baseline_temp": 36.5,
+        "wbgt_offset": 1.3,
+    },
+}
+
 MUNICIPAL_WARD_ALIASES: Dict[str, str] = {
     "ward_f_s": "ward_f_south",
     "ward_f_n": "ward_f_north",
@@ -358,6 +560,11 @@ MUNICIPAL_WARD_ALIASES: Dict[str, str] = {
     "ward_r_n": "ward_r_north",
     "ward_m_e": "ward_m_east",
     "ward_m_w": "ward_m_west",
+    # JMC Aliases
+    **{f"jmc_{i}": f"jmc_ward_{i}" for i in range(1, 19)},
+    **{f"jmc-0{i}": f"jmc_ward_{i}" for i in range(1, 10)},
+    **{f"jmc-{i}": f"jmc_ward_{i}" for i in range(10, 19)},
+    **{f"jaipur_ward_{i}": f"jmc_ward_{i}" for i in range(1, 19)},
 }
 
 
@@ -368,9 +575,14 @@ def get_ward_profile(ward_id: str) -> Optional[Dict[str, Any]]:
     clean = (ward_id or "").strip().lower()
     if clean in MUNICIPAL_WARD_REGISTRY:
         return MUNICIPAL_WARD_REGISTRY[clean]
+    if clean in JAIPUR_WARD_REGISTRY:
+        return JAIPUR_WARD_REGISTRY[clean]
     alias = MUNICIPAL_WARD_ALIASES.get(clean)
-    if alias and alias in MUNICIPAL_WARD_REGISTRY:
-        return MUNICIPAL_WARD_REGISTRY[alias]
+    if alias:
+        if alias in MUNICIPAL_WARD_REGISTRY:
+            return MUNICIPAL_WARD_REGISTRY[alias]
+        if alias in JAIPUR_WARD_REGISTRY:
+            return JAIPUR_WARD_REGISTRY[alias]
     return None
 
 

@@ -10,6 +10,7 @@ import {
   AreaRiskItem,
   ThermalZone,
   HeatRiskArea,
+  RiskLevel,
   HeatActionPlanResponse,
   WardForecastSummary,
   GlobalHeatStation,
@@ -22,7 +23,7 @@ import { translateRiskLevel } from '../../utils/translationHelpers';
 import { MUMBAI_PROTOTYPE_ZONES } from '../../data/thermalZones';
 import { MUMBAI_ADMIN_WARDS, BMC_WARD_PROVENANCE } from '../../data/mumbaiWards';
 import { GLOBAL_REGIONS, GLOBAL_HEAT_STATIONS, getStationsByRegion } from '../../data/globalHeatHotspots';
-import { getCityMunicipalAuthority, getOrGenerateCityWards } from '../../utils/cityWardsGenerator';
+import { getCityMunicipalAuthority, getOrGenerateCityWards, calculateWetBulb, calculateHeatIndex } from '../../utils/cityWardsGenerator';
 import { getRiskStyle } from '../../utils/risk';
 import { CityHeatActionPlanning } from '../../components/government/CityHeatActionPlanning';
 import {
@@ -181,32 +182,100 @@ export const GovernmentMap: React.FC = () => {
 
   // Dynamic Wards Recoloring based on selected Forecast Day (Now, +1d, +2d, +3d, +4d)
   const effectiveAdminWards = useMemo(() => {
-    if (forecastDayIdx === 0 || wardsForecastSummary.length === 0) {
+    if (forecastDayIdx === 0) {
       return activeCityWards;
     }
     return activeCityWards.map((w) => {
       const fcMatch = wardsForecastSummary.find((s) => s.ward_id === w.id);
-      if (!fcMatch) return w;
-      const dayData = fcMatch.forecast_days.find((d) => d.day_index === forecastDayIdx);
-      if (!dayData) return w;
+      if (fcMatch) {
+        const dayData = fcMatch.forecast_days.find((d) => d.day_index === forecastDayIdx);
+        if (dayData) {
+          return {
+            ...w,
+            weather: {
+              ...w.weather,
+              temperatureC: dayData.temperature_c,
+            },
+            thermal: {
+              ...w.thermal,
+              estimatedWbgtC: dayData.wbgt_c,
+            },
+            risk: {
+              score: dayData.risk_score,
+              level: dayData.risk_level as any,
+            },
+            attentionReason: `Forecast Day ${forecastDayIdx} (${dayData.day_label}): Projected ${dayData.risk_level} risk with ${dayData.health_concern} civic health concern.`,
+          };
+        }
+      }
+
+      // Dynamic biometeorological forecast projection for any city (Jaipur, Pune, Delhi, Ahmedabad, etc.)
+      const forecastDays = thermalData?.forecast?.dates;
+      const forecastMaxTemps = thermalData?.forecast?.max_temperature;
+      let dayDelta = 0;
+      let dayLabel = `+${forecastDayIdx}d`;
+
+      if (forecastMaxTemps && forecastMaxTemps[forecastDayIdx] !== undefined && forecastMaxTemps[0] !== undefined) {
+        dayDelta = Math.round((forecastMaxTemps[forecastDayIdx] - forecastMaxTemps[0]) * 10) / 10;
+        if (forecastDays && forecastDays[forecastDayIdx]) {
+          dayLabel = forecastDays[forecastDayIdx];
+        }
+      } else {
+        const standardCurve = [0, 1.2, 2.0, 2.5, 1.6];
+        dayDelta = standardCurve[forecastDayIdx] || 1.2;
+      }
+
+      const projTemp = Math.round((w.weather.temperatureC + dayDelta) * 10) / 10;
+      const projRh = Math.max(15, Math.min(95, Math.round(w.weather.humidityPercent - (dayDelta * 1.5))));
+      const projWbgt = calculateWetBulb(projTemp, projRh);
+      const projHeatIndex = calculateHeatIndex(projTemp, projRh);
+      const vulnScore = w.vulnerability?.score ?? 0.55;
+
+      let projLevel: RiskLevel = 'MODERATE';
+      if (
+        projWbgt >= 31.8 ||
+        projHeatIndex >= 44.0 ||
+        (projTemp >= 40.0 && vulnScore >= 0.65) ||
+        (projTemp >= 38.0 && vulnScore >= 0.78)
+      ) {
+        projLevel = 'EXTREME';
+      } else if (
+        projWbgt >= 29.2 ||
+        projHeatIndex >= 38.5 ||
+        vulnScore >= 0.65 ||
+        (projTemp >= 36.5 && projWbgt >= 28.0)
+      ) {
+        projLevel = 'HIGH';
+      } else if (projWbgt < 26.5 && projHeatIndex < 33.0) {
+        projLevel = 'LOW';
+      }
+
+      const projScore = Math.max(
+        10,
+        Math.min(99, Math.round(((projTemp - 24) / 20) * 42 + ((projWbgt - 20) / 14) * 38 + vulnScore * 20))
+      );
+
       return {
         ...w,
         weather: {
           ...w.weather,
-          temperatureC: dayData.temperature_c,
+          temperatureC: projTemp,
+          humidityPercent: projRh,
         },
         thermal: {
           ...w.thermal,
-          estimatedWbgtC: dayData.wbgt_c,
+          wetBulbC: projWbgt,
+          estimatedWbgtC: projWbgt,
+          heatIndexC: projHeatIndex,
         },
         risk: {
-          score: dayData.risk_score,
-          level: dayData.risk_level as any,
+          score: projScore,
+          level: projLevel,
         },
-        attentionReason: `Forecast Day ${forecastDayIdx} (${dayData.day_label}): Projected ${dayData.risk_level} risk with ${dayData.health_concern} civic health concern.`,
+        attentionReason: `Forecast Day ${forecastDayIdx} (${dayLabel}): Projected ${projLevel} risk (${projScore}/100) in ${w.name} (${w.district}) with expected peak temperature ${projTemp}°C and WBGT ${projWbgt}°C.`,
       };
     });
-  }, [forecastDayIdx, wardsForecastSummary, activeCityWards]);
+  }, [forecastDayIdx, wardsForecastSummary, activeCityWards, thermalData]);
 
   const filteredGlobalStations = useMemo(() => {
     return getStationsByRegion(selectedRegionFilter);
