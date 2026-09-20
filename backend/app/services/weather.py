@@ -160,7 +160,7 @@ def _evict_cache_if_needed():
 
 
 def _normalize_coords(latitude: float, longitude: float) -> Tuple[float, float]:
-    return round(float(latitude), 4), round(float(longitude), 4)
+    return round(float(latitude), 2), round(float(longitude), 2)
 
 
 def _is_nighttime_at_location(latitude: float, longitude: float, obs_time_str: Optional[str] = None) -> bool:
@@ -283,8 +283,31 @@ def get_cached_weather(key: Tuple[float, float], allow_stale: bool = False) -> O
                 "is_fallback": True,
             }
         return stale_copy
-    return None
+_WEATHER_CLIENT: Optional[httpx.AsyncClient] = None
+_WEATHER_LOOP: Optional[asyncio.AbstractEventLoop] = None
 
+def _get_weather_client() -> httpx.AsyncClient:
+    global _WEATHER_CLIENT, _WEATHER_LOOP
+    try:
+        current_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        current_loop = None
+
+    if (
+        _WEATHER_CLIENT is None
+        or _WEATHER_CLIENT.is_closed
+        or _WEATHER_LOOP != current_loop
+    ):
+        _WEATHER_CLIENT = httpx.AsyncClient(
+            timeout=httpx.Timeout(8.0, connect=2.0),
+            limits=httpx.Limits(max_keepalive_connections=35, max_connections=70, keepalive_expiry=60.0),
+            headers={
+                "User-Agent": "ThermoShield-HeatHealth/1.0 (https://github.com/NitishAwesome/ThermoShield)",
+                "Accept": "application/json",
+            }
+        )
+        _WEATHER_LOOP = current_loop
+    return _WEATHER_CLIENT
 
 
 async def _fetch_from_open_meteo(latitude: float, longitude: float) -> Dict[str, Any]:
@@ -336,8 +359,8 @@ async def _fetch_from_open_meteo(latitude: float, longitude: float) -> Dict[str,
 
     for attempt in range(max_retries + 1):
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(url, params=params, headers=headers, timeout=12.0)
+            client = _get_weather_client()
+            response = await client.get(url, params=params, headers=headers, timeout=8.0)
 
             if response.status_code == 200:
                 data = response.json()

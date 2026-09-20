@@ -35,6 +35,9 @@ from thermal_stress.calculator import (
     calculate_stull_wet_bulb,
     calculate_vapor_pressure,
     compute_all_indices,
+    calculate_utci,
+    get_utci_stress_category,
+    calculate_mean_radiant_temperature,
 )
 from thermal_stress.risk_classifier import (
     classify_risk,
@@ -127,6 +130,9 @@ __all__ = [
     "calculate_stull_wet_bulb",
     "calculate_vapor_pressure",
     "compute_all_indices",
+    "calculate_utci",
+    "get_utci_stress_category",
+    "calculate_mean_radiant_temperature",
     "classify_risk",
     "calculate_normalized_risk_score",
     "generate_explainability_factors",

@@ -118,6 +118,14 @@ def _build_mock_weather(
 
 class TestSIH24BForecastGrounding(unittest.IsolatedAsyncioTestCase):
 
+    def setUp(self):
+        from backend.app.services.health_forecast import clear_wards_forecast_cache
+        clear_wards_forecast_cache()
+
+    def tearDown(self):
+        from backend.app.services.health_forecast import clear_wards_forecast_cache
+        clear_wards_forecast_cache()
+
     async def test_a_ward_forecast_no_synthetic_multipliers_in_live_mode(self):
         """Test A: Ward forecast does NOT use synthetic multipliers (1.02, 1.04, etc.) in live mode."""
         custom_max = [33.0, 36.5, 31.0, 32.5, 30.0]

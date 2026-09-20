@@ -22,12 +22,15 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useProfile } from '../../context/ProfileContext';
+import { isGovUser } from '../../utils/authRoles';
 import { Card, Button, SearchableCombobox, ComboboxOption } from '../../components/ui';
 import indiaStatesReference from '../../data/india_states_reference.json';
 import maharashtraDistrictsReference from '../../data/maharashtra_districts_reference.json';
 import { MUMBAI_ADMIN_WARDS } from '../../data/mumbaiWards';
 import { validateAuthorityAccessRequest } from '../../utils/authorityValidation';
 import { api } from '../../services/api';
+import { INDIAN_MUNICIPAL_CORPORATIONS } from '../../data/indianMunicipalCorporations';
 
 // ============================================================================
 // CONFIGURED ADMINISTRATIVE CATALOGS (Section 34 A & C)
@@ -41,19 +44,15 @@ interface GovOrgConfig {
   departments: string[];
 }
 
+const MUNICIPAL_GOV_ORGS: GovOrgConfig[] = INDIAN_MUNICIPAL_CORPORATIONS.map((mc) => ({
+  id: mc.shortCode,
+  name: mc.name,
+  defaultScope: mc.id,
+  departments: mc.departments,
+}));
+
 const GOV_ORGANIZATIONS: GovOrgConfig[] = [
-  {
-    id: 'MCGM',
-    name: 'Municipal Corporation of Greater Mumbai (MCGM / BMC)',
-    defaultScope: 'IN-MH-MCGM',
-    departments: [
-      'Disaster Management Cell',
-      'Heat Action / Climate Cell',
-      'Public Health',
-      'Urban Health',
-      'Administration',
-    ],
-  },
+  ...MUNICIPAL_GOV_ORGS,
   {
     id: 'MH_SDMA',
     name: 'Maharashtra State Disaster Management Authority (SDMA)',
@@ -217,7 +216,40 @@ const AUTHORITY_DEMO_ACCOUNTS = [
     jurisdiction: 'Greater Mumbai (24 Wards)',
     jurisdictionId: 'IN-MH-MCGM',
     landingRoute: '/gov/dashboard',
-    badge: 'Municipal HAP Nodal Officer',
+    badge: 'BMC Mumbai HAP Officer',
+  },
+  {
+    name: 'Dr. Kirit Patel',
+    email: 'kirit.patel@ahmedabadcity.gov.in',
+    role: 'municipal_hap_officer',
+    designation: 'HAP Nodal Health Officer',
+    organization: 'Ahmedabad Municipal Corporation (AMC)',
+    jurisdiction: 'Ahmedabad (46 Wards)',
+    jurisdictionId: 'IN-GJ-AMC',
+    landingRoute: '/gov/dashboard',
+    badge: 'Ahmedabad AMC Officer',
+  },
+  {
+    name: 'Anjali Deshmukh',
+    email: 'climate.cell@punecorporation.org',
+    role: 'municipal_hap_officer',
+    designation: 'Environment & Climate Officer',
+    organization: 'Pune Municipal Corporation (PMC)',
+    jurisdiction: 'Pune (15 Wards)',
+    jurisdictionId: 'IN-MH-PMC',
+    landingRoute: '/gov/dashboard',
+    badge: 'Pune PMC Officer',
+  },
+  {
+    name: 'Vikram Malhotra',
+    email: 'vikram.malhotra@mcd.gov.in',
+    role: 'municipal_hap_officer',
+    designation: 'Disaster Cell In-Charge',
+    organization: 'Municipal Corporation of Delhi (MCD)',
+    jurisdiction: 'Delhi NCR (290 Wards)',
+    jurisdictionId: 'IN-DL-MCD',
+    landingRoute: '/gov/dashboard',
+    badge: 'Delhi MCD Officer',
   },
   {
     name: 'Sunil More',
@@ -292,7 +324,8 @@ export const AuthorityAuth: React.FC<{ initialMode?: 'login' | 'register' }> = (
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, register, refreshUser, isAuthenticated, error: authError, clearError } = useAuth();
+  const { login, register, refreshUser, isAuthenticated, error: authError, clearError, user, logout } = useAuth();
+  const { profile } = useProfile();
 
   const [mode, setMode] = useState<'login' | 'register'>(() => {
     if (location.pathname.includes('register') || location.pathname.includes('signup')) {
@@ -340,6 +373,13 @@ export const AuthorityAuth: React.FC<{ initialMode?: 'login' | 'register' }> = (
   const [localError, setLocalError] = useState<string | null>((location.state as any)?.error || null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Sync state error if redirected with new authorization error
+  useEffect(() => {
+    if ((location.state as any)?.error) {
+      setLocalError((location.state as any).error);
+    }
+  }, [location.state]);
+
   // Sync mode with URL path
   useEffect(() => {
     if (location.pathname.includes('register') || location.pathname.includes('signup')) {
@@ -352,11 +392,18 @@ export const AuthorityAuth: React.FC<{ initialMode?: 'login' | 'register' }> = (
 
   // Direct already-authenticated officials to dashboard
   useEffect(() => {
-    if (isAuthenticated) {
-      const dest = (location.state as any)?.from || '/gov/dashboard';
+    // CRITICAL: NEVER auto-redirect if there is an error in location.state (prevents redirect loop)
+    if ((location.state as any)?.error) {
+      return;
+    }
+
+    // Only redirect if authenticated AND confirmed to be an authorized authority user
+    if (isAuthenticated && isGovUser(user, profile)) {
+      const stateFrom = (location.state as any)?.from;
+      const dest = stateFrom && !stateFrom.startsWith('/auth') ? stateFrom : '/gov/dashboard';
       navigate(dest, { replace: true });
     }
-  }, [isAuthenticated, navigate, location.state]);
+  }, [isAuthenticated, user, profile, navigate, location.state]);
 
   // Selected organization object
   const currentOrg = useMemo(() => {
@@ -386,6 +433,18 @@ export const AuthorityAuth: React.FC<{ initialMode?: 'login' | 'register' }> = (
       setSelectedDept(currentOrg.departments[0] || 'Administration');
     }
   }, [currentOrg, selectedDept]);
+
+  // Auto-sync administrative level and municipal jurisdiction when organization is selected
+  useEffect(() => {
+    const mc = INDIAN_MUNICIPAL_CORPORATIONS.find((c) => c.shortCode === selectedOrgId || c.name === currentOrg.name);
+    if (mc) {
+      if (!adminLevel || adminLevel === 'MUNICIPAL_CORPORATION') {
+        setAdminLevel('MUNICIPAL_CORPORATION');
+        setSelectedMunicipalId(mc.id);
+        setSelectedStateId(`IN-${mc.stateCode}`);
+      }
+    }
+  }, [selectedOrgId, currentOrg]);
 
   // Designation Combobox Options (Item 9)
   const designationOptions: ComboboxOption[] = useMemo(() => {
@@ -424,16 +483,14 @@ export const AuthorityAuth: React.FC<{ initialMode?: 'login' | 'register' }> = (
     }));
   }, []);
 
-  // Municipal Corporation Combobox Options
+  // Municipal Corporation Combobox Options (50+ Indian Municipal Corporations)
   const municipalOptions: ComboboxOption[] = useMemo(() => {
-    return [
-      {
-        id: 'IN-MH-MCGM',
-        label: 'Municipal Corporation of Greater Mumbai (MCGM / BMC)',
-        secondaryLabel: '24 BMC Administrative Wards',
-        badge: 'MCGM',
-      },
-    ];
+    return INDIAN_MUNICIPAL_CORPORATIONS.map((mc) => ({
+      id: mc.id,
+      label: mc.name,
+      secondaryLabel: `${mc.wardCount} Wards • ${mc.city}, ${mc.state}`,
+      badge: mc.shortCode,
+    }));
   }, []);
 
   // Ward Combobox Options (24 BMC Wards)
@@ -479,8 +536,10 @@ export const AuthorityAuth: React.FC<{ initialMode?: 'login' | 'register' }> = (
         const dist = districtOptions.find((d) => d.id === selectedDistrictId);
         return dist ? `${dist.label}, Maharashtra` : 'District';
       }
-      case 'MUNICIPAL_CORPORATION':
-        return 'Greater Mumbai Municipal Corporation (MCGM)';
+      case 'MUNICIPAL_CORPORATION': {
+        const mc = INDIAN_MUNICIPAL_CORPORATIONS.find((m) => m.id === selectedMunicipalId);
+        return mc ? mc.name : 'Municipal Corporation';
+      }
       case 'ADMINISTRATIVE_WARD': {
         const ward = wardOptions.find((w) => w.id === selectedWardId);
         return ward ? ward.label : 'Administrative Ward';
@@ -488,7 +547,7 @@ export const AuthorityAuth: React.FC<{ initialMode?: 'login' | 'register' }> = (
       default:
         return 'Please select an administrative level';
     }
-  }, [adminLevel, selectedStateId, selectedDistrictId, selectedWardId, stateOptions, districtOptions, wardOptions]);
+  }, [adminLevel, selectedStateId, selectedDistrictId, selectedMunicipalId, selectedWardId, stateOptions, districtOptions, wardOptions]);
 
   // Login submission
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -506,8 +565,9 @@ export const AuthorityAuth: React.FC<{ initialMode?: 'login' | 'register' }> = (
     try {
       await login({ email: email.trim(), password });
       setSuccessMsg('Authority verified! Entering Command Portal...');
-      const dest = (location.state as any)?.from || '/gov/dashboard';
-      setTimeout(() => navigate(dest), 400);
+      const rawDest = (location.state as any)?.from || '/gov/dashboard';
+      const safeDest = rawDest && !rawDest.startsWith('/auth') ? rawDest : '/gov/dashboard';
+      setTimeout(() => navigate(safeDest, { replace: true }), 400);
     } catch (err: any) {
       setLocalError(err.message || 'Invalid official credentials or suspended account.');
     } finally {
@@ -631,7 +691,9 @@ export const AuthorityAuth: React.FC<{ initialMode?: 'login' | 'register' }> = (
         password: 'demo12345',
       });
       setSuccessMsg(`Signed in as ${acc.name} (${acc.designation}). Redirecting...`);
-      setTimeout(() => navigate(acc.landingRoute), 400);
+      const rawDest = (location.state as any)?.from || acc.landingRoute;
+      const safeDest = rawDest && !rawDest.startsWith('/auth') ? rawDest : acc.landingRoute;
+      setTimeout(() => navigate(safeDest, { replace: true }), 400);
     } catch (err: any) {
       setLocalError(`Demo sign-in failed for ${acc.name}. Ensure backend is running.`);
     } finally {
@@ -869,6 +931,39 @@ export const AuthorityAuth: React.FC<{ initialMode?: 'login' | 'register' }> = (
               <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 shrink-0" />
                 <span>{successMsg}</span>
+              </div>
+            )}
+
+            {/* Currently Signed In as Citizen Notice */}
+            {isAuthenticated && !isGovUser(user, profile) && (
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2">
+                <div className="flex items-start gap-2 text-amber-500 dark:text-amber-400 font-bold">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>Currently Signed In with Citizen Account</span>
+                </div>
+                <p className="ts-text-muted text-[11px] leading-relaxed">
+                  You are signed in as <strong className="ts-text-primary">{user?.name || user?.email}</strong>. 
+                  Access to the Authority Command Portal requires an official account with administrative credentials.
+                </p>
+                <div className="flex items-center gap-3 pt-1">
+                  <Link
+                    to="/"
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-500 hover:text-amber-400 underline"
+                  >
+                    <span>Return to Citizen Portal</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      logout();
+                      setLocalError(null);
+                    }}
+                    className="text-[11px] font-bold text-red-400 hover:text-red-300 underline cursor-pointer"
+                  >
+                    Sign Out
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1158,23 +1253,39 @@ export const AuthorityAuth: React.FC<{ initialMode?: 'login' | 'register' }> = (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <SearchableCombobox
                         label="State / Union Territory"
-                        placeholder="Select State / UT..."
+                        placeholder="Filter by State / UT..."
                         searchPlaceholder="Search state..."
                         options={stateOptions}
                         value={selectedStateId}
-                        onChange={(val) => setSelectedStateId(val)}
+                        onChange={(val) => {
+                          setSelectedStateId(val);
+                          // Auto-select first municipal corporation in this state if current is not in state
+                          const stCode = val.replace('IN-', '');
+                          const inState = INDIAN_MUNICIPAL_CORPORATIONS.filter((mc) => mc.stateCode === stCode);
+                          if (inState.length > 0 && !inState.some((mc) => mc.id === selectedMunicipalId)) {
+                            setSelectedMunicipalId(inState[0].id);
+                            setSelectedOrgId(inState[0].shortCode);
+                          }
+                        }}
                         required
-                        disabled
                       />
 
                       <SearchableCombobox
                         label="Municipal Body"
                         placeholder="Select municipal body..."
-                        searchPlaceholder="Search municipal body (e.g. MCGM)..."
+                        searchPlaceholder="Search 50+ bodies (e.g. AMC, PMC, MCD, BBMP)..."
                         options={municipalOptions}
                         value={selectedMunicipalId}
-                        onChange={(val) => setSelectedMunicipalId(val)}
+                        onChange={(val) => {
+                          setSelectedMunicipalId(val);
+                          const mc = INDIAN_MUNICIPAL_CORPORATIONS.find((c) => c.id === val);
+                          if (mc) {
+                            setSelectedStateId(`IN-${mc.stateCode}`);
+                            setSelectedOrgId(mc.shortCode);
+                          }
+                        }}
                         required
+                        helpText="Select from 50+ Indian municipal corporations"
                       />
                     </div>
                   )}

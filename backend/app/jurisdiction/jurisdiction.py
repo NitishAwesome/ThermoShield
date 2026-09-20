@@ -268,7 +268,30 @@ def get_jurisdiction(jurisdiction_id: str) -> Optional[JurisdictionNode]:
     }
     if clean_lower in legacy_map:
         return _JURISDICTION_REGISTRY.get(legacy_map[clean_lower])
-        
+
+    # Dynamic synthesis for any Indian Municipal Corporation (e.g. IN-GJ-AMC, IN-MH-PMC, IN-DL-MCD, etc.)
+    clean_upper = clean_id.upper()
+    if clean_upper.startswith("IN-"):
+        parts = clean_upper.split("-")
+        state_code = f"IN-{parts[1]}" if len(parts) >= 2 else "IN"
+        is_ward = "WARD" in clean_upper or len(parts) > 3
+        node_type = JurisdictionType.ADMINISTRATIVE_WARD if is_ward else JurisdictionType.MUNICIPAL_CORPORATION
+        name = f"Municipal Corporation ({parts[-1]})" if not is_ward else f"Municipal Ward ({clean_upper})"
+
+        synthesized = JurisdictionNode(
+            id=clean_upper,
+            name=name,
+            type=node_type,
+            parent_id=state_code,
+            state_id=state_code,
+            centroid={"latitude": 20.5937, "longitude": 78.9629},
+            has_municipal_detail=True,
+        )
+        _JURISDICTION_REGISTRY[clean_upper] = synthesized
+        if state_code in _JURISDICTION_REGISTRY:
+            _JURISDICTION_REGISTRY[state_code].child_ids.append(clean_upper)
+        return synthesized
+
     return None
 
 

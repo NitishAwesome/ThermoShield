@@ -47,8 +47,7 @@ import {
   getNavLabel,
   NavItemConfig,
 } from '../utils/navigationConfig';
-
-const AUTHORIZED_GOV_ROLES = ['official', 'responder', 'analyst', 'admin'];
+import { isGovUser } from '../utils/authRoles';
 
 export const Navbar: React.FC = () => {
   const [dropdownOpen, setDropdownOpen] = useState<boolean>(false);
@@ -73,19 +72,24 @@ export const Navbar: React.FC = () => {
 
   // Close dropdowns on outside click
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
         setDropdownOpen(false);
       }
-      if (themeDropdownRef.current && !themeDropdownRef.current.contains(event.target as Node)) {
+      if (themeDropdownRef.current && !themeDropdownRef.current.contains(target)) {
         setThemeDropdownOpen(false);
       }
-      if (moreDropdownRef.current && !moreDropdownRef.current.contains(event.target as Node)) {
+      if (moreDropdownRef.current && !moreDropdownRef.current.contains(target)) {
         setMoreDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, []);
 
   // Close mobile menu on route change
@@ -94,12 +98,7 @@ export const Navbar: React.FC = () => {
     setMoreDropdownOpen(false);
   }, [routerLocation.pathname]);
 
-  const userRole = (user?.role || effectiveIdentity.role || '').toLowerCase();
-  const isGovRole =
-    isAuthenticated &&
-    (user?.portal_type === 'AUTHORITY' ||
-      AUTHORIZED_GOV_ROLES.includes(userRole) ||
-      Boolean(user?.organization || user?.jurisdiction_id));
+  const isGovRole = isAuthenticated && isGovUser(user, profile);
   const isGovPortal = routerLocation.pathname.startsWith('/gov');
 
   const getRoleBadge = (role?: string) => {
@@ -236,7 +235,7 @@ export const Navbar: React.FC = () => {
           </NavLink>
 
           {/* Desktop Nav Links - Responsive Single-Source Partition */}
-          <nav className="hidden md:flex items-center space-x-1 flex-1 min-w-0 overflow-hidden justify-start pl-1 sm:pl-2">
+          <nav className="hidden md:flex items-center space-x-1 flex-1 min-w-0 justify-start pl-1 sm:pl-2 overflow-visible">
             {directItems.map((item) => {
               const Icon = item.icon;
               const displayLabel = getNavLabel(item, tier);
@@ -275,7 +274,13 @@ export const Navbar: React.FC = () => {
               <div className="relative flex-shrink-0" ref={moreDropdownRef}>
                 <button
                   type="button"
-                  onClick={() => setMoreDropdownOpen(!moreDropdownOpen)}
+                  id="navbar-more-dropdown-button"
+                  aria-expanded={moreDropdownOpen}
+                  aria-haspopup="true"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMoreDropdownOpen((prev) => !prev);
+                  }}
                   className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex-shrink-0 cursor-pointer ${
                     isMoreActive
                       ? 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/30'
@@ -357,7 +362,7 @@ export const Navbar: React.FC = () => {
                     title="Switch to Citizen Safety Portal"
                   >
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                    <span className="hidden 2xl:inline text-[11px] whitespace-nowrap">Citizen View</span>
+                    <span className="hidden xl:inline text-[11px] whitespace-nowrap">Citizen View</span>
                   </Link>
                 ) : (
                   <Link
@@ -366,7 +371,7 @@ export const Navbar: React.FC = () => {
                     title="Switch to Authority Command Portal"
                   >
                     <Building2 className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />
-                    <span className="hidden 2xl:inline text-[11px] whitespace-nowrap">Authority View</span>
+                    <span className="hidden xl:inline text-[11px] whitespace-nowrap">Authority View</span>
                   </Link>
                 )}
               </div>
@@ -375,17 +380,17 @@ export const Navbar: React.FC = () => {
             {/* Location / Jurisdiction Indicator (Item 9 & 22) */}
             {isGovPortal ? (
               <div
-                className="hidden 2xl:flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 border ts-border text-xs ts-text-muted flex-shrink-0"
+                className="hidden xl:flex items-center space-x-1 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-400 max-w-[150px] truncate flex-shrink-0"
                 title={`Operational Scope: ${(user as any)?.jurisdiction_id === 'IN-MH-MCGM' ? 'Greater Mumbai' : (user as any)?.jurisdiction_name || (user as any)?.jurisdiction_id || 'Greater Mumbai'}`}
               >
-                <Building2 className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
-                <span className="text-[11px] font-bold text-orange-400 whitespace-nowrap">
-                  Operational Scope: {(user as any)?.jurisdiction_id === 'IN-MH-MCGM' ? 'Greater Mumbai' : (user as any)?.jurisdiction_name || (user as any)?.jurisdiction_id || 'Greater Mumbai'}
+                <Building2 className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                <span className="text-[11px] font-bold text-amber-400 truncate">
+                  {(user as any)?.jurisdiction_id === 'IN-MH-MCGM' ? 'Greater Mumbai' : (user as any)?.jurisdiction_name || (user as any)?.jurisdiction_id || 'Greater Mumbai'}
                 </span>
               </div>
             ) : locationName ? (
               <div
-                className="hidden 2xl:flex items-center space-x-1 px-2 py-1 rounded-lg ts-card-subtle border ts-border text-xs ts-text-muted max-w-[110px] truncate flex-shrink-0"
+                className="hidden xl:flex items-center space-x-1 px-2 py-1 rounded-lg ts-card-subtle border ts-border text-xs ts-text-muted max-w-[120px] truncate flex-shrink-0"
                 title={`${t('nav.activeZone', 'Active Zone')}: ${locationName}`}
               >
                 <MapPin className="w-3 h-3 text-orange-400 flex-shrink-0" />

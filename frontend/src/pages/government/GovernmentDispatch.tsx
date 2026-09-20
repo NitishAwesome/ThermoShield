@@ -752,20 +752,93 @@ export const GovernmentDispatch: React.FC = () => {
                 </div>
               )}
 
-              {showSmsPreview && (
-                <div className="mt-4 p-4 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs space-y-2">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                    <span className="font-bold text-emerald-400">📱 Mobile SMS Preview (160 GSM Character Format)</span>
-                    <span className="text-[10px] text-slate-400">To: {recipientPhone}</span>
+              {showSmsPreview && (() => {
+                const previewText = `[ThermoShield ALERT] Heatwave early warning for ${locationName}. Stage 2 HAP protocol active. Seek shade & hydrate. — MCGM Heat Action Plan`;
+                const charCount = previewText.length;
+                const msgParts = Math.ceil(charCount / 160);
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+                return (
+                  <div className="mt-4 space-y-3">
+                    {/* WhatsApp-style phone frame */}
+                    <div className="flex items-start gap-3">
+                      {/* Phone chrome */}
+                      <div className="flex-1 max-w-xs mx-auto rounded-3xl border-4 border-slate-700 bg-[#0b141a] shadow-2xl overflow-hidden">
+                        {/* Status bar */}
+                        <div className="flex items-center justify-between px-4 pt-2 pb-1 bg-[#1f2c34]">
+                          <span className="text-[9px] text-emerald-400 font-bold tracking-wider">ALERT DISPATCH</span>
+                          <span className="text-[9px] text-slate-400">{timeStr}</span>
+                        </div>
+                        {/* Chat header */}
+                        <div className="flex items-center gap-2 px-3 py-2 bg-[#202c33] border-b border-slate-700/60">
+                          <div className="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
+                            TH
+                          </div>
+                          <div>
+                            <div className="text-[10px] font-semibold text-slate-200">ThermoShield — MCGM</div>
+                            <div className="text-[8px] text-emerald-400">● online</div>
+                          </div>
+                        </div>
+                        {/* Chat body */}
+                        <div className="px-3 py-4 min-h-[120px] bg-[#0b141a]"
+                          style={{backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0)', backgroundSize: '24px 24px'}}>
+                          {/* Message bubble */}
+                          <div className="flex justify-end">
+                            <div className="relative max-w-[85%]">
+                              <div className="bg-[#005c4b] text-slate-100 rounded-2xl rounded-tr-sm px-3 py-2 text-[10px] leading-relaxed shadow-md">
+                                {previewText}
+                                <div className="flex items-center justify-end gap-1 mt-1.5">
+                                  <span className="text-[8px] text-emerald-300/70">{timeStr}</span>
+                                  {/* Delivery double tick */}
+                                  <svg className="w-3 h-3 text-sky-400" viewBox="0 0 16 11" fill="currentColor">
+                                    <path d="M11.071.653a.75.75 0 0 1 1.06 1.06L6.78 7.065 5.72 6.005l4.292-4.292-.94-.94L11.07.653zM.928 6.005 5.72 10.797l1.06-1.06L2.048 4.945.988 6.005zm4.793 4.793 6.35-6.35-1.06-1.06-6.35 6.35 1.06 1.06z"/>
+                                  </svg>
+                                </div>
+                              </div>
+                              {/* Bubble tail */}
+                              <div className="absolute -right-1.5 top-0 w-3 h-3 bg-[#005c4b]"
+                                style={{clipPath: 'polygon(0 0, 100% 0, 0 100%)'}} />
+                            </div>
+                          </div>
+                        </div>
+                        {/* Input bar (non-functional, cosmetic) */}
+                        <div className="flex items-center gap-2 px-3 py-2 bg-[#202c33] border-t border-slate-700/60">
+                          <div className="flex-1 rounded-full bg-[#2a3942] px-3 py-1.5 text-[9px] text-slate-500 italic">
+                            Message...
+                          </div>
+                          <div className="w-6 h-6 rounded-full bg-emerald-600 flex items-center justify-center">
+                            <Send className="w-3 h-3 text-white" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Stats panel to the right */}
+                      <div className="hidden sm:flex flex-col gap-2 text-[10px] pt-2 min-w-[140px]">
+                        <div className="p-2.5 rounded-xl bg-slate-900/70 border border-slate-700">
+                          <div className="text-slate-500 uppercase tracking-wider text-[9px] font-bold mb-1">Message Format</div>
+                          <div className="text-slate-200 font-mono">{charCount} chars</div>
+                          <div className="text-slate-400">{msgParts} SMS part{msgParts > 1 ? 's' : ''} (GSM-7)</div>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-slate-900/70 border border-slate-700">
+                          <div className="text-slate-500 uppercase tracking-wider text-[9px] font-bold mb-1">Gateway</div>
+                          <div className={`font-bold ${deliveryStatus?.sms?.mode === 'LIVE' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            {deliveryStatus?.sms?.mode === 'LIVE' ? '🟢 Twilio Live' : '🟡 Demo Sim'}
+                          </div>
+                          <div className="text-slate-400 mt-0.5">{deliveryStatus?.sms?.status || 'DEMO_SIMULATION'}</div>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-slate-900/70 border border-slate-700">
+                          <div className="text-slate-500 uppercase tracking-wider text-[9px] font-bold mb-1">Recipient</div>
+                          <div className="text-slate-200 font-mono break-all">{recipientPhone}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-slate-500 text-center">
+                      ↑ Recipient view — exact text that will be dispatched via {deliveryStatus?.sms?.mode === 'LIVE' ? 'Twilio live gateway' : 'simulation log'}.
+                    </p>
                   </div>
-                  <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-[11px] text-slate-200">
-                    [ThermoShield TEST ALERT] Heatwave early warning test for {locationName}. Stage 2 HAP protocol active. Seek shade and hydrate.
-                  </div>
-                  <div className="text-[10px] text-slate-500">
-                    Provider Mode: {deliveryStatus?.sms?.display_status || 'Demo Simulation Mode'} • Gateway Status: {deliveryStatus?.sms?.status || 'DEMO_SIMULATION'}
-                  </div>
-                </div>
-              )}
+                );
+              })()}
             </Card>
 
             {/* Decision Engine Live Evaluation & Testing Suite */}

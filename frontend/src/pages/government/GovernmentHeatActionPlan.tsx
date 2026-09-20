@@ -77,6 +77,77 @@ export const GovernmentHeatActionPlan: React.FC = () => {
   const [updatingAction, setUpdatingAction] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
+  // Initiate Municipal Triggers modal (Gap 8)
+  const [showTriggersModal, setShowTriggersModal] = useState<boolean>(false);
+  const [selectedTriggers, setSelectedTriggers] = useState<string[]>([]);
+  const [triggerNotes, setTriggerNotes] = useState<string>('');
+  const [isInitiatingTriggers, setIsInitiatingTriggers] = useState<boolean>(false);
+  const [triggerReceipts, setTriggerReceipts] = useState<any[] | null>(null);
+  const [triggerError, setTriggerError] = useState<string | null>(null);
+
+  const MUNICIPAL_TRIGGERS = [
+    {
+      id: 'cooling_centers',
+      label: 'Cooling Centre Activation',
+      icon: '🏢',
+      agency: 'Municipal Commissioner / Ward Office',
+      color: 'text-sky-600 dark:text-sky-400',
+      bgColor: 'bg-sky-500/10 border-sky-500/30',
+      description: 'Open all designated cooling shelters 09:00–21:00 with water and ORS.',
+    },
+    {
+      id: 'grid_peak_load_balance',
+      label: 'Peak-Load Grid Balancing Directive',
+      icon: '⚡',
+      agency: 'MSEDCL',
+      color: 'text-amber-600 dark:text-amber-400',
+      bgColor: 'bg-amber-500/10 border-amber-500/30',
+      description: 'Defer non-critical loads 12:00–16:00 IST to prevent brown-outs.',
+    },
+    {
+      id: 'outdoor_work_halt',
+      label: 'Outdoor Labour Work Halt Order',
+      icon: '⛑️',
+      agency: 'District Labour Commissioner / BMC Civil Works',
+      color: 'text-orange-600 dark:text-orange-400',
+      bgColor: 'bg-orange-500/10 border-orange-500/30',
+      description: 'Mandatory outdoor work halt 12:00–16:00 IST with water and shade provided.',
+    },
+    {
+      id: 'emergency_108_staging',
+      label: '108 Emergency Pre-Positioning',
+      icon: '🚑',
+      agency: 'Maharashtra EMS (GVK EMRI) / Dial 108',
+      color: 'text-red-600 dark:text-red-400',
+      bgColor: 'bg-red-500/10 border-red-500/30',
+      description: 'Pre-position ambulances in 5 highest-risk wards with heat-stroke kits.',
+    },
+  ];
+
+  const handleInitiateTriggers = async () => {
+    if (!plan || selectedTriggers.length === 0) return;
+    setIsInitiatingTriggers(true);
+    setTriggerError(null);
+    setTriggerReceipts(null);
+    try {
+      const res = await api.triggerHAPInitiatives(plan.area_id, {
+        triggers: selectedTriggers,
+        notes: triggerNotes || undefined,
+        risk_level: plan.risk_level || 'HIGH',
+        wbgt_c: plan.evaluated_telemetry?.wbgt_c || 30.0,
+      });
+      setTriggerReceipts(res.receipts || []);
+      setFeedbackMessage(`✅ ${res.triggers_dispatched} trigger(s) dispatched successfully.`);
+      setTimeout(() => setFeedbackMessage(null), 5000);
+    } catch (err: any) {
+      setTriggerError(
+        err?.response?.data?.detail || err?.message || 'Failed to initiate triggers. Check permissions.'
+      );
+    } finally {
+      setIsInitiatingTriggers(false);
+    }
+  };
+
   useEffect(() => {
     api.getJurisdictionUserContext()
       .then((ctx) => setJurisdictionContext(ctx))
@@ -320,7 +391,7 @@ export const GovernmentHeatActionPlan: React.FC = () => {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap">
           <Button
             variant="outline"
             size="sm"
@@ -330,6 +401,21 @@ export const GovernmentHeatActionPlan: React.FC = () => {
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             <span>Re-evaluate</span>
+          </Button>
+
+          {/* Gap 8 — Initiate Triggers */}
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => { setShowTriggersModal(true); setTriggerReceipts(null); setTriggerError(null); }}
+            disabled={isViewingOutsideScope || !plan}
+            className={`flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white shadow-md shadow-red-500/20 ${
+              isViewingOutsideScope ? 'opacity-40 cursor-not-allowed' : ''
+            }`}
+            title={isViewingOutsideScope ? 'Triggers disabled in read-only mode' : 'Initiate concrete municipal triggers'}
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span>Initiate Triggers</span>
           </Button>
 
           <Button
@@ -347,6 +433,141 @@ export const GovernmentHeatActionPlan: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* ─── Initiate Municipal Triggers Modal (Gap 8) ─── */}
+      {showTriggersModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl ts-card border ts-border shadow-2xl overflow-hidden">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b ts-border bg-red-500/10">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-red-500" />
+                  <h2 className="font-black text-base ts-text-primary">Initiate Municipal Triggers</h2>
+                </div>
+                <p className="text-[11px] ts-text-muted mt-0.5">
+                  For: <strong className="ts-text-primary">{plan?.area_name || selectedWardId}</strong>
+                  {plan?.risk_level && (
+                    <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                      plan.risk_level === 'EXTREME' ? 'bg-red-500/20 text-red-400' :
+                      plan.risk_level === 'HIGH' ? 'bg-orange-500/20 text-orange-400' :
+                      'bg-amber-500/20 text-amber-400'
+                    }`}>{plan.risk_level}</span>
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowTriggersModal(false)}
+                className="text-slate-400 hover:text-slate-200 transition-colors p-1 rounded-lg hover:bg-slate-700/50"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Trigger checkboxes */}
+            {!triggerReceipts ? (
+              <div className="px-6 py-5 space-y-3 max-h-[60vh] overflow-y-auto">
+                <p className="text-[11px] ts-text-muted mb-2">
+                  Select one or more initiatives to dispatch. Each generates an agency receipt with contact details.
+                </p>
+                {MUNICIPAL_TRIGGERS.map((trigger) => (
+                  <label
+                    key={trigger.id}
+                    className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                      selectedTriggers.includes(trigger.id)
+                        ? trigger.bgColor + ' ring-1 ring-current'
+                        : 'ts-card-subtle border-transparent hover:border-slate-600'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 accent-red-500"
+                      checked={selectedTriggers.includes(trigger.id)}
+                      onChange={(e) => {
+                        setSelectedTriggers(prev =>
+                          e.target.checked ? [...prev, trigger.id] : prev.filter(t => t !== trigger.id)
+                        );
+                      }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-[13px] font-bold ${trigger.color}`}>
+                        {trigger.icon} {trigger.label}
+                      </div>
+                      <div className="text-[10px] ts-text-muted mt-0.5">{trigger.description}</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5 font-mono">Agency: {trigger.agency}</div>
+                    </div>
+                  </label>
+                ))}
+
+                <div className="mt-3">
+                  <label className="text-[11px] font-bold ts-text-muted uppercase tracking-wider">
+                    Officer Justification (optional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Add rationale, WBGT reading, or special conditions..."
+                    value={triggerNotes}
+                    onChange={e => setTriggerNotes(e.target.value)}
+                    className="mt-1.5 w-full px-3 py-2 text-xs rounded-xl ts-input ts-text-primary focus:outline-none resize-none"
+                  />
+                </div>
+
+                {triggerError && (
+                  <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                    <span>{triggerError}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Receipts view */
+              <div className="px-6 py-5 space-y-3 max-h-[60vh] overflow-y-auto">
+                <div className="flex items-center gap-2 text-emerald-500 font-bold text-sm">
+                  <CheckCircle2 className="w-5 h-5" />
+                  {triggerReceipts.length} initiative(s) dispatched
+                </div>
+                {triggerReceipts.map((r: any, i: number) => (
+                  <div key={i} className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-1 text-xs">
+                    <div className="font-bold ts-text-primary">{r.label}</div>
+                    <div className="text-[11px] ts-text-muted">Agency: <span className="ts-text-primary font-mono">{r.agency}</span></div>
+                    <div className="text-[11px] ts-text-muted">Contact: <span className="text-emerald-400 font-mono">{r.contact}</span></div>
+                    <div className="text-[10px] text-slate-500">Dispatched at: {r.initiated_at}</div>
+                    <div className={`text-[10px] font-bold ${r.status === 'DISPATCHED' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      Status: {r.status}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Modal footer */}
+            <div className="flex items-center justify-between px-6 py-4 border-t ts-border">
+              <button
+                onClick={() => { setShowTriggersModal(false); setSelectedTriggers([]); setTriggerNotes(''); setTriggerReceipts(null); }}
+                className="text-xs ts-text-muted hover:ts-text-primary transition-colors"
+              >
+                {triggerReceipts ? 'Close' : 'Cancel'}
+              </button>
+              {!triggerReceipts && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleInitiateTriggers}
+                  disabled={isInitiatingTriggers || selectedTriggers.length === 0}
+                  className="bg-red-600 hover:bg-red-500 text-white font-bold flex items-center gap-1.5"
+                >
+                  {isInitiatingTriggers ? (
+                    <><RefreshCw className="w-3.5 h-3.5 animate-spin" /><span>Initiating...</span></>
+                  ) : (
+                    <><Zap className="w-3.5 h-3.5" /><span>Initiate {selectedTriggers.length > 0 ? `${selectedTriggers.length} Trigger${selectedTriggers.length > 1 ? 's' : ''}` : 'Triggers'}</span></>
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Ward Selector Bar */}
       <Card variant="elevated" className="p-4 border ts-border">

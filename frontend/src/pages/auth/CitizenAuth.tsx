@@ -53,8 +53,15 @@ export const CitizenAuth: React.FC<{ initialMode?: 'login' | 'register' }> = ({
 
   const [isDemoAccordionOpen, setIsDemoAccordionOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [localError, setLocalError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>((location.state as any)?.error || null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Sync state error if redirected with new authorization error
+  useEffect(() => {
+    if ((location.state as any)?.error) {
+      setLocalError((location.state as any).error);
+    }
+  }, [location.state]);
 
   // Sync mode with route
   useEffect(() => {
@@ -64,13 +71,21 @@ export const CitizenAuth: React.FC<{ initialMode?: 'login' | 'register' }> = ({
       setMode('login');
     }
     clearError();
-    setLocalError(null);
   }, [location.pathname, clearError]);
 
   // If already authenticated, redirect to citizen home
   useEffect(() => {
+    // NEVER auto-redirect if there was an error in location.state
+    if ((location.state as any)?.error) {
+      return;
+    }
+
     if (isAuthenticated) {
-      const dest = (location.state as any)?.from || '/';
+      const stateFrom = (location.state as any)?.from;
+      // Citizen must never be redirected to /gov/* or /auth/*
+      const dest = stateFrom && !stateFrom.startsWith('/gov') && !stateFrom.startsWith('/auth')
+        ? stateFrom
+        : '/';
       navigate(dest, { replace: true });
     }
   }, [isAuthenticated, navigate, location.state]);

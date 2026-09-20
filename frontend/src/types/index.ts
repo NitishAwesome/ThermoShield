@@ -70,6 +70,8 @@ export interface ThermalIndices {
   apparent_temperature_c: number;
   wet_bulb_temp_c: number;
   heat_index_status: 'VALID' | 'OUTSIDE_VALIDATED_RANGE' | 'NOT_APPLICABLE_COOL';
+  utci_c?: number | null;
+  utci_category?: string | null;
 }
 
 export interface RiskAssessment {
@@ -650,6 +652,10 @@ export interface HeatActionPlanResponse {
   action_count: number;
   recommended_actions: HeatActionItem[];
   evaluated_telemetry: Record<string, any>;
+  bilingual_advisory?: {
+    en: string;
+    hi: string;
+  };
 }
 
 export interface HeatActionDecisionUpdateRequest {
@@ -804,6 +810,26 @@ export interface StateHeatAlertCollection {
     properties: { name: string };
   };
   features: StateHeatAlertFeature[];
+}
+
+export interface NationalStateAlertsResponse extends StateHeatAlertCollection {
+  states: StateHeatAlertProperties[];
+  statistics: {
+    totalStates: number;
+    redCount: number;
+    orangeCount: number;
+    yellowCount: number;
+    greenCount: number;
+    maxTemp: number;
+    maxTempState: string;
+    minTemp: number;
+    minTempState: string;
+    avgTemp: number;
+    totalPopulationUnderAlertMillion: number;
+    isNight: boolean;
+    isLive: boolean;
+    updatedAt: string;
+  };
 }
 
 export * from './notifications';

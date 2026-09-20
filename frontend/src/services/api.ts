@@ -24,6 +24,7 @@ import {
   NationalHeatRiskResponse,
   StateHeatRiskResponse,
   DistrictHeatRiskResponse,
+  NationalStateAlertsResponse,
 } from '../types';
 
 const API_BASE_URL =
@@ -52,6 +53,36 @@ apiClient.interceptors.request.use((config) => {
 });
 
 export const api = {
+  // Generic HTTP helpers
+  get: async <T = any>(url: string, config?: any): Promise<T> => {
+    const res = await apiClient.get<T>(url, config);
+    return res.data;
+  },
+  post: async <T = any>(url: string, data?: any, config?: any): Promise<T> => {
+    const res = await apiClient.post<T>(url, data, config);
+    return res.data;
+  },
+
+  // Heat Action Plan municipal triggers (PS 26083)
+  triggerHAPInitiatives: async (
+    areaId: string,
+    payload: {
+      triggers: string[];
+      notes?: string;
+      risk_level?: string;
+      wbgt_c?: number;
+    }
+  ): Promise<any> => {
+    const res = await apiClient.post(`/api/health-data/heat-action-plan/${encodeURIComponent(areaId)}/trigger-initiatives`, payload);
+    return res.data;
+  },
+
+  // Calibrated National Baseline Outlook
+  getBaselineOutlook: async (areaId: string): Promise<any> => {
+    const res = await apiClient.get(`/api/health-data/baseline-outlook/${encodeURIComponent(areaId)}`);
+    return res.data;
+  },
+
   // Location Search Endpoint
   searchLocations: async (query: string, signal?: AbortSignal): Promise<LocationSearchResult> => {
     const res = await apiClient.get<LocationSearchResult>('/location/search', {
@@ -212,6 +243,12 @@ export const api = {
     const res = await apiClient.get<AreasRiskOverviewResponse>('/areas/global-risk-overview', {
       params: region ? { region } : undefined,
     });
+    return res.data;
+  },
+
+  // Dynamic 37-State Heat Alerts & Live Diurnal Telemetry
+  getNationalStateAlerts: async (): Promise<NationalStateAlertsResponse> => {
+    const res = await apiClient.get<NationalStateAlertsResponse>('/areas/national-state-alerts');
     return res.data;
   },
 

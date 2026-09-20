@@ -23,12 +23,15 @@ export interface AuthorityRequestParams {
   jurisdictionId?: string;
 }
 
+import { INDIAN_MUNICIPAL_CORPORATIONS } from '../data/indianMunicipalCorporations';
+
 interface OrgRule {
   id: string;
   name: string;
   allowedLevels: string[];
   primaryJurisdiction: string;
   allowedRoles: string[];
+  isMunicipal?: boolean;
 }
 
 const CONFIGURED_ORGS: Record<string, OrgRule> = {
@@ -38,6 +41,7 @@ const CONFIGURED_ORGS: Record<string, OrgRule> = {
     allowedLevels: ['MUNICIPAL_CORPORATION', 'ADMINISTRATIVE_WARD'],
     primaryJurisdiction: 'IN-MH-MCGM',
     allowedRoles: ['municipal_hap_officer', 'ward_officer', 'responder', 'official'],
+    isMunicipal: true,
   },
   MH_SDMA: {
     id: 'MH_SDMA',
@@ -123,6 +127,27 @@ function matchOrg(orgStr?: string): OrgRule | null {
   const upper = orgStr.trim().toUpperCase();
   if (CONFIGURED_ORGS[upper]) return CONFIGURED_ORGS[upper];
 
+  // Match against 50+ Indian Municipal Corporations Catalog
+  const mcMatch = INDIAN_MUNICIPAL_CORPORATIONS.find(
+    (c) =>
+      c.shortCode.toUpperCase() === upper ||
+      c.id.toUpperCase() === upper ||
+      c.name.toUpperCase() === upper ||
+      upper.includes(c.name.toUpperCase()) ||
+      (upper.includes(c.city.toUpperCase()) && (upper.includes('MUNICIPAL') || upper.includes('NAGAR NIGAM') || upper.includes('CORPORATION') || upper.includes('MAHANAGARA')))
+  );
+
+  if (mcMatch) {
+    return {
+      id: mcMatch.shortCode,
+      name: mcMatch.name,
+      allowedLevels: ['MUNICIPAL_CORPORATION', 'ADMINISTRATIVE_WARD'],
+      primaryJurisdiction: mcMatch.id,
+      allowedRoles: ['municipal_hap_officer', 'ward_officer', 'responder', 'official'],
+      isMunicipal: true,
+    };
+  }
+
   if (upper.includes('MCGM') || upper.includes('GREATER MUMBAI') || upper.includes('BMC')) return CONFIGURED_ORGS.MCGM;
   if (upper.includes('SDMA') || (upper.includes('MAHARASHTRA') && upper.includes('DISASTER'))) return CONFIGURED_ORGS.MH_SDMA;
   if (upper.includes('MAHARASHTRA') && (upper.includes('HEALTH') || upper.includes('PHD'))) return CONFIGURED_ORGS.MH_PHD;
@@ -197,14 +222,20 @@ export function validateAuthorityAccessRequest(params: AuthorityRequestParams): 
 
   normalizedJurisdictionId = reqJuris;
 
-  if (orgConfig.id === 'MCGM') {
-    if (reqJuris !== 'IN-MH-MCGM' && !reqJuris.startsWith('IN-MH-MCGM-')) {
-      errors.push(`MCGM operates strictly within Greater Mumbai (IN-MH-MCGM) or BMC administrative wards. Requested jurisdiction '${reqJuris}' is invalid.`);
+  if (orgConfig.isMunicipal || orgConfig.id === 'MCGM') {
+    const primaryId = orgConfig.primaryJurisdiction;
+    const isPrimary = reqJuris.toUpperCase() === primaryId.toUpperCase();
+    const isWard = reqJuris.toUpperCase().startsWith(`${primaryId.toUpperCase()}-`) || reqJuris.toLowerCase().startsWith('ward_');
+    const isMatched = isPrimary || isWard || reqJuris.toUpperCase().includes(orgConfig.id.toUpperCase());
+
+    if (!isMatched) {
+      errors.push(`${orgConfig.name} operates strictly within its designated municipal corporation (${primaryId}) or subordinate wards. Requested jurisdiction '${reqJuris}' is invalid.`);
     } else {
-      normalizedJurisdictionType = reqJuris.startsWith('IN-MH-MCGM-') ? 'ADMINISTRATIVE_WARD' : 'MUNICIPAL_CORPORATION';
-      normalizedJurisdictionName = reqJuris.startsWith('IN-MH-MCGM-')
-        ? `BMC Ward (${reqJuris.replace('IN-MH-MCGM-', '')})`
-        : 'Greater Mumbai (MCGM)';
+      normalizedJurisdictionId = isWard ? reqJuris : primaryId;
+      normalizedJurisdictionType = isWard ? 'ADMINISTRATIVE_WARD' : 'MUNICIPAL_CORPORATION';
+      normalizedJurisdictionName = isWard
+        ? `${orgConfig.name} Ward (${reqJuris.replace(`${primaryId}-`, '')})`
+        : orgConfig.name;
     }
   } else if (orgConfig.id === 'MH_SDMA' || orgConfig.id === 'MH_PHD') {
     if (reqJuris !== 'IN-MH' && !reqJuris.startsWith('IN-MH-DIST-')) {

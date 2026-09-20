@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useProfile } from '../context/ProfileContext';
+import { isGovUser } from '../utils/authRoles';
 import { AuthorityProvider, useAuthority } from '../context/AuthorityContext';
 import {
   Building2,
@@ -16,19 +18,6 @@ import {
 } from 'lucide-react';
 import { Card, Button, Badge } from '../components/ui';
 import { api } from '../services/api';
-
-const AUTHORIZED_GOV_ROLES = [
-  'official',
-  'responder',
-  'analyst',
-  'admin',
-  'municipal_hap_officer',
-  'state_coordinator',
-  'district_authority',
-  'ward_officer',
-  'national_analyst',
-  'system_admin',
-];
 
 /**
  * GovernmentLayoutInner
@@ -264,19 +253,32 @@ const GovernmentLayoutInner: React.FC = () => {
  * Redirects unauthorized visitors to Authority Login.
  */
 export const GovernmentLayout: React.FC = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const { profile } = useProfile();
   const location = useLocation();
 
-  const userRole = (user?.role || '').toLowerCase();
-  const isAuthorized = isAuthenticated && AUTHORIZED_GOV_ROLES.includes(userRole);
+  // If still loading session from token/localStorage, display loading screen instead of premature redirect
+  if (isLoading) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-8 space-y-4 animate-fadeIn">
+        <div className="w-10 h-10 border-3 border-amber-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs font-bold uppercase tracking-wider ts-text-muted">
+          Verifying Authority Authorization...
+        </p>
+      </div>
+    );
+  }
 
-  // If user is unauthenticated or an ordinary citizen, redirect directly to Authority Login
+  const isAuthorized = isAuthenticated && isGovUser(user, profile);
+  const targetPath = location.pathname + location.search;
+
+  // If user is unauthenticated, redirect directly to Authority Login
   if (!isAuthenticated) {
     return (
       <Navigate
         to="/auth/authority/login"
         state={{
-          from: location.pathname,
+          from: targetPath,
           error: 'An approved Authority account is required to access this portal.',
         }}
         replace
@@ -284,12 +286,13 @@ export const GovernmentLayout: React.FC = () => {
     );
   }
 
+  // If authenticated as citizen without authority credentials, redirect with clear message
   if (!isAuthorized) {
     return (
       <Navigate
         to="/auth/authority/login"
         state={{
-          from: location.pathname,
+          from: targetPath,
           error: 'Citizen accounts cannot access the Authority Command Portal. Please sign in with an approved Authority account.',
         }}
         replace

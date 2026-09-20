@@ -80,12 +80,16 @@ class ThermalIndices:
         apparent_temperature_c: Australian Apparent Temperature (°C).
         wet_bulb_temp_c: Estimated Natural Wet-Bulb Temperature (°C) via Stull formula.
         heat_index_status: Operational validity flag ("VALID", "OUTSIDE_VALIDATED_RANGE", "NOT_APPLICABLE_COOL").
+        utci_c: Universal Thermal Climate Index (°C) — Bröde et al. 2012 polynomial approximation.
+        utci_category: ISO 15743 / UTCI stress category label.
     """
     wbgt_c: float
     heat_index_c: Optional[float]
     apparent_temperature_c: float
     wet_bulb_temp_c: float
     heat_index_status: str = "VALID"
+    utci_c: Optional[float] = None
+    utci_category: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -94,6 +98,8 @@ class ThermalIndices:
             "apparent_temperature_c": round(self.apparent_temperature_c, 1),
             "wet_bulb_temp_c": round(self.wet_bulb_temp_c, 1),
             "heat_index_status": self.heat_index_status,
+            "utci_c": round(self.utci_c, 1) if self.utci_c is not None else None,
+            "utci_category": self.utci_category,
         }
 
 

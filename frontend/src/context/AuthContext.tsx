@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User, LoginCredentials, RegisterCredentials } from '../types';
 import { api } from '../services/api';
+import { isGovUser } from '../utils/authRoles';
 
 export interface AuthContextType {
   user: User | null;
@@ -209,10 +210,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [token]);
 
-  const portalType: 'CITIZEN' | 'AUTHORITY' =
-    user?.role && !['user', 'citizen'].includes(user.role.toLowerCase())
-      ? 'AUTHORITY'
-      : 'CITIZEN';
+  const portalType: 'CITIZEN' | 'AUTHORITY' = isGovUser(user)
+    ? 'AUTHORITY'
+    : 'CITIZEN';
 
   return (
     <AuthContext.Provider

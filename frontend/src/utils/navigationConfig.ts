@@ -193,16 +193,10 @@ export function partitionNavItems(
   let isDirect: (item: NavItemConfig) => boolean;
 
   if (isGov) {
-    if (tier === 'WIDE') {
-      // Direct: Priority 1 & 2 (Dashboard, Risk Map, Health, Action Plan, Dispatch)
-      // More: Priority 3 (Simulator, Matrix, Reports)
-      isDirect = (item) => item.priority <= 2;
-    } else {
-      // STANDARD / COMPACT:
-      // Direct: Priority 1 (Dashboard, Risk Map, Health, Action Plan)
-      // More: Priority 2 & 3 (Dispatch, Simulator, Matrix, Reports)
-      isDirect = (item) => item.priority === 1;
-    }
+    // Direct: Priority 1 (Dashboard, Risk Map, Health, Action Plan)
+    // More: Priority 2 & 3 (Dispatch, Simulator, Matrix, Reports)
+    // Keeping direct items to 4 prevents visual collision with operational scope and portal switcher
+    isDirect = (item) => item.priority === 1;
   } else {
     if (tier === 'COMPACT') {
       // Direct: Priority 1 (Home, Local Heat Map, My Heat Risk)
