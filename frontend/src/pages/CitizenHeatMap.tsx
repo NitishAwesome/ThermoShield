@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   MapPin,
@@ -15,7 +15,6 @@ import {
   HeartPulse,
   Compass,
   MousePointerClick,
-  Globe,
   Flame,
   Building2,
   Layers,
@@ -27,16 +26,23 @@ import { DataRealityBadge, FallbackModeBanner } from '../components/provenance';
 import { useLocation } from '../context/LocationContext';
 import { useProfile } from '../context/ProfileContext';
 import { api } from '../services/api';
-import { ThermalResponse, RiskLevel, ThermalZone, MapLocationRisk, GlobalHeatStation, HeatRiskArea, StateHeatAlertProperties, WardForecastSummary } from '../types';
+import { ThermalResponse, RiskLevel, ThermalZone, MapLocationRisk, HeatRiskArea, StateHeatAlertProperties, WardForecastSummary } from '../types';
 import { MUMBAI_PROTOTYPE_ZONES } from '../data/thermalZones';
 import { MUMBAI_ADMIN_WARDS } from '../data/mumbaiWards';
-import { GLOBAL_HEAT_STATIONS } from '../data/globalHeatHotspots';
-import { ALL_STATE_HEAT_ALERTS, getStateCategoryStyle, getStateAlertByName, getNationalAlertStatistics } from '../data/stateHeatAlerts';
+import {
+  getStateCategoryStyle,
+  getStateAlertByName,
+  getNationalAlertStatistics,
+  subscribeStateAlerts,
+  fetchLiveNationalStateAlerts,
+  getLiveAllStateHeatAlerts,
+  NationalAlertStats,
+} from '../data/stateHeatAlerts';
 import { getOrGenerateCityWards } from '../utils/cityWardsGenerator';
+import { INDIAN_MUNICIPAL_CORPORATIONS } from '../data/indianMunicipalCorporations';
 import { getRiskStyle } from '../utils/risk';
 
-
-// Popular Indian reference regions for rapid citizen exploration
+// Major Indian municipal corporations and reference regions for rapid citizen exploration
 const REGIONAL_PRESETS = [
   { name: 'Central Mumbai (UHI)', lat: 19.0400, lon: 72.8550 },
   { name: 'Pune (Shivajinagar)', lat: 18.5204, lon: 73.8567 },
@@ -45,35 +51,35 @@ const REGIONAL_PRESETS = [
   { name: 'Ahmedabad (Dry Heat)', lat: 23.0225, lon: 72.5714 },
   { name: 'Kolkata (Humid Delta)', lat: 22.5726, lon: 88.3639 },
   { name: 'Chennai (Coastal Heat)', lat: 13.0827, lon: 80.2707 },
-];
-
-// Worldwide megacities and extreme heat frontiers
-const GLOBAL_EXPLORER_PRESETS = [
-  { name: 'Dubai', country: 'UAE', lat: 25.2048, lon: 55.2708, temp: '43°C' },
-  { name: 'Phoenix', country: 'USA', lat: 33.4484, lon: -112.0740, temp: '44°C' },
-  { name: 'Jacobabad', country: 'Pakistan', lat: 28.2835, lon: 68.4388, temp: '48°C' },
-  { name: 'Cairo', country: 'Egypt', lat: 30.0444, lon: 31.2357, temp: '41°C' },
-  { name: 'Seville', country: 'Spain', lat: 37.3891, lon: -5.9845, temp: '39°C' },
-  { name: 'Bangkok', country: 'Thailand', lat: 13.7563, lon: 100.5018, temp: '36°C' },
-  { name: 'Tokyo', country: 'Japan', lat: 35.6762, lon: 139.6503, temp: '34°C' },
-  { name: 'Sydney', country: 'Australia', lat: -33.8688, lon: 151.2093, temp: '26°C' },
-  { name: 'London', country: 'UK', lat: 51.5074, lon: -0.1278, temp: '25°C' },
-  { name: 'New York', country: 'USA', lat: 40.7128, lon: -74.0060, temp: '31°C' },
+  { name: 'Bengaluru (BBMP)', lat: 12.9716, lon: 77.5946 },
+  { name: 'Hyderabad (GHMC)', lat: 17.3850, lon: 78.4867 },
+  { name: 'Jaipur (JMC)', lat: 26.9124, lon: 75.7873 },
+  { name: 'Surat (SMC)', lat: 21.1702, lon: 72.8311 },
+  { name: 'Lucknow (LMC)', lat: 26.8467, lon: 80.9462 },
+  { name: 'Kanpur (KNN)', lat: 26.4499, lon: 80.3319 },
+  { name: 'Nagpur (NMC)', lat: 21.1458, lon: 79.0882 },
+  { name: 'Indore (IMC)', lat: 22.7196, lon: 75.8577 },
+  { name: 'Bhopal (BMC)', lat: 23.2599, lon: 77.4126 },
+  { name: 'Patna (PMC)', lat: 25.5941, lon: 85.1376 },
+  { name: 'Vadodara (VMC)', lat: 22.3072, lon: 73.1812 },
+  { name: 'Varanasi (VNN)', lat: 25.3176, lon: 82.9739 },
 ];
 
 export const CitizenHeatMap: React.FC = () => {
   const { coords, locationName, setLocation, detectMyLocation, isLocating } = useLocation();
   const { profile } = useProfile();
 
-  const [viewScope, setViewScope] = useState<'local' | 'national' | 'world'>('local');
+  const [viewScope, setViewScope] = useState<'local' | 'national'>('local');
+  const [liveStateAlerts, setLiveStateAlerts] = useState<StateHeatAlertProperties[]>(() => getLiveAllStateHeatAlerts());
+  const [citizenNationalStats, setCitizenNationalStats] = useState<NationalAlertStats>(() => getNationalAlertStatistics(getLiveAllStateHeatAlerts()));
   const [selectedState, setSelectedState] = useState<StateHeatAlertProperties | null>(() => {
+    const list = getLiveAllStateHeatAlerts();
     if (profile.state) {
       const match = getStateAlertByName(profile.state);
       if (match) return match;
     }
-    return ALL_STATE_HEAT_ALERTS.find((s) => s.stateCode === 'DL') || ALL_STATE_HEAT_ALERTS[0];
+    return list.find((s) => s.stateCode === 'DL') || list[0];
   });
-  const citizenNationalStats = useMemo(() => getNationalAlertStatistics(), []);
   const [thermalData, setThermalData] = useState<ThermalResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +88,33 @@ export const CitizenHeatMap: React.FC = () => {
   const [selectedZone, setSelectedZone] = useState<ThermalZone | null>(null);
   const [showPrototypeZones, setShowPrototypeZones] = useState<boolean>(false);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState<boolean>(false);
+  const wardDetailRef = useRef<HTMLDivElement>(null);
+
+  // Subscribe to live state alerts and fetch Open-Meteo multi-coordinate telemetry
+  useEffect(() => {
+    fetchLiveNationalStateAlerts().catch(() => {});
+    const unsub = subscribeStateAlerts(() => {
+      const updated = getLiveAllStateHeatAlerts();
+      setLiveStateAlerts(updated);
+      setCitizenNationalStats(getNationalAlertStatistics(updated));
+      setSelectedState((prev) => {
+        if (!prev) return null;
+        return updated.find((s) => s.stateCode === prev.stateCode) || prev;
+      });
+    });
+    return unsub;
+  }, []);
+
+  const handleSelectWard = useCallback((ward: HeatRiskArea) => {
+    setSelectedWard(ward);
+  }, []);
+
+  const handleInspectWardTelemetry = useCallback((ward: HeatRiskArea) => {
+    setSelectedWard(ward);
+    setTimeout(() => {
+      wardDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+  }, []);
 
   // Check if active session location differs from permanent profile home
   const isDifferentFromHome = Boolean(
@@ -214,8 +247,10 @@ export const CitizenHeatMap: React.FC = () => {
 
   // Dynamically generate or load official wards for current monitored city
   const activeCityWards = useMemo(() => {
-    return getOrGenerateCityWards(locationName, coords.lat, coords.lon, tempC ?? 33.5, humidity ?? 65);
-  }, [locationName, coords.lat, coords.lon, tempC, humidity]);
+    const wind = windMps ?? 2.5;
+    const solar = thermalData?.weather?.solar_radiation ?? 650;
+    return getOrGenerateCityWards(locationName, coords.lat, coords.lon, tempC ?? 33.5, humidity ?? 65, wind, solar);
+  }, [locationName, coords.lat, coords.lon, tempC, humidity, windMps, thermalData?.weather?.solar_radiation]);
 
   useEffect(() => {
     if (activeCityWards.length > 0) {
@@ -319,70 +354,53 @@ export const CitizenHeatMap: React.FC = () => {
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-black ts-text-primary tracking-tight font-sans mt-2">
-              {viewScope === 'world'
-                ? 'World Heat Explorer'
-                : viewScope === 'national'
-                ? 'National State Heatwave Alerts'
-                : 'Local Heat Map'}
+              {viewScope === 'national'
+                ? 'National State Heatwave Alerts (37)'
+                : 'Local City & Ward Heat Map'}
             </h1>
             <p className="text-xs sm:text-sm ts-text-muted mt-1 max-w-2xl leading-relaxed">
-              {viewScope === 'world'
-                ? 'Continuous planetary thermal diffusion belts, extreme heat frontiers, and megacity telemetry worldwide.'
-                : viewScope === 'national'
+              {viewScope === 'national'
                 ? 'Official Survey of India GIS borders with real-time IMD Severe Heat Wave classifications, wet-bulb metrics, and SDMA advisories.'
-                : 'Estimated thermal stress and heat conditions around your monitored location.'}
+                : 'Estimated thermal stress, wet-bulb temperature, and ward microclimate heat index around your monitored Indian city.'}
               {' '}
               <span className="inline-flex items-center gap-1 text-orange-400 font-semibold">
                 <MousePointerClick className="w-3.5 h-3.5" />
-                {viewScope === 'national' ? 'Tap any Indian State to view emergency advisories.' : 'Tap anywhere on Earth to explore.'}
+                {viewScope === 'national' ? 'Tap any Indian State to view emergency advisories.' : 'Tap any ward or location on map to inspect.'}
               </span>
             </p>
           </div>
 
           {/* Right controls: View Scope switcher & Location Search */}
           <div className="flex flex-col sm:items-end gap-2.5 max-w-md w-full">
-            {/* View Scope Switcher */}
-            <div className="flex items-center p-1 rounded-2xl bg-slate-500/10 border ts-border text-xs self-start sm:self-auto overflow-x-auto max-w-full">
+            {/* View Scope Switcher: Two Button Choice [Local Wards] vs [State Heat Alerts] */}
+            <div className="flex items-center p-1 rounded-2xl bg-slate-500/10 border ts-border text-xs self-start sm:self-auto overflow-x-auto max-w-full gap-1">
               <button
                 type="button"
                 onClick={() => setViewScope('local')}
-                className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 whitespace-nowrap ${
+                className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 whitespace-nowrap ${
                   viewScope === 'local'
-                    ? 'bg-orange-500 text-white shadow-sm'
+                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm'
                     : 'ts-text-muted hover:ts-text-primary'
                 }`}
               >
                 <MapPin className="w-3.5 h-3.5" />
-                <span>My Local Area</span>
+                <span>📍 My Local Area (City & Wards)</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setViewScope('national')}
-                className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 whitespace-nowrap ${
+                className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 whitespace-nowrap ${
                   viewScope === 'national'
                     ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-sm'
                     : 'ts-text-muted hover:ts-text-primary'
                 }`}
               >
-                <ShieldAlert className="w-3.5 h-3.5 text-red-400" />
-                <span>State Heat Alerts (37)</span>
+                <ShieldAlert className="w-3.5 h-3.5 text-red-300" />
+                <span>🇮🇳 State Heat Alerts (37)</span>
                 <span className="px-1.5 py-0.2 rounded-full bg-red-500/30 text-[10px] text-white font-extrabold ml-1">
-                  4 RED
+                  {citizenNationalStats.redCount} RED
                 </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setViewScope('world')}
-                className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 whitespace-nowrap ${
-                  viewScope === 'world'
-                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm'
-                    : 'ts-text-muted hover:ts-text-primary'
-                }`}
-              >
-                <Globe className="w-3.5 h-3.5" />
-                <span>World Heat Explorer</span>
               </button>
             </div>
 
@@ -390,46 +408,34 @@ export const CitizenHeatMap: React.FC = () => {
             <div className="w-full">
               <LocationSearch
                 currentLocationName={locationName}
-                onSelectLocation={setLocation}
-                onUseMyLocation={detectMyLocation}
+                onSelectLocation={(loc) => {
+                  setSelectedWard(null);
+                  setLocation(loc);
+                  setViewScope('local');
+                }}
+                onUseMyLocation={() => {
+                  setSelectedWard(null);
+                  detectMyLocation();
+                  setViewScope('local');
+                }}
                 isLocating={isLocating}
               />
             </div>
           </div>
         </div>
 
-        {/* Quick Select Presets (Sample Areas, States, or World Megacities) */}
+        {/* Quick Select Presets (Major Indian Cities or High Priority States) */}
         <div className="mt-4 pt-3 border-t ts-border flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-          <span className="ts-text-subtle text-[11px] font-semibold whitespace-nowrap flex items-center gap-1">
+          <span className="ts-text-subtle text-[11px] font-semibold whitespace-nowrap flex items-center gap-1 shrink-0">
             <Compass className="w-3 h-3 text-orange-500" />
             <span>
-              {viewScope === 'world'
-                ? 'Global Metropolises & Extreme Zones:'
-                : viewScope === 'national'
+              {viewScope === 'national'
                 ? 'High Heatwave Priority States:'
-                : 'Sample Areas:'}
+                : 'Major Indian Cities & Municipalities:'}
             </span>
           </span>
-          {viewScope === 'world'
-            ? GLOBAL_EXPLORER_PRESETS.map((preset) => (
-                <button
-                  key={preset.name}
-                  type="button"
-                  onClick={() =>
-                    setLocation({
-                      name: `${preset.name}, ${preset.country}`,
-                      latitude: preset.lat,
-                      longitude: preset.lon,
-                    })
-                  }
-                  className="px-2.5 py-1 rounded-full text-[11px] font-medium border ts-border ts-card-subtle hover:border-orange-500/50 hover:bg-orange-500/5 transition-all text-slate-300 whitespace-nowrap cursor-pointer flex items-center gap-1.5"
-                >
-                  <span>{preset.name}</span>
-                  <span className="font-mono text-[10px] text-orange-400">{preset.temp}</span>
-                </button>
-              ))
-            : viewScope === 'national'
-            ? ALL_STATE_HEAT_ALERTS.slice(0, 10).map((st) => {
+          {viewScope === 'national'
+            ? liveStateAlerts.slice(0, 10).map((st) => {
                 const isSelected = selectedState?.stateCode === st.stateCode;
                 const cStyle = getStateCategoryStyle(st.alertCategory, isSelected);
                 return (
@@ -588,15 +594,15 @@ export const CitizenHeatMap: React.FC = () => {
       {/* ========================================================================= */}
       {/* 4. INTERACTIVE RISK MAP (CITIZEN VIEW)                                    */}
       {/* ========================================================================= */}
-      {/* Layer Control: 24 Ward Boundaries (Default) + Optional Prototype Zones */}
+      {/* Layer Control: Dynamic Ward Boundaries for active city + Optional Prototype Zones */}
       <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-2xl ts-card border ts-border text-xs">
         <div className="flex items-center space-x-2">
           <Building2 className="w-4 h-4 text-orange-500 flex-shrink-0" />
           <span className="font-bold ts-text-primary">
-            Primary Heat Map Layer: 24 Mumbai Administrative Ward References
+            Primary Heat Map Layer: {activeCityWards.length} {locationName.split(',')[0]} Administrative Wards
           </span>
           <span className="text-[10.5px] ts-text-subtle hidden sm:inline">
-            • Shared calculated ward-level biometeorological risk
+            • Live calculated ward-level biometeorological risk & UHI microclimates
           </span>
         </div>
         <button
@@ -616,35 +622,65 @@ export const CitizenHeatMap: React.FC = () => {
       </div>
 
       <RiskMap
-        scope={viewScope === 'world' ? 'world' : viewScope === 'national' ? 'national' : 'wards'}
+        scope={viewScope === 'national' ? 'national' : 'wards'}
+        stateAlerts={liveStateAlerts}
         center={
           viewScope === 'national' && selectedState
             ? [selectedState.centroid[1], selectedState.centroid[0]]
             : [coords.lat, coords.lon]
         }
-        zoom={viewScope === 'world' ? 3 : viewScope === 'national' ? 5 : 11}
-        locationName={viewScope === 'national' && selectedState ? `${selectedState.stateName}, India` : locationName}
-        temperature={viewScope === 'national' && selectedState ? selectedState.temperatureC : (tempC ?? undefined)}
-        humidity={viewScope === 'national' && selectedState ? selectedState.humidityPercent : (humidity ?? undefined)}
-        wbgt={viewScope === 'national' && selectedState ? selectedState.wbgtC : (wbgtC ?? undefined)}
-        riskLevel={viewScope === 'national' && selectedState ? selectedState.riskLevel : (riskLevel ?? undefined)}
-        riskScore={thermalData?.thermal?.risk_assessment?.score}
+        zoom={viewScope === 'national' ? 5 : 12}
+        locationName={
+          viewScope === 'national' && selectedState
+            ? `${selectedState.stateName}, India`
+            : viewScope === 'local' && selectedWard
+            ? selectedWard.name
+            : locationName
+        }
+        temperature={
+          viewScope === 'national' && selectedState
+            ? selectedState.temperatureC
+            : viewScope === 'local' && selectedWard
+            ? selectedWard.weather.temperatureC
+            : (tempC ?? undefined)
+        }
+        humidity={
+          viewScope === 'national' && selectedState
+            ? selectedState.humidityPercent
+            : viewScope === 'local' && selectedWard
+            ? selectedWard.weather.humidityPercent
+            : (humidity ?? undefined)
+        }
+        wbgt={
+          viewScope === 'national' && selectedState
+            ? selectedState.wbgtC
+            : viewScope === 'local' && selectedWard
+            ? selectedWard.thermal.estimatedWbgtC
+            : (wbgtC ?? undefined)
+        }
+        riskLevel={
+          viewScope === 'national' && selectedState
+            ? selectedState.riskLevel
+            : viewScope === 'local' && selectedWard
+            ? selectedWard.risk.level
+            : (riskLevel ?? undefined)
+        }
+        riskScore={
+          viewScope === 'national' && selectedState
+            ? (selectedState.riskScore > 1 ? selectedState.riskScore / 100 : selectedState.riskScore)
+            : viewScope === 'local' && selectedWard
+            ? (selectedWard.risk.score > 1 ? selectedWard.risk.score / 100 : selectedWard.risk.score)
+            : thermalData?.thermal?.risk_assessment?.score
+        }
         showStateAlerts={viewScope === 'national'}
         selectedStateCode={selectedState?.stateCode}
         onSelectState={(st) => setSelectedState(st)}
         mapLocations={viewScope === 'national' ? [] : mapLocations}
-        globalStations={GLOBAL_HEAT_STATIONS}
-        onSelectGlobalStation={(station) => {
-          setLocation({
-            name: `${station.name}, ${station.country}`,
-            latitude: station.lat,
-            longitude: station.lon,
-          });
-        }}
         adminWards={viewScope === 'local' ? activeCityWards : []}
         selectedWardId={selectedWard?.id}
-        onSelectWard={(ward) => setSelectedWard(ward)}
-        thermalZones={MUMBAI_PROTOTYPE_ZONES}
+        onSelectWard={handleSelectWard}
+        onInspectWardTelemetry={handleInspectWardTelemetry}
+        thermalZones={showPrototypeZones ? MUMBAI_PROTOTYPE_ZONES : []}
         selectedZoneId={selectedZone?.id}
         onSelectZone={(zone) => setSelectedZone(zone)}
         onMapClick={handleMapClick}
@@ -652,16 +688,12 @@ export const CitizenHeatMap: React.FC = () => {
         mapError={error}
         isCitizenView={true}
         title={
-          viewScope === 'world'
-            ? 'Planetary Heat Stress & Worldwide Diffusion'
-            : viewScope === 'national'
+          viewScope === 'national'
             ? 'India State-Wise GIS Heatwave Alert Map (IMD Criteria)'
-            : `${locationName.split(',')[0]} Heat Stress & Ward Microclimate Map`
+            : `${locationName.split(',')[0]} Municipal Administrative Wards (${activeCityWards.length} Wards)`
         }
         subtitle={
-          viewScope === 'world'
-            ? 'Continuous planetary thermal diffusion fields and 38+ megacity observation stations — tap anywhere on Earth to inspect'
-            : viewScope === 'national'
+          viewScope === 'national'
             ? 'Official Survey of India boundaries across 37 States and Union Territories with calibrated IMD heatwave criteria & SDMA directives'
             : `Displaying administrative ward boundaries and thermal heat diffusion around ${locationName} — tap anywhere to inspect`
         }
@@ -726,7 +758,7 @@ export const CitizenHeatMap: React.FC = () => {
 
       {/* Selected Administrative Ward Details Card */}
       {selectedWard && viewScope === 'local' && (
-        <div className="p-5 rounded-2xl ts-card border border-orange-500/30 bg-orange-500/5 space-y-3 text-xs animate-fadeIn">
+        <div ref={wardDetailRef} className="p-5 rounded-2xl ts-card border border-orange-500/30 bg-orange-500/5 space-y-3 text-xs animate-fadeIn">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center space-x-2">
               <span className="font-bold text-orange-400 uppercase text-[11px] font-mono">

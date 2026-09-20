@@ -29,11 +29,11 @@ from app.auth.router import (
 )
 from app.routers.personal_risk import router as personal_risk_router
 from app.routers.copilot import router as copilot_router
-from app.routers.health_data import router as health_data_router
+from app.routers.health_data import router as health_data_router, trigger_initiatives
 from app.routers.regional_alerts import router as regional_alerts_router
 from app.services.firebase_service import update_live_risk
 
-from fastapi import FastAPI, Query, Depends, HTTPException, BackgroundTasks, status
+from fastapi import FastAPI, Query, Depends, HTTPException, BackgroundTasks, status, Body
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
@@ -68,6 +68,7 @@ from app.services.risk import predict_risk
 from app.services.map_services import (
     get_location_risk,
     get_all_areas_risk_overview,
+    get_national_state_alerts,
     get_area_profile_for_coordinates,
 )
 from app.services.global_areas import (
@@ -2010,6 +2011,16 @@ async def global_areas_risk_overview(
     return await get_all_global_areas_overview(region_filter=region)
 
 
+@app.get("/areas/national-state-alerts")
+async def national_state_alerts():
+    """
+    Returns live dynamic IMD state-wise heat alerts and telemetry across all 37 Indian States and Union Territories.
+    Integrates live Open-Meteo telemetry, diurnal day/night cycles, and official IMD criteria.
+    """
+    return await get_national_state_alerts()
+
+
+
 
 # ==================================================
 # FORECAST
@@ -2607,7 +2618,29 @@ def evaluate_heat_action_plan_api(payload: HeatActionEvaluateRequest):
     return plan_dict
 
 
-# =========================================================================
+@app.post("/api/heat-action-plan/{area_id}/trigger-initiatives")
+@app.post("/api/action-plan/{area_id}/trigger-initiatives")
+def trigger_initiatives_endpoint_alias(
+    area_id: str,
+    triggers: List[str] = Body(..., embed=True),
+    notes: Optional[str] = Body(None, embed=True),
+    risk_level: str = Body("HIGH", embed=True),
+    wbgt_c: float = Body(30.0, embed=True),
+    user: User = Depends(require_permission("ACTIVATE_HAP")),
+):
+    """
+    Municipal authority endpoint to initiate concrete multi-agency Heat Action Plan directives.
+    Accepts triggers: cooling_centers | grid_peak_load_balance | outdoor_work_halt | emergency_108_staging.
+    """
+    return trigger_initiatives(
+        area_id=area_id,
+        triggers=triggers,
+        notes=notes,
+        risk_level=risk_level,
+        wbgt_c=wbgt_c,
+        user=user,
+    )
+
 # 3–5 DAY HUMAN HEALTH IMPACT FORECAST & PREDICTIVE EARLY WARNING (PROMPT 22)
 # =========================================================================
 

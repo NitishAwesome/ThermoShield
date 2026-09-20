@@ -17,7 +17,13 @@ import { getRiskColor, getRiskStyle } from '../utils/risk';
 import { Card, CardHeader, CardContent, Badge } from './ui';
 import { useTranslation } from '../context/LanguageContext';
 import { WORLD_HEAT_DIFFUSION_SEEDS, HeatmapSeedPoint } from '../data/globalHeatHotspots';
-import { INDIA_STATE_HEAT_ALERTS_GEOJSON, getStateCategoryStyle } from '../data/stateHeatAlerts';
+import {
+  INDIA_STATE_HEAT_ALERTS_GEOJSON,
+  getStateCategoryStyle,
+  getLiveStateGeoJSON,
+  getLiveAllStateHeatAlerts,
+  getIndianStandardTime,
+} from '../data/stateHeatAlerts';
 
 
 // ─────────────────────────────────────────────
@@ -44,6 +50,7 @@ interface RiskMapProps {
   adminWards?: HeatRiskArea[];
   selectedWardId?: string;
   onSelectWard?: (ward: HeatRiskArea) => void;
+  onInspectWardTelemetry?: (ward: HeatRiskArea) => void;
   selectedZoneId?: string;
   onSelectZone?: (zone: ThermalZone) => void;
   isLoadingMap?: boolean;
@@ -66,6 +73,8 @@ interface RiskMapProps {
   showStateAlerts?: boolean;
   selectedStateCode?: string;
   onSelectState?: (state: StateHeatAlertProperties) => void;
+  stateAlerts?: StateHeatAlertProperties[];
+  stateGeoJson?: any;
 }
 
 // ─────────────────────────────────────────────
@@ -123,12 +132,20 @@ const BADGE_ZOOM_THRESHOLD = 12;
 // ─────────────────────────────────────────────
 const createCentroidBadgeIcon = (label: string, level: RiskLevel, isSelected: boolean) => {
   const style = getRiskStyle(level);
-  let code = label;
-  const match = label.match(/Ward\s+([A-Z0-9\/]+)/i);
-  if (match) {
-    code = match[1];
-  } else if (label.length > 5) {
-    code = label.substring(0, 4);
+  // Strip any descriptive suffix like ": Vejalpur"
+  const cleanLabel = (label || '').split(':')[0].trim();
+  let code = cleanLabel;
+
+  const wardMatch = cleanLabel.match(/Ward\s+([A-Z0-9\/]+)/i);
+  const dashCodeMatch = cleanLabel.match(/^([A-Z]+)-?(\d+)/i);
+
+  if (dashCodeMatch) {
+    // e.g. "AMC-04" → "AMC-4", "AMC-32" → "AMC-32"
+    code = `${dashCodeMatch[1]}-${parseInt(dashCodeMatch[2], 10)}`;
+  } else if (wardMatch) {
+    code = wardMatch[1];
+  } else if (cleanLabel.length > 8) {
+    code = cleanLabel.substring(0, 8).replace(/[-_:]+$/, '');
   }
 
   return L.divIcon({
@@ -357,8 +374,9 @@ const WorldHeatmapCanvas: React.FC<{
   points: HeatmapSeedPoint[];
   stations: GlobalHeatStation[];
   wards?: HeatRiskArea[];
+  stateAlerts?: StateHeatAlertProperties[];
   visible: boolean;
-}> = ({ points, stations, wards = [], visible }) => {
+}> = ({ points, stations, wards = [], stateAlerts = [], visible }) => {
   const map = useMap();
 
   useEffect(() => {
@@ -389,27 +407,53 @@ const WorldHeatmapCanvas: React.FC<{
 
       const zoom = map.getZoom();
       const zoomFactor = Math.max(0.6, Math.pow(1.35, zoom - 2));
+      const { isDay } = getIndianStandardTime();
 
-      // 1. Draw Planetary Heat Diffusion Seeds (Sahara, Arabian Peninsula, Thar, Sonoran, etc.)
+      // 1. Draw Planetary Heat Diffusion Seeds with dynamic diurnal Indian modulation
       points.forEach((p) => {
+        let intensity = p.intensity;
+        const isIndiaAxis = p.lat >= 6.0 && p.lat <= 36.0 && p.lon >= 68.0 && p.lon <= 97.0;
+
+        if (isIndiaAxis && stateAlerts && stateAlerts.length > 0) {
+          let closestDist = Infinity;
+          let matchedAlert: StateHeatAlertProperties | null = null;
+          for (const s of stateAlerts) {
+            const d = Math.hypot(s.centroid[1] - p.lat, s.centroid[0] - p.lon);
+            if (d < closestDist) {
+              closestDist = d;
+              matchedAlert = s;
+            }
+          }
+          if (matchedAlert) {
+            // Real physical intensity based on live temperature (20°C -> 0.12, 45°C -> 0.96)
+            intensity = Math.min(0.96, Math.max(0.12, (matchedAlert.temperatureC - 20) / 26));
+            if (!isDay) {
+              intensity *= 0.52; // Night cooling reduction
+            }
+          }
+        }
+
         const pt = map.latLngToContainerPoint([p.lat, p.lon]);
         const radius = Math.min(360, Math.max(50, (p.radiusKm / 100) * 8 * zoomFactor));
 
         const grad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, radius);
-        if (p.intensity >= 0.93) {
-          grad.addColorStop(0, 'rgba(192, 38, 211, 0.82)'); // Magenta / Critical
-          grad.addColorStop(0.35, 'rgba(239, 68, 68, 0.72)'); // Red / Extreme
-          grad.addColorStop(0.7, 'rgba(249, 115, 22, 0.45)'); // Orange / High
+        if (intensity >= 0.88) {
+          grad.addColorStop(0, 'rgba(239, 68, 68, 0.78)');
+          grad.addColorStop(0.4, 'rgba(249, 115, 22, 0.55)');
+          grad.addColorStop(0.75, 'rgba(245, 158, 11, 0.3)');
           grad.addColorStop(1, 'rgba(249, 115, 22, 0)');
-        } else if (p.intensity >= 0.85) {
-          grad.addColorStop(0, 'rgba(239, 68, 68, 0.78)'); // Red / Extreme
-          grad.addColorStop(0.4, 'rgba(249, 115, 22, 0.58)'); // Orange / High
-          grad.addColorStop(0.75, 'rgba(245, 158, 11, 0.35)'); // Amber / Moderate
+        } else if (intensity >= 0.65) {
+          grad.addColorStop(0, 'rgba(249, 115, 22, 0.72)');
+          grad.addColorStop(0.5, 'rgba(245, 158, 11, 0.45)');
           grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+        } else if (intensity >= 0.40) {
+          grad.addColorStop(0, 'rgba(245, 158, 11, 0.55)');
+          grad.addColorStop(0.6, 'rgba(16, 185, 129, 0.25)');
+          grad.addColorStop(1, 'rgba(16, 185, 129, 0)');
         } else {
-          grad.addColorStop(0, 'rgba(249, 115, 22, 0.72)'); // Orange / High
-          grad.addColorStop(0.5, 'rgba(245, 158, 11, 0.48)'); // Amber / Moderate
-          grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+          grad.addColorStop(0, 'rgba(16, 185, 129, 0.42)');
+          grad.addColorStop(0.6, 'rgba(52, 211, 153, 0.18)');
+          grad.addColorStop(1, 'rgba(52, 211, 153, 0)');
         }
 
         ctx.fillStyle = grad;
@@ -420,26 +464,53 @@ const WorldHeatmapCanvas: React.FC<{
 
       // 2. Draw Dynamic Global Megacities & Extreme Heat Stations
       stations.forEach((s) => {
+        let level = s.riskLevel;
+        const isIndiaAxis = s.lat >= 6.0 && s.lat <= 36.0 && s.lon >= 68.0 && s.lon <= 97.0;
+
+        if (isIndiaAxis && stateAlerts && stateAlerts.length > 0) {
+          let closestDist = Infinity;
+          let matchedAlert: StateHeatAlertProperties | null = null;
+          for (const st of stateAlerts) {
+            const d = Math.hypot(st.centroid[1] - s.lat, st.centroid[0] - s.lon);
+            if (d < closestDist) {
+              closestDist = d;
+              matchedAlert = st;
+            }
+          }
+          if (matchedAlert) {
+            level = matchedAlert.alertCategory === 'RED' ? 'EXTREME'
+              : matchedAlert.alertCategory === 'ORANGE' ? 'HIGH'
+              : matchedAlert.alertCategory === 'YELLOW' ? 'MODERATE'
+              : 'LOW';
+          }
+        } else if (isIndiaAxis && !isDay) {
+          level = level === 'CRITICAL' ? 'HIGH' : level === 'EXTREME' ? 'MODERATE' : 'LOW';
+        }
+
         const pt = map.latLngToContainerPoint([s.lat, s.lon]);
         const radius = Math.min(220, Math.max(35, 45 * zoomFactor));
 
         const grad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, radius);
-        if (s.riskLevel === 'CRITICAL') {
+        if (level === 'CRITICAL') {
           grad.addColorStop(0, 'rgba(217, 70, 239, 0.85)');
           grad.addColorStop(0.4, 'rgba(239, 68, 68, 0.65)');
           grad.addColorStop(1, 'rgba(239, 68, 68, 0)');
-        } else if (s.riskLevel === 'EXTREME') {
+        } else if (level === 'EXTREME') {
           grad.addColorStop(0, 'rgba(239, 68, 68, 0.8)');
           grad.addColorStop(0.45, 'rgba(249, 115, 22, 0.6)');
           grad.addColorStop(1, 'rgba(249, 115, 22, 0)');
-        } else if (s.riskLevel === 'HIGH') {
+        } else if (level === 'HIGH') {
           grad.addColorStop(0, 'rgba(249, 115, 22, 0.75)');
           grad.addColorStop(0.5, 'rgba(245, 158, 11, 0.45)');
-          grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
-        } else {
+          grad.addColorStop(1, 'rgba(249, 115, 22, 0)');
+        } else if (level === 'MODERATE') {
           grad.addColorStop(0, 'rgba(245, 158, 11, 0.65)');
           grad.addColorStop(0.6, 'rgba(16, 185, 129, 0.3)');
           grad.addColorStop(1, 'rgba(16, 185, 129, 0)');
+        } else {
+          grad.addColorStop(0, 'rgba(16, 185, 129, 0.55)');
+          grad.addColorStop(0.6, 'rgba(52, 211, 153, 0.2)');
+          grad.addColorStop(1, 'rgba(52, 211, 153, 0)');
         }
 
         ctx.fillStyle = grad;
@@ -494,7 +565,7 @@ const WorldHeatmapCanvas: React.FC<{
         canvas.parentNode.removeChild(canvas);
       }
     };
-  }, [map, visible, points, stations, wards]);
+  }, [map, visible, points, stations, wards, stateAlerts]);
 
   return null;
 };
@@ -514,6 +585,7 @@ export const RiskMap: React.FC<RiskMapProps> = ({
   adminWards = [],
   selectedWardId,
   onSelectWard,
+  onInspectWardTelemetry,
   selectedZoneId,
   onSelectZone,
   isLoadingMap = false,
@@ -532,8 +604,12 @@ export const RiskMap: React.FC<RiskMapProps> = ({
   showStateAlerts = false,
   selectedStateCode,
   onSelectState,
+  stateAlerts,
+  stateGeoJson,
 }) => {
   const { t } = useTranslation();
+  const effectiveStateAlerts = stateAlerts && stateAlerts.length > 0 ? stateAlerts : getLiveAllStateHeatAlerts();
+  const effectiveStateGeoJson = stateGeoJson || getLiveStateGeoJSON();
   const currentRiskColor = getRiskColor(riskLevel);
   const [currentZoom, setCurrentZoom] = useState(zoom);
   const [heatmapVisible, setHeatmapVisible] = useState<boolean>(showHeatmapOverlay);
@@ -695,6 +771,7 @@ export const RiskMap: React.FC<RiskMapProps> = ({
               points={WORLD_HEAT_DIFFUSION_SEEDS}
               stations={globalStations}
               wards={adminWards}
+              stateAlerts={effectiveStateAlerts}
               visible={heatmapVisible}
             />
 
@@ -702,8 +779,8 @@ export const RiskMap: React.FC<RiskMapProps> = ({
             {showStateAlerts && (
               <>
                 <GeoJSON
-                  key={`state_alerts_geojson_${selectedStateCode || 'all'}`}
-                  data={INDIA_STATE_HEAT_ALERTS_GEOJSON as any}
+                  key={`state_alerts_geojson_${selectedStateCode || 'all'}_${effectiveStateAlerts[0]?.temperatureC || 'def'}`}
+                  data={effectiveStateGeoJson as any}
                   style={(feature: any) => {
                     const p = feature?.properties as StateHeatAlertProperties;
                     const isSelected = selectedStateCode === p?.stateCode;
@@ -759,8 +836,8 @@ export const RiskMap: React.FC<RiskMapProps> = ({
                           IMD: ${p.imdClassification}
                         </div>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #f8fafc; padding: 6px; border-radius: 6px; margin-bottom: 8px; font-size: 11px;">
-                          <div><strong>Max Temp:</strong> <span style="color: #ea580c; font-weight: 800;">${p.temperatureC}°C</span></div>
-                          <div><strong>Heat Index:</strong> <strong>${p.apparentTemperatureC}°C</strong></div>
+                          <div><strong>Current Temp:</strong> <span style="color: #ea580c; font-weight: 800;">${p.temperatureC}°C</span></div>
+                          <div><strong>Feels-Like:</strong> <strong>${p.apparentTemperatureC}°C</strong></div>
                           <div><strong>Wet-Bulb:</strong> <strong>${p.wetBulbC}°C</strong></div>
                           <div><strong>Est WBGT:</strong> <strong>${p.wbgtC}°C</strong></div>
                         </div>
@@ -776,12 +853,12 @@ export const RiskMap: React.FC<RiskMapProps> = ({
                 />
 
                 {/* State Centroid Badges */}
-                {INDIA_STATE_HEAT_ALERTS_GEOJSON.features.map((f) => {
+                {effectiveStateGeoJson.features.map((f: any) => {
                   const p = f.properties;
                   const isSelected = selectedStateCode === p.stateCode;
                   return (
                     <Marker
-                      key={`state_centroid_${p.stateCode}`}
+                      key={`state_centroid_${p.stateCode}_${p.alertCategory}_${p.temperatureC}`}
                       position={[p.centroid[1], p.centroid[0]]}
                       icon={showBadges
                         ? createStateBadgeIcon(p.stateCode, p.alertCategory, p.temperatureC, isSelected)
@@ -854,11 +931,18 @@ export const RiskMap: React.FC<RiskMapProps> = ({
                             {ward.attentionReason}
                           </div>
                         )}
-                        {onSelectWard && (
+                        {(onInspectWardTelemetry || onSelectWard) && (
                           <button
                             type="button"
-                            onClick={() => onSelectWard(ward)}
-                            className="w-full mt-1 px-2.5 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold cursor-pointer transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onInspectWardTelemetry) {
+                                onInspectWardTelemetry(ward);
+                              } else {
+                                onSelectWard?.(ward);
+                              }
+                            }}
+                            className="w-full mt-1 px-2.5 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold cursor-pointer transition-colors shadow-sm text-center"
                           >
                             Inspect Ward Telemetry →
                           </button>
@@ -1038,7 +1122,9 @@ export const RiskMap: React.FC<RiskMapProps> = ({
                     {riskScore !== undefined && riskScore !== null ? (
                       <div className="flex justify-between">
                         <span className="ts-text-subtle">{t('riskMap.strainScore')}:</span>
-                        <span className="font-bold ts-text-primary">{riskScore.toFixed(2)} / 1.00</span>
+                        <span className="font-bold ts-text-primary">
+                          {(riskScore > 1 ? riskScore / 100 : riskScore).toFixed(2)} / 1.00
+                        </span>
                       </div>
                     ) : (
                       <div className="flex justify-between">

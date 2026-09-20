@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useLocation } from '../../context/LocationContext';
 import { useTranslation } from '../../context/LanguageContext';
@@ -8,12 +8,10 @@ import {
   RiskResponse,
   MapLocationRisk,
   AreaRiskItem,
-  ThermalZone,
   HeatRiskArea,
   RiskLevel,
   HeatActionPlanResponse,
   WardForecastSummary,
-  GlobalHeatStation,
   StateHeatAlertProperties,
 } from '../../types';
 import { RiskMap } from '../../components/RiskMap';
@@ -21,11 +19,22 @@ import { LocationSearch } from '../../components/LocationSearch';
 import { Card, CardHeader, CardContent, Badge, Button } from '../../components/ui';
 import { DataRealityBadge, FallbackModeBanner, CalculationInfoTooltip } from '../../components/provenance';
 import { translateRiskLevel } from '../../utils/translationHelpers';
-import { MUMBAI_PROTOTYPE_ZONES } from '../../data/thermalZones';
-import { MUMBAI_ADMIN_WARDS, BMC_WARD_PROVENANCE } from '../../data/mumbaiWards';
-import { GLOBAL_REGIONS, GLOBAL_HEAT_STATIONS, getStationsByRegion } from '../../data/globalHeatHotspots';
-import { ALL_STATE_HEAT_ALERTS, getStateCategoryStyle, getNationalAlertStatistics } from '../../data/stateHeatAlerts';
-import { getCityMunicipalAuthority, getOrGenerateCityWards, calculateWetBulb, calculateHeatIndex, findNearestMetroHub } from '../../utils/cityWardsGenerator';
+import {
+  getStateCategoryStyle,
+  getNationalAlertStatistics,
+  fetchLiveNationalStateAlerts,
+  subscribeStateAlerts,
+  getLiveAllStateHeatAlerts,
+  NationalAlertStats,
+} from '../../data/stateHeatAlerts';
+import { INDIAN_MUNICIPAL_CORPORATIONS, getMunicipalCorporationById, findMunicipalCorporationByCity } from '../../data/indianMunicipalCorporations';
+import { MUMBAI_ADMIN_WARDS } from '../../data/mumbaiWards';
+import {
+  getCityMunicipalAuthority,
+  getOrGenerateCityWards,
+  calculateWetBulb,
+  calculateHeatIndex,
+} from '../../utils/cityWardsGenerator';
 import { getRiskStyle } from '../../utils/risk';
 import { CityHeatActionPlanning } from '../../components/government/CityHeatActionPlanning';
 import { useAuthority } from '../../context/AuthorityContext';
@@ -47,30 +56,24 @@ import {
   Calendar,
   ShieldAlert,
   Sparkles,
-  Globe,
   Flame,
   Landmark,
   Eye,
 } from 'lucide-react';
 
-const QUICK_GOV_CITIES = [
-  { name: 'Mumbai', authority: 'BMC', state: 'Maharashtra', lat: 19.0760, lon: 72.8777, zone: 'Western Coastal' },
-  { name: 'Pune', authority: 'PMC', state: 'Maharashtra', lat: 18.5204, lon: 73.8567, zone: 'Deccan Plateau' },
-  { name: 'New Delhi', authority: 'MCD', state: 'Delhi NCR', lat: 28.6139, lon: 77.2090, zone: 'Northern Plains' },
-  { name: 'Bengaluru', authority: 'BBMP', state: 'Karnataka', lat: 12.9716, lon: 77.5946, zone: 'Southern Plateau' },
-  { name: 'Hyderabad', authority: 'GHMC', state: 'Telangana', lat: 17.3850, lon: 78.4867, zone: 'Deccan Central' },
-  { name: 'Ahmedabad', authority: 'AMC', state: 'Gujarat', lat: 23.0225, lon: 72.5714, zone: 'Western Arid' },
-  { name: 'Jaipur', authority: 'JMC', state: 'Rajasthan', lat: 26.9124, lon: 75.7873, zone: 'North-Western' },
-  { name: 'Chennai', authority: 'GCC', state: 'Tamil Nadu', lat: 13.0827, lon: 80.2707, zone: 'Southern Coastal' },
-  { name: 'Kolkata', authority: 'KMC', state: 'West Bengal', lat: 22.5726, lon: 88.3639, zone: 'Eastern Delta' },
-  { name: 'Nagpur', authority: 'NMC', state: 'Maharashtra', lat: 21.1458, lon: 79.0882, zone: 'Central Plateau' },
-  { name: 'Lucknow', authority: 'LMC', state: 'Uttar Pradesh', lat: 26.8467, lon: 80.9462, zone: 'Gangetic Plains' },
-  { name: 'Surat', authority: 'SMC', state: 'Gujarat', lat: 21.1702, lon: 72.8311, zone: 'Western Coastal' },
-];
+const QUICK_GOV_CITIES = INDIAN_MUNICIPAL_CORPORATIONS.map((mc) => ({
+  name: mc.city,
+  authority: mc.shortCode,
+  state: mc.state,
+  lat: mc.lat,
+  lon: mc.lon,
+  zone: `${mc.wardCount} Wards`,
+}));
 
 export const GovernmentMap: React.FC = () => {
   const { coords, locationName, setCoordsAndName, setLocation, detectMyLocation, isLocating } = useLocation();
   const { t } = useTranslation();
+  const wardTelemetryRef = useRef<HTMLDivElement>(null);
 
   const {
     authority,
@@ -81,17 +84,31 @@ export const GovernmentMap: React.FC = () => {
     resetToOperationalScope,
   } = useAuthority();
 
-  const [gisLayerMode, setGisLayerMode] = useState<'official_wards' | 'state_alerts' | 'global_world' | 'mumbai_zones' | 'national_centroids'>('official_wards');
+  const [gisLayerMode, setGisLayerMode] = useState<'official_wards' | 'state_alerts'>('official_wards');
+  const [liveStateAlerts, setLiveStateAlerts] = useState<StateHeatAlertProperties[]>(() => getLiveAllStateHeatAlerts());
+  const [nationalStats, setNationalStats] = useState<NationalAlertStats>(() => getNationalAlertStatistics(getLiveAllStateHeatAlerts()));
+
+  useEffect(() => {
+    fetchLiveNationalStateAlerts().then((stats) => {
+      setNationalStats(stats);
+      setLiveStateAlerts(getLiveAllStateHeatAlerts());
+    });
+
+    const unsubscribe = subscribeStateAlerts((alerts, stats) => {
+      setLiveStateAlerts(alerts);
+      setNationalStats(stats);
+    });
+    return unsubscribe;
+  }, []);
+
   const [selectedStateAlert, setSelectedStateAlert] = useState<StateHeatAlertProperties | null>(() => {
-    return ALL_STATE_HEAT_ALERTS.find((s) => s.stateCode === 'RJ') || ALL_STATE_HEAT_ALERTS[0];
+    return liveStateAlerts.find((s) => s.stateCode === 'DL') || liveStateAlerts[0];
   });
   const [stateFilterCategory, setStateFilterCategory] = useState<'ALL' | 'RED' | 'ORANGE' | 'YELLOW' | 'GREEN'>('ALL');
   const [stateSearchQuery, setStateSearchQuery] = useState<string>('');
 
-  const nationalStats = useMemo(() => getNationalAlertStatistics(), []);
-
   const filteredStateAlerts = useMemo(() => {
-    return ALL_STATE_HEAT_ALERTS.filter((s) => {
+    return liveStateAlerts.filter((s) => {
       const matchesCategory = stateFilterCategory === 'ALL' || s.alertCategory === stateFilterCategory;
       const matchesSearch =
         !stateSearchQuery ||
@@ -100,7 +117,7 @@ export const GovernmentMap: React.FC = () => {
         s.capitalCity.toLowerCase().includes(stateSearchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
-  }, [stateFilterCategory, stateSearchQuery]);
+  }, [liveStateAlerts, stateFilterCategory, stateSearchQuery]);
 
   // Administrative Jurisdiction & State Hierarchy State
   const [selectedState, setSelectedState] = useState<{ id: string; name: string; centroid?: { latitude: number; longitude: number } } | null>({
@@ -160,9 +177,17 @@ export const GovernmentMap: React.FC = () => {
       setGisLayerMode('official_wards');
     }
   };
-  const [selectedGlobalStation, setSelectedGlobalStation] = useState<GlobalHeatStation | null>(GLOBAL_HEAT_STATIONS[0]); // Default: Dubai
-  const [selectedRegionFilter, setSelectedRegionFilter] = useState<string>('all');
-  const [selectedZone, setSelectedZone] = useState<ThermalZone | null>(MUMBAI_PROTOTYPE_ZONES[1]);
+
+  // Auto-center map on official's registered jurisdiction upon loading
+  useEffect(() => {
+    if (authority?.jurisdictionId && authority.jurisdictionId !== 'IN') {
+      const mc = getMunicipalCorporationById(authority.jurisdictionId) || findMunicipalCorporationByCity(authority.jurisdictionName);
+      if (mc) {
+        setCoordsAndName({ lat: mc.lat, lon: mc.lon }, `${mc.city}, ${mc.state}`);
+        setGisLayerMode('official_wards');
+      }
+    }
+  }, [authority?.jurisdictionId, authority?.jurisdictionName]);
   const [thermalData, setThermalData] = useState<ThermalResponse | null>(null);
   const [riskData, setRiskData] = useState<RiskResponse | null>(null);
   const [mapLocations, setMapLocations] = useState<MapLocationRisk[]>([]);
@@ -184,8 +209,10 @@ export const GovernmentMap: React.FC = () => {
   // Dynamically generate or load official wards for current monitored city
   const activeCityWards = useMemo(() => {
     const humidity = thermalData?.weather?.humidity ?? 55;
-    return getOrGenerateCityWards(locationName, coords.lat, coords.lon, currentTemp, humidity);
-  }, [locationName, coords.lat, coords.lon, currentTemp, thermalData?.weather?.humidity]);
+    const wind = thermalData?.weather?.wind_speed ?? 2.5;
+    const solar = thermalData?.weather?.solar_radiation ?? 650;
+    return getOrGenerateCityWards(locationName, coords.lat, coords.lon, currentTemp, humidity, wind, solar);
+  }, [locationName, coords.lat, coords.lon, currentTemp, thermalData?.weather?.humidity, thermalData?.weather?.wind_speed, thermalData?.weather?.solar_radiation]);
 
   const [selectedWard, setSelectedWard] = useState<HeatRiskArea | null>(null);
 
@@ -205,24 +232,22 @@ export const GovernmentMap: React.FC = () => {
   const [wardsForecastSummary, setWardsForecastSummary] = useState<WardForecastSummary[]>([]);
   const [wardActionPlan, setWardActionPlan] = useState<HeatActionPlanResponse | null>(null);
   const [loadingWardHap, setLoadingWardHap] = useState<boolean>(false);
+  const [wardBaselineOutlook, setWardBaselineOutlook] = useState<any>(null);
+  const [advisoryLang, setAdvisoryLang] = useState<'en' | 'hi'>('en');
 
   const fetchMapData = async (lat: number, lon: number) => {
     setIsLoading(true);
     setMapError(null);
     try {
-      const [thermalRes, riskRes, mapRes, areasRes, forecastRes] = await Promise.allSettled([
+      const [thermalRes, riskRes, mapRes] = await Promise.allSettled([
         api.getThermal(lat, lon),
         api.getRisk(lat, lon),
         api.getMapRisk([`${lat.toFixed(4)},${lon.toFixed(4)}`]),
-        api.getAreasRiskOverview(),
-        api.getWardsForecastSummary(),
       ]);
 
       if (thermalRes.status === 'fulfilled') setThermalData(thermalRes.value);
       if (riskRes.status === 'fulfilled') setRiskData(riskRes.value);
       if (mapRes.status === 'fulfilled') setMapLocations(mapRes.value.locations || []);
-      if (areasRes.status === 'fulfilled') setPriorityAreas(areasRes.value.areas || []);
-      if (forecastRes.status === 'fulfilled') setWardsForecastSummary(forecastRes.value.wards || []);
 
       setLastUpdatedTime(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
     } catch (e: any) {
@@ -235,6 +260,20 @@ export const GovernmentMap: React.FC = () => {
   useEffect(() => {
     fetchMapData(coords.lat, coords.lon);
   }, [coords.lat, coords.lon]);
+
+  // Regional & national background intelligence: load once on mount without blocking active location
+  useEffect(() => {
+    let isMounted = true;
+    Promise.allSettled([
+      api.getAreasRiskOverview(),
+      api.getWardsForecastSummary(),
+    ]).then(([areasRes, forecastRes]) => {
+      if (!isMounted) return;
+      if (areasRes.status === 'fulfilled') setPriorityAreas(areasRes.value.areas || []);
+      if (forecastRes.status === 'fulfilled') setWardsForecastSummary(forecastRes.value.wards || []);
+    });
+    return () => { isMounted = false; };
+  }, []);
 
   // Load live Heat Action Plan triggers whenever selected ward changes
   useEffect(() => {
@@ -273,6 +312,10 @@ export const GovernmentMap: React.FC = () => {
           } as any);
         })
         .finally(() => setLoadingWardHap(false));
+
+      api.getBaselineOutlook(selectedWard.id)
+        .then((res) => setWardBaselineOutlook(res))
+        .catch(() => setWardBaselineOutlook(null));
     }
   }, [selectedWard?.id]);
 
@@ -379,8 +422,8 @@ export const GovernmentMap: React.FC = () => {
     setSelectedDistrictFilter('ALL');
   }, [locationName]);
 
-  const availableDistricts = useMemo(() => {
-    const dists = Array.from(new Set(effectiveAdminWards.map((w) => w.district).filter(Boolean)));
+  const availableDistricts: string[] = useMemo(() => {
+    const dists: string[] = Array.from(new Set(effectiveAdminWards.map((w) => w.district).filter((d): d is string => Boolean(d))));
     return ['ALL', ...dists];
   }, [effectiveAdminWards]);
 
@@ -388,15 +431,6 @@ export const GovernmentMap: React.FC = () => {
     if (selectedDistrictFilter === 'ALL') return effectiveAdminWards;
     return effectiveAdminWards.filter((w) => w.district === selectedDistrictFilter);
   }, [effectiveAdminWards, selectedDistrictFilter]);
-
-  const filteredGlobalStations = useMemo(() => {
-    return getStationsByRegion(selectedRegionFilter);
-  }, [selectedRegionFilter]);
-
-  const handleSelectGlobalStation = (station: GlobalHeatStation) => {
-    setSelectedGlobalStation(station);
-    setCoordsAndName({ lat: station.lat, lon: station.lon }, `${station.name}, ${station.country}`);
-  };
 
   const isViewingOutsideScope = useMemo(() => {
     if (!authority) return false;
@@ -406,6 +440,12 @@ export const GovernmentMap: React.FC = () => {
     if (!officerJid) return false;
 
     const currentShortCode = municipalAuthority?.shortCode;
+    const assignedMc = getMunicipalCorporationById(officerJid);
+    if (assignedMc) {
+      const isSameCity = locationName.toLowerCase().includes(assignedMc.city.toLowerCase()) || currentShortCode === assignedMc.shortCode;
+      return !isSameCity;
+    }
+
     if (authority.isMunicipal && officerJid === 'IN-MH-MCGM') {
       const isMumbai = locationName.toLowerCase().includes('mumbai') || currentShortCode === 'BMC';
       return !isMumbai;
@@ -429,6 +469,14 @@ export const GovernmentMap: React.FC = () => {
     if (resetToOperationalScope) {
       resetToOperationalScope();
     }
+    if (authority?.jurisdictionId && authority.jurisdictionId !== 'IN') {
+      const mc = getMunicipalCorporationById(authority.jurisdictionId) || findMunicipalCorporationByCity(authority.jurisdictionName);
+      if (mc) {
+        setCoordsAndName({ lat: mc.lat, lon: mc.lon }, `${mc.city}, ${mc.state}`);
+        setGisLayerMode('official_wards');
+        return;
+      }
+    }
     if (authority?.isMunicipal && authority.jurisdictionId === 'IN-MH-MCGM') {
       setCoordsAndName({ lat: 19.0760, lon: 72.8777 }, 'Mumbai, Maharashtra');
       setGisLayerMode('official_wards');
@@ -438,6 +486,7 @@ export const GovernmentMap: React.FC = () => {
   };
 
   const handleCitySelect = (city: typeof QUICK_GOV_CITIES[0]) => {
+    setSelectedWard(null);
     setCoordsAndName({ lat: city.lat, lon: city.lon }, `${city.name}, ${city.state}`);
     setGisLayerMode('official_wards');
     setSelectedDistrictFilter('ALL');
@@ -452,6 +501,7 @@ export const GovernmentMap: React.FC = () => {
   };
 
   const handlePriorityClick = (area: AreaRiskItem) => {
+    setSelectedWard(null);
     setLocation({
       name: `${area.name}, ${area.state}`,
       latitude: area.latitude,
@@ -560,22 +610,33 @@ export const GovernmentMap: React.FC = () => {
             </h1>
           </div>
 
-          {/* Sleek Segmented GIS Layer Switcher */}
-          <div className="inline-flex items-center p-1 rounded-2xl bg-slate-500/10 border ts-border text-xs flex-shrink-0 overflow-x-auto max-w-full">
+          {/* Two-Button Option: [My Jurisdiction Wards] vs [National State Heat Alerts (37)] */}
+          <div className="inline-flex items-center p-1 rounded-2xl bg-slate-500/10 border ts-border text-xs flex-shrink-0 overflow-x-auto max-w-full gap-1.5">
             <button
               type="button"
-              onClick={() => setGisLayerMode('official_wards')}
-              className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 whitespace-nowrap ${
+              onClick={() => {
+                setGisLayerMode('official_wards');
+                if (authority?.jurisdictionId && authority.jurisdictionId !== 'IN') {
+                  const mc = getMunicipalCorporationById(authority.jurisdictionId) || findMunicipalCorporationByCity(authority.jurisdictionName);
+                  if (mc) {
+                    setCoordsAndName({ lat: mc.lat, lon: mc.lon }, `${mc.city}, ${mc.state}`);
+                  }
+                }
+              }}
+              className={`px-4 py-2 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-2 whitespace-nowrap ${
                 gisLayerMode === 'official_wards'
-                  ? 'bg-orange-500 text-white shadow-sm'
-                  : 'ts-text-muted hover:ts-text-primary'
+                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/20'
+                  : 'ts-text-muted hover:ts-text-primary hover:bg-slate-500/10'
               }`}
             >
-              <Building2 className="w-3.5 h-3.5" />
+              <Building2 className="w-4 h-4" />
               <span>
-                {locationName.toLowerCase().includes('mumbai')
-                  ? 'Mumbai BMC Wards (24)'
-                  : `${municipalAuthority.shortCode} Wards (${effectiveAdminWards.length})`}
+                {authority?.jurisdictionId && authority.jurisdictionId !== 'IN'
+                  ? `📍 My Jurisdiction Wards (${municipalAuthority.shortCode})`
+                  : `📍 ${municipalAuthority.shortCode} Wards (${effectiveAdminWards.length})`}
+              </span>
+              <span className="px-1.5 py-0.5 rounded-md bg-black/25 text-[10px] text-white font-mono font-bold">
+                {effectiveAdminWards.length} Wards
               </span>
             </button>
 
@@ -585,56 +646,17 @@ export const GovernmentMap: React.FC = () => {
                 setGisLayerMode('state_alerts');
                 setCoordsAndName({ lat: 22.8000, lon: 79.6000 }, 'India (National IMD Heat Alerts)');
               }}
-              className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 whitespace-nowrap ${
+              className={`px-4 py-2 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-2 whitespace-nowrap ${
                 gisLayerMode === 'state_alerts'
-                  ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-sm'
-                  : 'ts-text-muted hover:ts-text-primary'
+                  ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-md shadow-red-500/20'
+                  : 'ts-text-muted hover:ts-text-primary hover:bg-slate-500/10'
               }`}
             >
-              <ShieldAlert className="w-3.5 h-3.5 text-red-400" />
-              <span>State Heatmap Alerts (37)</span>
-              <span className="px-1.5 py-0.2 rounded-full bg-red-500/30 text-[10px] text-white font-extrabold ml-1">
-                4 RED
+              <ShieldAlert className="w-4 h-4 text-red-300" />
+              <span>🇮🇳 National State Heat Alerts (37)</span>
+              <span className="px-1.5 py-0.5 rounded-md bg-red-500/40 text-[10px] text-white font-bold">
+                {nationalStats.redCount} RED
               </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setGisLayerMode('global_world')}
-              className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 whitespace-nowrap ${
-                gisLayerMode === 'global_world'
-                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm'
-                  : 'ts-text-muted hover:ts-text-primary'
-              }`}
-            >
-              <Globe className="w-3.5 h-3.5" />
-              <span>World Heatmap (38)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setGisLayerMode('mumbai_zones')}
-              className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 whitespace-nowrap ${
-                gisLayerMode === 'mumbai_zones'
-                  ? 'bg-orange-500 text-white shadow-sm'
-                  : 'ts-text-muted hover:ts-text-primary'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>Prototype Zones</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setGisLayerMode('national_centroids')}
-              className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center space-x-1.5 whitespace-nowrap ${
-                gisLayerMode === 'national_centroids'
-                  ? 'bg-orange-500 text-white shadow-sm'
-                  : 'ts-text-muted hover:ts-text-primary'
-              }`}
-            >
-              <MapIcon className="w-3.5 h-3.5" />
-              <span>Centroids</span>
             </button>
           </div>
         </div>
@@ -645,10 +667,12 @@ export const GovernmentMap: React.FC = () => {
             <LocationSearch
               currentLocationName={locationName}
               onSelectLocation={(loc) => {
+                setSelectedWard(null);
                 setLocation(loc);
                 setGisLayerMode('official_wards');
               }}
               onUseMyLocation={() => {
+                setSelectedWard(null);
                 detectMyLocation();
                 setGisLayerMode('official_wards');
               }}
@@ -943,7 +967,7 @@ export const GovernmentMap: React.FC = () => {
                   const isSelected = stateFilterCategory === cat;
                   const count =
                     cat === 'ALL'
-                      ? ALL_STATE_HEAT_ALERTS.length
+                      ? liveStateAlerts.length
                       : cat === 'RED'
                       ? nationalStats.redCount
                       : cat === 'ORANGE'
@@ -1036,179 +1060,10 @@ export const GovernmentMap: React.FC = () => {
           </div>
         )}
 
-        {gisLayerMode === 'global_world' && (
-          <div className="pt-2 border-t ts-border space-y-2">
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs scrollbar-none">
-              <span className="ts-text-subtle font-bold whitespace-nowrap text-[11px] flex items-center gap-1 mr-1">
-                <Globe className="w-3.5 h-3.5 text-orange-500" />
-                <span>Regions:</span>
-              </span>
-              {GLOBAL_REGIONS.map((region) => {
-                const isSelected = selectedRegionFilter === region.id;
-                return (
-                  <button
-                    key={region.id}
-                    type="button"
-                    onClick={() => setSelectedRegionFilter(region.id)}
-                    className={`px-2.5 py-0.5 rounded-xl font-semibold whitespace-nowrap transition-all cursor-pointer text-xs ${
-                      isSelected
-                        ? 'bg-orange-500 text-white shadow-sm font-bold'
-                        : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary hover:bg-slate-500/10'
-                    }`}
-                  >
-                    <span>{region.shortName}</span>
-                    <span className="ml-1 text-[10px] opacity-75">
-                      ({getStationsByRegion(region.id).length})
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
-              <span className="ts-text-subtle font-bold whitespace-nowrap text-[11px]">
-                Megacities:
-              </span>
-              <div className="flex items-center gap-1.5">
-                {filteredGlobalStations.map((station) => {
-                  const isSelected = selectedGlobalStation?.id === station.id;
-                  const rStyle = getRiskStyle(station.riskLevel);
-                  return (
-                    <button
-                      key={station.id}
-                      type="button"
-                      onClick={() => handleSelectGlobalStation(station)}
-                      className={`px-2.5 py-1 rounded-xl border text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center space-x-1.5 ${
-                        isSelected
-                          ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white border-orange-500 shadow-sm font-bold'
-                          : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary hover:bg-slate-500/10'
-                      }`}
-                    >
-                      <span>{station.name}</span>
-                      <span className="font-mono text-[10px] opacity-90">{station.baselineTemp.toFixed(0)}°C</span>
-                      <span className="text-[10px]">{rStyle.emoji}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {gisLayerMode === 'mumbai_zones' && (
-          <div className="pt-2 border-t ts-border flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
-            <span className="ts-text-subtle font-bold whitespace-nowrap text-[11px]">
-              Prototype Zones:
-            </span>
-            <div className="flex items-center gap-1.5">
-              {MUMBAI_PROTOTYPE_ZONES.map((zone) => {
-                const isSelected = selectedZone?.id === zone.id;
-                return (
-                  <button
-                    key={zone.id}
-                    type="button"
-                    onClick={() => setSelectedZone(zone)}
-                    className={`px-3 py-1.5 rounded-xl border text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
-                        : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary hover:bg-slate-500/10'
-                    }`}
-                  >
-                    {zone.shortName}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {gisLayerMode === 'national_centroids' && (
-          <div className="pt-2 border-t ts-border flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
-            <span className="ts-text-subtle font-bold whitespace-nowrap text-[11px]">
-              Quick City Jump:
-            </span>
-            <div className="flex items-center gap-1.5">
-              {QUICK_GOV_CITIES.map((c) => {
-                const isSelected = Math.abs(coords.lat - c.lat) < 0.05 && Math.abs(coords.lon - c.lon) < 0.05;
-                return (
-                  <button
-                    key={c.name}
-                    type="button"
-                    onClick={() => handleCitySelect(c)}
-                    className={`px-3 py-1.5 rounded-xl border text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
-                        : 'ts-card-subtle border ts-border ts-text-muted hover:ts-text-primary hover:bg-slate-500/10'
-                    }`}
-                  >
-                    {c.name} ({c.zone})
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* SECTION 3 — PRIMARY GEOGRAPHIC MAP */}
       <div className="space-y-4">
-        {/* Global Surveillance KPI Summary Row */}
-        {gisLayerMode === 'global_world' && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="p-4 rounded-2xl ts-card-subtle border ts-border flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider ts-text-subtle block">
-                  Planetary Hotspot
-                </span>
-                <div className="text-xl font-black text-red-500 font-mono mt-0.5">
-                  Jacobabad / Kuwait
-                </div>
-                <div className="text-[11px] ts-text-muted">47.8°C Peak Recorded</div>
-              </div>
-              <Flame className="w-8 h-8 text-red-500/40 shrink-0" />
-            </div>
-
-            <div className="p-4 rounded-2xl ts-card-subtle border ts-border flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider ts-text-subtle block">
-                  Severe Thermal Strain
-                </span>
-                <div className="text-xl font-black text-orange-500 font-mono mt-0.5">
-                  {GLOBAL_HEAT_STATIONS.filter((s) => s.riskLevel === 'EXTREME' || s.riskLevel === 'CRITICAL').length} Zones
-                </div>
-                <div className="text-[11px] ts-text-muted">Extreme & Critical Heat Index</div>
-              </div>
-              <AlertTriangle className="w-8 h-8 text-orange-500/40 shrink-0" />
-            </div>
-
-            <div className="p-4 rounded-2xl ts-card-subtle border ts-border flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider ts-text-subtle block">
-                  Peak Wet-Bulb Load
-                </span>
-                <div className="text-xl font-black text-rose-500 font-mono mt-0.5">
-                  34.2°C WBGT
-                </div>
-                <div className="text-[11px] ts-text-muted">High Gulf & South Asian Humidity</div>
-              </div>
-              <HeartPulse className="w-8 h-8 text-rose-500/40 shrink-0" />
-            </div>
-
-            <div className="p-4 rounded-2xl ts-card-subtle border ts-border flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider ts-text-subtle block">
-                  Global Met Grid
-                </span>
-                <div className="text-xl font-black text-emerald-500 font-mono mt-0.5">
-                  38 Stations
-                </div>
-                <div className="text-[11px] ts-text-muted">7 Continental Climate Belts</div>
-              </div>
-              <Globe className="w-8 h-8 text-emerald-500/40 shrink-0" />
-            </div>
-          </div>
-        )}
-
         {/* 5-Day Early Warning Forecast Horizon Selector */}
         {gisLayerMode === 'official_wards' && (
           <div className="p-3.5 rounded-2xl bg-slate-500/10 border ts-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn">
@@ -1255,131 +1110,88 @@ export const GovernmentMap: React.FC = () => {
         )}
 
         <RiskMap
-          scope={gisLayerMode === 'global_world' ? 'world' : gisLayerMode === 'state_alerts' ? 'national' : 'wards'}
+          scope={gisLayerMode === 'state_alerts' ? 'national' : 'wards'}
           center={
-            gisLayerMode === 'global_world' && selectedGlobalStation
-              ? [selectedGlobalStation.lat, selectedGlobalStation.lon]
-              : gisLayerMode === 'state_alerts' && selectedStateAlert
+            gisLayerMode === 'state_alerts' && selectedStateAlert
               ? [selectedStateAlert.centroid[1], selectedStateAlert.centroid[0]]
-              : gisLayerMode === 'official_wards' && selectedWard
-              ? [selectedWard.centroid.latitude, selectedWard.centroid.longitude]
-              : gisLayerMode === 'mumbai_zones' && selectedZone
-              ? selectedZone.representativeCoords
               : [coords.lat, coords.lon]
           }
           zoom={
-            gisLayerMode === 'global_world'
-              ? (selectedGlobalStation ? 5 : 3)
-              : gisLayerMode === 'state_alerts'
+            gisLayerMode === 'state_alerts'
               ? (selectedStateAlert ? 6 : 5)
-              : gisLayerMode === 'official_wards'
-              ? 12
-              : gisLayerMode === 'mumbai_zones'
-              ? 11
-              : 6
+              : 12
           }
           locationName={
-            gisLayerMode === 'global_world' && selectedGlobalStation
-              ? `${selectedGlobalStation.name}, ${selectedGlobalStation.country}`
-              : gisLayerMode === 'state_alerts' && selectedStateAlert
+            gisLayerMode === 'state_alerts' && selectedStateAlert
               ? `${selectedStateAlert.stateName}, India`
-              : gisLayerMode === 'official_wards' && selectedWard
+              : selectedWard
               ? selectedWard.name
-              : gisLayerMode === 'mumbai_zones' && selectedZone
-              ? selectedZone.name
               : locationName
           }
           temperature={
-            gisLayerMode === 'global_world' && selectedGlobalStation
-              ? selectedGlobalStation.baselineTemp
-              : gisLayerMode === 'state_alerts' && selectedStateAlert
+            gisLayerMode === 'state_alerts' && selectedStateAlert
               ? selectedStateAlert.temperatureC
-              : gisLayerMode === 'official_wards' && selectedWard
+              : selectedWard
               ? selectedWard.weather.temperatureC
-              : gisLayerMode === 'mumbai_zones' && selectedZone
-              ? currentTemp + selectedZone.baselineTempOffsetC
               : currentTemp
           }
           humidity={
-            gisLayerMode === 'global_world' && selectedGlobalStation
-              ? selectedGlobalStation.baselineRh
-              : gisLayerMode === 'state_alerts' && selectedStateAlert
+            gisLayerMode === 'state_alerts' && selectedStateAlert
               ? selectedStateAlert.humidityPercent
-              : gisLayerMode === 'official_wards' && selectedWard
+              : selectedWard
               ? selectedWard.weather.humidityPercent
               : thermalData?.weather?.humidity
           }
           wbgt={
-            gisLayerMode === 'global_world' && selectedGlobalStation
-              ? selectedGlobalStation.baselineWbgt
-              : gisLayerMode === 'state_alerts' && selectedStateAlert
+            gisLayerMode === 'state_alerts' && selectedStateAlert
               ? selectedStateAlert.wbgtC
-              : gisLayerMode === 'official_wards' && selectedWard
+              : selectedWard
               ? selectedWard.thermal.estimatedWbgtC
               : thermalData?.thermal?.indices?.wbgt_c
           }
           riskLevel={
-            gisLayerMode === 'global_world' && selectedGlobalStation
-              ? selectedGlobalStation.riskLevel
-              : gisLayerMode === 'state_alerts' && selectedStateAlert
+            gisLayerMode === 'state_alerts' && selectedStateAlert
               ? selectedStateAlert.riskLevel
-              : gisLayerMode === 'official_wards' && selectedWard
+              : selectedWard
               ? selectedWard.risk.level
               : currentRiskLevel
           }
           riskScore={
-            gisLayerMode === 'global_world' && selectedGlobalStation
-              ? selectedGlobalStation.riskScore / 100
-              : gisLayerMode === 'state_alerts' && selectedStateAlert
-              ? selectedStateAlert.riskScore / 100
-              : gisLayerMode === 'official_wards' && selectedWard
-              ? selectedWard.risk.score / 100
+            gisLayerMode === 'state_alerts' && selectedStateAlert
+              ? (selectedStateAlert.riskScore > 1 ? selectedStateAlert.riskScore / 100 : selectedStateAlert.riskScore)
+              : selectedWard
+              ? (selectedWard.risk.score > 1 ? selectedWard.risk.score / 100 : selectedWard.risk.score)
               : thermalData?.thermal?.risk_assessment?.score
           }
           showStateAlerts={gisLayerMode === 'state_alerts'}
           selectedStateCode={selectedStateAlert?.stateCode}
           onSelectState={(st) => setSelectedStateAlert(st)}
-          globalStations={gisLayerMode === 'global_world' ? filteredGlobalStations : []}
-          selectedGlobalStationId={gisLayerMode === 'global_world' ? selectedGlobalStation?.id : undefined}
-          onSelectGlobalStation={handleSelectGlobalStation}
+          stateAlerts={liveStateAlerts}
           adminWards={gisLayerMode === 'official_wards' ? effectiveAdminWards : []}
           selectedWardId={gisLayerMode === 'official_wards' ? selectedWard?.id : undefined}
-          onSelectWard={(ward) => setSelectedWard(ward)}
-          thermalZones={gisLayerMode === 'mumbai_zones' ? MUMBAI_PROTOTYPE_ZONES : []}
-          selectedZoneId={gisLayerMode === 'mumbai_zones' ? selectedZone?.id : undefined}
-          onSelectZone={(zone) => setSelectedZone(zone)}
-          mapLocations={gisLayerMode === 'national_centroids' ? mapLocations : []}
+          onSelectWard={(ward) => {
+            setSelectedWard(ward);
+          }}
+          onInspectWardTelemetry={(ward) => {
+            setSelectedWard(ward);
+            setTimeout(() => {
+              wardTelemetryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 60);
+          }}
           isLoadingMap={isLoading}
           mapError={mapError}
           title={
-            gisLayerMode === 'global_world'
-              ? 'Worldwide Thermal Surveillance & Planetary Heat Diffusion'
-              : gisLayerMode === 'state_alerts'
+            gisLayerMode === 'state_alerts'
               ? 'Official Survey of India State-Wise Heatmap Alerts (IMD Scale)'
-              : gisLayerMode === 'official_wards'
-              ? `${locationName.split(',')[0]} Municipal Administrative Wards (${municipalAuthority.shortCode} Reference)`
-              : gisLayerMode === 'mumbai_zones'
-              ? 'Greater Mumbai Urban Thermal Zones (Prototype GIS Layer)'
-              : 'National Heat Risk Reference Centroids'
+              : `${locationName.split(',')[0]} Municipal Administrative Wards (${municipalAuthority.shortCode} Reference)`
           }
           subtitle={
-            gisLayerMode === 'global_world'
-              ? 'Continuous planetary heat diffusion belts and multi-continent meteorological observation nodes'
-              : gisLayerMode === 'state_alerts'
+            gisLayerMode === 'state_alerts'
               ? 'Accurate GIS boundary models across all 37 Indian States/UTs enriched with IMD Heat Wave criteria, Rothfusz Heat Index, Stull Wet-Bulb & SDMA directives'
-              : gisLayerMode === 'official_wards'
-              ? `Curated ${municipalAuthority.name} boundaries & thermal diffusion — weather sampled at ward representative coordinates`
-              : gisLayerMode === 'mumbai_zones'
-              ? 'Coarse prototype polygons with thermal microclimate demonstration offsets'
-              : 'Regional heat risk evaluated at curated municipal monitoring reference points'
+              : `Curated ${municipalAuthority.name} boundaries & thermal diffusion across ${effectiveAdminWards.length} wards`
           }
           onMapClick={async (lat, lon) => {
-            const hub = findNearestMetroHub(lat, lon);
-            if (hub) {
-              setCoordsAndName({ lat: hub.lat, lon: hub.lon }, `${hub.name}, India`);
-              setSelectedDistrictFilter('ALL');
-              return;
-            }
+            setSelectedWard(null);
             try {
               const res = await api.reverseGeocode(lat, lon);
               if (res && res.name) {
@@ -1398,24 +1210,16 @@ export const GovernmentMap: React.FC = () => {
           <Info className="w-4 h-4 text-orange-400 mt-0.5 flex-shrink-0" />
           <div className="leading-relaxed">
             <strong className="ts-text-primary">Data Reality & Provenance Notice: </strong>
-            {gisLayerMode === 'global_world' ? (
+            {gisLayerMode === 'state_alerts' ? (
               <span>
-                Planetary thermal surveillance is synthesized using <strong>WMO synoptic observation standards</strong>, Open-Meteo meteorological telemetry across 38 global megacity observation stations, and continuous thermodynamic radial heat diffusion modeling across all continental belts.
+                State-level heatwave monitoring is based on official <strong>Survey of India</strong> administrative boundaries and real-time <strong>IMD (India Meteorological Department)</strong> heatwave classification thresholds, integrated with State Disaster Management Authority (SDMA) operational directives.
               </span>
-            ) : gisLayerMode === 'official_wards' ? (
+            ) : (
               <span>
                 Administrative ward geometry is aligned with <strong>{selectedWard?.provenance?.sourceName || municipalAuthority.name}</strong>.
                 Classification: <strong>{selectedWard?.provenance?.sourceType || 'Municipal Administrative Division'}</strong>.
                 Boundary level: <strong>{selectedWard?.provenance?.boundaryLevel || municipalAuthority.boundaryType}</strong>.
                 Local meteorological telemetry is sampled across representative coordinates with microclimate urban heat island (UHI) adjustments.
-              </span>
-            ) : gisLayerMode === 'mumbai_zones' ? (
-              <span>
-                Greater Mumbai polygons represent <strong>Prototype Urban Thermal Zones</strong> calibrated with microclimate adjustments (Urban Heat Island offsets). They are coarse demonstration shapes and should not be confused with official administrative wards.
-              </span>
-            ) : (
-              <span>
-                Reference pins represent curated municipal reference coordinates evaluated with live meteorological telemetry. Colored buffers are analytical risk envelopes, not continuous physical sensor grids.
               </span>
             )}
           </div>
@@ -1423,7 +1227,7 @@ export const GovernmentMap: React.FC = () => {
       </div>
 
       {/* SECTION 4 — SELECTED AREA THERMAL RISK */}
-      <div className="rounded-3xl ts-card p-6 sm:p-8 border ts-border shadow-xl">
+      <div ref={wardTelemetryRef} className="rounded-3xl ts-card p-6 sm:p-8 border ts-border shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b ts-border">
           <div>
             <div className="flex items-center space-x-2">
@@ -1431,40 +1235,20 @@ export const GovernmentMap: React.FC = () => {
                 Selected Area Thermal Risk
               </span>
               <DataRealityBadge
-                tier={
-                  gisLayerMode === 'state_alerts'
-                    ? 'LIVE'
-                    : gisLayerMode === 'global_world'
-                    ? 'LIVE'
-                    : gisLayerMode === 'official_wards'
-                    ? 'LIVE'
-                    : gisLayerMode === 'mumbai_zones'
-                    ? 'MODELLED'
-                    : 'CALCULATED'
-                }
+                tier="LIVE"
                 size="xs"
                 customLabel={
                   gisLayerMode === 'state_alerts'
                     ? 'Official Survey of India GIS'
-                    : gisLayerMode === 'global_world'
-                    ? 'Global Observation Station'
-                    : gisLayerMode === 'official_wards'
-                    ? `${municipalAuthority.shortCode} Administrative Ward`
-                    : gisLayerMode === 'mumbai_zones'
-                    ? 'Modelled Prototype Thermal Zone'
-                    : 'Calculated Regional Risk Estimate'
+                    : `${municipalAuthority.shortCode} Administrative Ward`
                 }
               />
             </div>
             <h2 className="text-xl sm:text-2xl font-black ts-text-primary mt-0.5">
               {gisLayerMode === 'state_alerts' && selectedStateAlert
                 ? `${selectedStateAlert.stateName} (${selectedStateAlert.stateCode})`
-                : gisLayerMode === 'global_world' && selectedGlobalStation
-                ? `${selectedGlobalStation.name}, ${selectedGlobalStation.country}`
-                : gisLayerMode === 'official_wards' && selectedWard
+                : selectedWard
                 ? selectedWard.name
-                : gisLayerMode === 'mumbai_zones' && selectedZone
-                ? selectedZone.name
                 : `${locationName.split(',')[0]} Selected Area`}
             </h2>
             <div className="flex items-center gap-3 text-xs ts-text-subtle mt-1 flex-wrap">
@@ -1478,21 +1262,7 @@ export const GovernmentMap: React.FC = () => {
                   <span>•</span>
                   <span><strong>Affected Population:</strong> ~{selectedStateAlert.affectedPopulationMillion}M</span>
                 </>
-              ) : gisLayerMode === 'global_world' && selectedGlobalStation ? (
-                <>
-                  <span><strong>Station ID:</strong> {selectedGlobalStation.id}</span>
-                  <span>•</span>
-                  <span><strong>Region:</strong> {selectedGlobalStation.region}</span>
-                  <span>•</span>
-                  <span><strong>Geography:</strong> Global Met Observation Node</span>
-                  <span>•</span>
-                  <span className="font-mono">
-                    <strong>Coordinates:</strong> {selectedGlobalStation.lat.toFixed(4)}° N, {selectedGlobalStation.lon.toFixed(4)}° E
-                  </span>
-                  <span>•</span>
-                  <span><strong>Data Source:</strong> WMO Synoptic / Open-Meteo Planetary Feed</span>
-                </>
-              ) : gisLayerMode === 'official_wards' && selectedWard ? (
+              ) : selectedWard ? (
                 <>
                   <span><strong>Ward Code:</strong> {selectedWard.wardCode}</span>
                   <span>•</span>
@@ -1509,20 +1279,6 @@ export const GovernmentMap: React.FC = () => {
                   </span>
                   <span>•</span>
                   <span><strong>Localities:</strong> {selectedWard.localities?.join(', ')}</span>
-                </>
-              ) : gisLayerMode === 'mumbai_zones' && selectedZone ? (
-                <>
-                  <span><strong>District:</strong> {selectedZone.district}</span>
-                  <span>•</span>
-                  <span><strong>Zone Type:</strong> {selectedZone.zone}</span>
-                  <span>•</span>
-                  <span>
-                    <strong>Microclimate Offset:</strong>{' '}
-                    {selectedZone.baselineTempOffsetC >= 0
-                      ? `+${selectedZone.baselineTempOffsetC}°C`
-                      : `${selectedZone.baselineTempOffsetC}°C`}{' '}
-                    UHI
-                  </span>
                 </>
               ) : (
                 <>
@@ -1547,16 +1303,7 @@ export const GovernmentMap: React.FC = () => {
                   Score: {selectedStateAlert.riskScore}/100
                 </span>
               </div>
-            ) : gisLayerMode === 'global_world' && selectedGlobalStation ? (
-              <div className="flex items-center space-x-2">
-                <span className={`px-3 py-1 rounded-xl text-xs font-black uppercase ${getRiskStyle(selectedGlobalStation.riskLevel).badge}`}>
-                  {getRiskStyle(selectedGlobalStation.riskLevel).emoji} {selectedGlobalStation.riskLevel}
-                </span>
-                <span className="font-mono font-bold text-xs ts-text-muted">
-                  Score: {selectedGlobalStation.riskScore.toFixed(0)}/100
-                </span>
-              </div>
-            ) : gisLayerMode === 'official_wards' && selectedWard ? (
+            ) : selectedWard ? (
               <div className="flex items-center space-x-2">
                 <span className={`px-3 py-1 rounded-xl text-xs font-black uppercase ${getRiskStyle(selectedWard.risk.level).badge}`}>
                   {getRiskStyle(selectedWard.risk.level).emoji} {selectedWard.risk.level}
@@ -1582,17 +1329,10 @@ export const GovernmentMap: React.FC = () => {
             <div className="text-2xl font-black text-orange-600 dark:text-orange-400 font-mono mt-1">
               {gisLayerMode === 'state_alerts' && selectedStateAlert
                 ? `${selectedStateAlert.wbgtC.toFixed(1)}°C`
-                : gisLayerMode === 'global_world' && selectedGlobalStation
-                ? `${selectedGlobalStation.baselineWbgt.toFixed(1)}°C`
-                : gisLayerMode === 'official_wards' && selectedWard
+                : selectedWard
                 ? `${selectedWard.thermal.estimatedWbgtC.toFixed(1)}°C`
                 : thermalData?.thermal?.indices?.wbgt_c !== undefined
-                ? `${(
-                    thermalData.thermal.indices.wbgt_c +
-                    (gisLayerMode === 'mumbai_zones' && selectedZone
-                      ? selectedZone.baselineTempOffsetC * 0.7
-                      : 0)
-                  ).toFixed(1)}°C`
+                ? `${thermalData.thermal.indices.wbgt_c.toFixed(1)}°C`
                 : '--'}
             </div>
             <div className="text-[11px] ts-text-muted mt-0.5">
@@ -1607,16 +1347,9 @@ export const GovernmentMap: React.FC = () => {
             <div className="text-2xl font-black text-amber-500 font-mono mt-1">
               {gisLayerMode === 'state_alerts' && selectedStateAlert
                 ? `${selectedStateAlert.apparentTemperatureC.toFixed(1)}°C`
-                : gisLayerMode === 'global_world' && selectedGlobalStation
-                ? `${selectedGlobalStation.baselineHeatIndex.toFixed(1)}°C`
-                : gisLayerMode === 'official_wards' && selectedWard
+                : selectedWard
                 ? `${selectedWard.thermal.heatIndexC.toFixed(1)}°C`
-                : `${(
-                    feelsLike +
-                    (gisLayerMode === 'mumbai_zones' && selectedZone
-                      ? selectedZone.baselineTempOffsetC
-                      : 0)
-                  ).toFixed(1)}°C`}
+                : `${feelsLike.toFixed(1)}°C`}
             </div>
             <div className="text-[11px] ts-text-muted mt-0.5">
               Effective physiological heat load
@@ -1630,26 +1363,15 @@ export const GovernmentMap: React.FC = () => {
             <div className="text-2xl font-black ts-text-primary font-mono mt-1">
               {gisLayerMode === 'state_alerts' && selectedStateAlert
                 ? `${selectedStateAlert.temperatureC.toFixed(1)}°C`
-                : gisLayerMode === 'global_world' && selectedGlobalStation
-                ? `${selectedGlobalStation.baselineTemp.toFixed(1)}°C`
-                : gisLayerMode === 'official_wards' && selectedWard
+                : selectedWard
                 ? `${selectedWard.weather.temperatureC.toFixed(1)}°C`
-                : `${(
-                    currentTemp +
-                    (gisLayerMode === 'mumbai_zones' && selectedZone
-                      ? selectedZone.baselineTempOffsetC
-                      : 0)
-                  ).toFixed(1)}°C`}
+                : `${currentTemp.toFixed(1)}°C`}
             </div>
             <div className="text-[11px] ts-text-muted mt-0.5">
               {gisLayerMode === 'state_alerts' && selectedStateAlert
                 ? `Max daytime temperature recorded in ${selectedStateAlert.stateName}`
-                : gisLayerMode === 'global_world' && selectedGlobalStation
-                ? `${selectedGlobalStation.region} Regional Reading`
-                : gisLayerMode === 'official_wards' && selectedWard
+                : selectedWard
                 ? `UHI offset: +${selectedWard.microclimateOffsetC ?? 0}°C`
-                : gisLayerMode === 'mumbai_zones' && selectedZone && selectedZone.baselineTempOffsetC !== 0
-                ? `Adjusted for ${selectedZone.baselineTempOffsetC >= 0 ? `+${selectedZone.baselineTempOffsetC}°C` : `${selectedZone.baselineTempOffsetC}°C`} UHI`
                 : 'Ambient meteorological reading'}
             </div>
           </div>
@@ -1661,36 +1383,26 @@ export const GovernmentMap: React.FC = () => {
             <div className="text-2xl font-black text-orange-600 dark:text-orange-400 font-mono mt-1">
               {gisLayerMode === 'state_alerts' && selectedStateAlert
                 ? `${Math.round(selectedStateAlert.vulnerabilityScore * 100)}%`
-                : gisLayerMode === 'global_world' && selectedGlobalStation
-                ? `${Math.round(selectedGlobalStation.vulnerabilityIndex * 100)}%`
-                : gisLayerMode === 'official_wards' && selectedWard
+                : selectedWard
                 ? `${Math.round(selectedWard.vulnerability.score * 100)}%`
-                : gisLayerMode === 'mumbai_zones' && selectedZone
-                ? `${Math.round(selectedZone.vulnerabilityIndex * 100)}%`
                 : '62%'}
             </div>
             <div className="text-[11px] ts-text-muted mt-0.5">
               {gisLayerMode === 'state_alerts'
                 ? 'State socioeconomic & outdoor labor vulnerability'
-                : gisLayerMode === 'global_world'
-                ? 'Regional climatic exposure index'
-                : gisLayerMode === 'official_wards'
-                ? 'Modelled vulnerability estimate'
-                : 'Modelled demographic risk'}
+                : 'Modelled vulnerability estimate'}
             </div>
           </div>
         </div>
 
         {/* Secondary Weather telemetry row */}
-        {((gisLayerMode === 'state_alerts' && selectedStateAlert) || (gisLayerMode === 'official_wards' && selectedWard) || (gisLayerMode === 'global_world' && selectedGlobalStation)) && (
+        {((gisLayerMode === 'state_alerts' && selectedStateAlert) || (gisLayerMode === 'official_wards' && selectedWard)) && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 text-xs">
             <div className="p-3 rounded-xl ts-card-subtle border ts-border">
               <span className="ts-text-subtle text-[11px]">Relative Humidity:</span>
               <div className="font-bold font-mono text-sm ts-text-primary mt-0.5">
                 {gisLayerMode === 'state_alerts' && selectedStateAlert
                   ? `${selectedStateAlert.humidityPercent}%`
-                  : gisLayerMode === 'global_world' && selectedGlobalStation
-                  ? `${selectedGlobalStation.baselineRh}%`
                   : `${selectedWard?.weather.humidityPercent}%`}
               </div>
             </div>
@@ -1701,8 +1413,6 @@ export const GovernmentMap: React.FC = () => {
               <div className="font-bold font-mono text-sm ts-text-primary mt-0.5">
                 {gisLayerMode === 'state_alerts' && selectedStateAlert
                   ? `${selectedStateAlert.wetBulbC}°C`
-                  : gisLayerMode === 'global_world' && selectedGlobalStation
-                  ? '14.5 km/h'
                   : `${selectedWard?.weather.windSpeedMps.toFixed(1)} m/s`}
               </div>
             </div>
@@ -1713,8 +1423,6 @@ export const GovernmentMap: React.FC = () => {
               <div className="font-bold font-mono text-sm ts-text-primary mt-0.5 truncate">
                 {gisLayerMode === 'state_alerts' && selectedStateAlert
                   ? selectedStateAlert.imdClassification
-                  : gisLayerMode === 'global_world' && selectedGlobalStation
-                  ? '860 W/m²'
                   : `${selectedWard?.weather.solarRadiationWm2} W/m²`}
               </div>
             </div>
@@ -1725,34 +1433,9 @@ export const GovernmentMap: React.FC = () => {
               <div className="font-bold font-mono text-sm ts-text-primary mt-0.5">
                 {gisLayerMode === 'state_alerts' && selectedStateAlert
                   ? `${selectedStateAlert.affectedDistricts.length} Monitored`
-                  : gisLayerMode === 'global_world' && selectedGlobalStation
-                  ? `${selectedGlobalStation.baselineWbgt.toFixed(1)}°C`
                   : `${selectedWard?.thermal.wetBulbC.toFixed(1)}°C`}
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Vulnerability factors pill list if in prototype zone */}
-        {gisLayerMode === 'mumbai_zones' && selectedZone && (
-          <div className="mt-4 p-4 rounded-2xl ts-card-subtle border ts-border space-y-2">
-            <div className="text-xs font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400">
-              Zone Vulnerability Factors & Demographics:
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {selectedZone.vulnerabilityFactors.map((f, i) => (
-                <span
-                  key={i}
-                  className="px-2.5 py-1 rounded-lg text-xs bg-orange-500/10 border border-orange-500/25 text-orange-700 dark:text-orange-300 font-medium"
-                >
-                  • {f}
-                </span>
-              ))}
-            </div>
-            <p className="text-xs ts-text-muted pt-1">
-              <strong>Demographic Summary: </strong>
-              {selectedZone.demographicsNote}
-            </p>
           </div>
         )}
 
@@ -1766,12 +1449,8 @@ export const GovernmentMap: React.FC = () => {
             <p className="text-xs sm:text-sm ts-text-primary leading-relaxed">
               {gisLayerMode === 'state_alerts' && selectedStateAlert
                 ? `${selectedStateAlert.alertTitle}. ${selectedStateAlert.alertHeadline} Monitored under ${selectedStateAlert.authorityName}. Directives active across ${selectedStateAlert.affectedDistricts.length} administrative districts.`
-                : gisLayerMode === 'global_world' && selectedGlobalStation
-                ? selectedGlobalStation.hazardNote
-                : gisLayerMode === 'official_wards' && selectedWard
+                : selectedWard
                 ? selectedWard.attentionReason || `Elevated thermal strain in ${selectedWard.name}. High ambient temperature combined with ${selectedWard.weather.humidityPercent}% relative humidity requires active municipal hydration points.`
-                : gisLayerMode === 'mumbai_zones' && selectedZone
-                ? `Conditions in ${selectedZone.name} indicate elevated thermal stress. Authorities should review outdoor worker precautions, local cooling center access, and drinking water availability.`
                 : getAreaAttentionReasoning()}
             </p>
             {gisLayerMode === 'state_alerts' && selectedStateAlert && (
@@ -1848,75 +1527,6 @@ export const GovernmentMap: React.FC = () => {
           </div>
         )}
 
-        {/* Global Surveillance Operational Protocol */}
-        {gisLayerMode === 'global_world' && selectedGlobalStation && (
-          <div className="mt-4 p-4 rounded-2xl bg-slate-500/5 border border-orange-500/30 space-y-3">
-            <div className="flex items-center justify-between border-b ts-border pb-2">
-              <div className="flex items-center space-x-2">
-                <Globe className="w-4 h-4 text-orange-500" />
-                <span className="text-xs font-black ts-text-primary uppercase tracking-wider">
-                  Planetary Heat Surveillance & Civil Protection Protocol
-                </span>
-              </div>
-              <span className="text-xs font-mono font-bold text-orange-400">
-                {selectedGlobalStation.region}
-              </span>
-            </div>
-
-            {/* Stepper Flow Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5 text-xs">
-              <div className="p-3 rounded-xl ts-card-subtle border ts-border space-y-1">
-                <span className="text-[10px] font-bold uppercase text-slate-400 block">1. Planetary Thermal Stress</span>
-                <div className="text-sm font-black text-orange-500">
-                  {selectedGlobalStation.riskLevel} ({selectedGlobalStation.riskScore}/100)
-                </div>
-                <div className="text-[11px] ts-text-muted">
-                  WBGT: {selectedGlobalStation.baselineWbgt.toFixed(1)}°C | Heat Index: {selectedGlobalStation.baselineHeatIndex.toFixed(1)}°C
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl ts-card-subtle border ts-border space-y-1">
-                <span className="text-[10px] font-bold uppercase text-slate-400 block">2. Civic Health Hazard</span>
-                <div className="text-sm font-black text-amber-500">
-                  {selectedGlobalStation.riskLevel === 'EXTREME' || selectedGlobalStation.riskLevel === 'CRITICAL'
-                    ? 'Severe Heatstroke / Thermal Shock'
-                    : selectedGlobalStation.riskLevel === 'HIGH'
-                    ? 'Acute Dehydration & Exertion Hazard'
-                    : 'Manageable Thermal Load'}
-                </div>
-                <div className="text-[11px] ts-text-muted">
-                  Exposure: {Math.round(selectedGlobalStation.vulnerabilityIndex * 100)}%
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl ts-card-subtle border ts-border space-y-1">
-                <span className="text-[10px] font-bold uppercase text-slate-400 block">3. Early Warning Protocol</span>
-                <div className="text-xs font-black text-red-500 dark:text-red-400 truncate">
-                  {selectedGlobalStation.riskLevel === 'EXTREME' || selectedGlobalStation.riskLevel === 'CRITICAL'
-                    ? 'RED ALERT — ACTIVE ESCALATION'
-                    : selectedGlobalStation.riskLevel === 'HIGH'
-                    ? 'ORANGE ADVISORY — STAGE SUPPLIES'
-                    : 'YELLOW WATCH — MONITORING'}
-                </div>
-                <div className="text-[10px] ts-text-muted">
-                  WMO / Local Civil Defense Coordination
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl ts-card-subtle border border-orange-500/30 bg-orange-500/5 space-y-1">
-                <span className="text-[10px] font-bold uppercase text-orange-500 block">4. Priority Civic Countermeasure</span>
-                <div className="text-xs font-bold ts-text-primary truncate">
-                  {selectedGlobalStation.riskLevel === 'EXTREME' || selectedGlobalStation.riskLevel === 'CRITICAL'
-                    ? 'Open Air-Conditioned Municipal Refuges'
-                    : 'Enforce Shaded Rest & Hydration Stations'}
-                </div>
-                <div className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold">
-                  Priority: {selectedGlobalStation.riskLevel === 'EXTREME' ? 'IMMEDIATE' : 'HIGH'}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* SIH Core Flow: Current/Forecast Risk -> Health Concern -> Heat Action Trigger -> Recommended Action */}
         {gisLayerMode === 'official_wards' && selectedWard && (
@@ -1985,6 +1595,119 @@ export const GovernmentMap: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Gap 6: Ward Mortality & Hospital Surge + UTCI + Bilingual Public Health Advisory */}
+            <div className="mt-3 p-4 rounded-2xl bg-slate-900/60 border ts-border space-y-3">
+              {/* Header with UTCI pill & Bilingual Toggle */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b ts-border pb-2.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <HeartPulse className="w-4 h-4 text-rose-500" />
+                  <span className="text-xs font-black ts-text-primary uppercase tracking-wider">
+                    Epidemiological Outcomes & Advisory
+                  </span>
+                  {/* UTCI Badge */}
+                  {thermalData?.thermal?.indices?.utci_c !== undefined && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/15 text-orange-400 border border-orange-500/30 font-mono">
+                      UTCI: {thermalData.thermal.indices.utci_c.toFixed(1)}°C ({thermalData.thermal.indices.utci_category || 'Thermal Strain'})
+                    </span>
+                  )}
+                </div>
+
+                {/* Bilingual Toggle (EN / HI) */}
+                <div className="flex items-center gap-1 bg-slate-800/80 p-0.5 rounded-lg border border-slate-700 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setAdvisoryLang('en')}
+                    className={`px-2.5 py-0.5 rounded-md font-bold transition-colors ${
+                      advisoryLang === 'en' ? 'bg-orange-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    English
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdvisoryLang('hi')}
+                    className={`px-2.5 py-0.5 rounded-md font-bold transition-colors ${
+                      advisoryLang === 'hi' ? 'bg-orange-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    हिन्दी
+                  </button>
+                </div>
+              </div>
+
+              {/* Metric Tiles: Mortality Risk Index + Hospitalization Surge */}
+              {(() => {
+                const day0 = wardBaselineOutlook?.forecast_days?.[0];
+                const mortIndex = day0?.mortality_risk_index 
+                  ?? Math.min(100, Math.round(Math.max(0, (selectedWard.thermal.estimatedWbgtC - 27.5) * 8.0 + (selectedWard.vulnerability.score * 0.35))));
+                const hospSurge = day0?.hospitalization_surge_pct 
+                  ?? Math.round(Math.max(0, (selectedWard.thermal.estimatedWbgtC - 27.0) * 5.8 + (selectedWard.vulnerability.score * 0.22)));
+                const mortColor = mortIndex >= 60 ? 'bg-red-500 text-red-400' : mortIndex >= 30 ? 'bg-orange-500 text-orange-400' : 'bg-amber-500 text-amber-400';
+                const hospColor = hospSurge >= 30 ? 'bg-red-500 text-red-400' : hospSurge >= 15 ? 'bg-orange-500 text-orange-400' : 'bg-emerald-500 text-emerald-400';
+
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Mortality Risk Index */}
+                    <div className="p-3 rounded-xl ts-card-subtle border ts-border space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold ts-text-primary">Mortality Risk Index</span>
+                        <span className="font-mono font-black text-sm">{mortIndex}/100</span>
+                      </div>
+                      <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${mortColor.split(' ')[0]}`}
+                          style={{ width: `${Math.min(100, Math.max(5, mortIndex))}%` }}
+                        />
+                      </div>
+                      <div className="text-[10px] ts-text-muted flex items-center justify-between">
+                        <span>Calendar-adjusted excess mortality proxy</span>
+                        <span className="font-semibold text-slate-400">Calibrated Baseline</span>
+                      </div>
+                    </div>
+
+                    {/* Hospitalization Surge */}
+                    <div className="p-3 rounded-xl ts-card-subtle border ts-border space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold ts-text-primary">Hospital Admission Surge</span>
+                        <span className="font-mono font-black text-sm">+{hospSurge}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${hospColor.split(' ')[0]}`}
+                          style={{ width: `${Math.min(100, Math.max(5, hospSurge * 2))}%` }}
+                        />
+                      </div>
+                      <div className="text-[10px] ts-text-muted flex items-center justify-between">
+                        <span>Estimated acute heat ED influx</span>
+                        <span className="font-semibold text-slate-400">Ward Surge Projection</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Bilingual Advisory Card */}
+              {(() => {
+                const rawAdv = wardActionPlan?.bilingual_advisory;
+                const advText = (rawAdv && rawAdv[advisoryLang]) || (
+                  advisoryLang === 'hi'
+                    ? `उच्च गर्मी चेतावनी (${selectedWard.name}) — WBGT ${selectedWard.thermal.estimatedWbgtC.toFixed(1)}°C। खतरनाक ताप तनाव संभव। दोपहर 12–4 बजे बाहरी गतिविधि सीमित करें और पर्याप्त पानी पिएं।`
+                    : `HIGH HEAT WARNING (${selectedWard.name}) — WBGT ${selectedWard.thermal.estimatedWbgtC.toFixed(1)}°C. Dangerous heat stress likely. Avoid outdoor activity 12 PM–4 PM. Stay hydrated and check on elderly citizens.`
+                );
+                return (
+                  <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/25 space-y-1">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-orange-400 uppercase tracking-wider">
+                      <span>📢 Public Health Advisory ({advisoryLang === 'en' ? 'English' : 'हिन्दी'})</span>
+                      <span className="text-[10px] font-normal text-slate-400">SIH 26083 Calibrated</span>
+                    </div>
+                    <p className="text-xs ts-text-primary leading-relaxed">
+                      {advText}
+                    </p>
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         )}
 
@@ -2051,7 +1774,7 @@ export const GovernmentMap: React.FC = () => {
                 key={area.name}
                 onClick={() => {
                   handlePriorityClick(area);
-                  setGisLayerMode('national_centroids');
+                  setGisLayerMode('official_wards');
                 }}
                 className="p-4 rounded-2xl ts-card-subtle border ts-border hover:border-orange-500/50 transition-all cursor-pointer group flex flex-col justify-between"
               >
@@ -2087,22 +1810,14 @@ export const GovernmentMap: React.FC = () => {
       {/* SECTION 6 — CITY HEAT ACTION PLANNING (OPERATIONAL RECOMMENDATIONS) */}
       <CityHeatActionPlanning
         locationName={locationName}
-        temperature={
-          gisLayerMode === 'mumbai_zones' && selectedZone
-            ? currentTemp + selectedZone.baselineTempOffsetC
-            : currentTemp
-        }
-        wbgt={thermalData?.thermal?.indices?.wbgt_c}
-        heatIndex={feelsLike}
-        humidity={thermalData?.weather?.humidity}
-        riskLevel={currentRiskLevel}
-        vulnerabilityIndex={
-          gisLayerMode === 'mumbai_zones' && selectedZone
-            ? selectedZone.vulnerabilityIndex
-            : 0.65
-        }
-        isPrototypeZone={gisLayerMode === 'mumbai_zones'}
-        zoneName={gisLayerMode === 'mumbai_zones' && selectedZone ? selectedZone.name : undefined}
+        temperature={selectedWard ? selectedWard.weather.temperatureC : currentTemp}
+        wbgt={selectedWard ? selectedWard.thermal.estimatedWbgtC : thermalData?.thermal?.indices?.wbgt_c}
+        heatIndex={selectedWard ? selectedWard.thermal.heatIndexC : feelsLike}
+        humidity={selectedWard ? selectedWard.weather.humidityPercent : thermalData?.weather?.humidity}
+        riskLevel={selectedWard ? selectedWard.risk.level : currentRiskLevel}
+        vulnerabilityIndex={selectedWard ? selectedWard.vulnerability.score : 0.65}
+        isPrototypeZone={false}
+        zoneName={selectedWard ? selectedWard.name : undefined}
       />
 
       {/* SECTION 7 — CONNECTED AUTHORITY ACTIONS */}

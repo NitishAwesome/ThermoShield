@@ -60,8 +60,11 @@ class HeatActionPlanResult:
     trigger_reasons: List[str]
     recommended_actions: List[HeatActionItem]
     evaluated_telemetry: Dict[str, Any] = field(default_factory=dict)
+    bilingual_advisory: Dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
+        wbgt = self.evaluated_telemetry.get("wbgt_c", 30.0) if self.evaluated_telemetry else 30.0
+        advisory = self.bilingual_advisory or bilingual_advisory_for_risk(self.risk_level, wbgt)
         return {
             "area_id": self.area_id,
             "area_name": self.area_name,
@@ -72,6 +75,7 @@ class HeatActionPlanResult:
             "action_count": len(self.recommended_actions),
             "recommended_actions": [a.to_dict() for a in self.recommended_actions],
             "evaluated_telemetry": self.evaluated_telemetry,
+            "bilingual_advisory": advisory,
         }
 
 
@@ -1194,7 +1198,8 @@ def evaluate_heat_action_plan(
             "vulnerability_score": effective_vuln,
             "forecast_trend": forecast_trend or "STEADY",
             "forecast_lead_time_hours": forecast_lead_time_hours,
-        }
+        },
+        bilingual_advisory=bilingual_advisory_for_risk(norm_risk, effective_wbgt),
     )
 
 
@@ -1231,3 +1236,175 @@ def get_all_wards_heat_action_overview() -> List[Dict[str, Any]]:
         results.append(plan.to_dict())
 
     return results
+
+
+# ---------------------------------------------------------------------------
+# Municipal Concrete Initiative Triggers (Gap 4 — PS 26083)
+# ---------------------------------------------------------------------------
+
+# Agency registry: maps each trigger to the responsible municipal agency
+_TRIGGER_AGENCIES = {
+    "cooling_centers": {
+        "trigger_id": "cooling_centers",
+        "label": "Cooling Centre Activation",
+        "agency": "Municipal Commissioner / Ward Office",
+        "contact": "mcgm-cooling@mcgm.gov.in | 1800-22-4949",
+        "description": (
+            "Activate all designated cooling shelters (community halls, ward offices, "
+            "schools) for free public access 09:00–21:00. Ensure water, ORS, and basic "
+            "first-aid kits are stocked."
+        ),
+    },
+    "grid_peak_load_balance": {
+        "trigger_id": "grid_peak_load_balance",
+        "label": "Peak-Load Power Grid Balancing Directive",
+        "agency": "Maharashtra State Electricity Distribution Co. Ltd (MSEDCL)",
+        "contact": "control-room@msedcl.com | 19122",
+        "description": (
+            "Issue directive to defer non-critical industrial and commercial loads "
+            "between 12:00–16:00 IST to prevent brown-outs during peak heat hours. "
+            "Priority continuity: hospitals, water-treatment plants, and cold-chains."
+        ),
+    },
+    "outdoor_work_halt": {
+        "trigger_id": "outdoor_work_halt",
+        "label": "Outdoor Labour Work Halt Order",
+        "agency": "District Labour Commissioner / PWD / BMC Civil Works",
+        "contact": "dlc-helpline@maharashtra.gov.in | 18001234567",
+        "description": (
+            "Mandatory halt of all outdoor construction and manual labour activity "
+            "between 12:00–16:00 IST. Workers must be provided water, shade, and "
+            "ORS during restricted hours. Employers must maintain attendance records."
+        ),
+    },
+    "emergency_108_staging": {
+        "trigger_id": "emergency_108_staging",
+        "label": "108 Emergency Pre-Positioning",
+        "agency": "Maharashtra Emergency Medical Services (MEMS) / GVK EMRI",
+        "contact": "mems-ops@gvkemri.org | 108",
+        "description": (
+            "Pre-position ambulances in the 5 highest-risk wards. Activate heat-stroke "
+            "protocol: rapid cooling kits, IV fluid packs, and direct-admission "
+            "coordination with designated heat-treatment hospitals."
+        ),
+    },
+}
+
+
+def bilingual_advisory_for_risk(risk_level: str, wbgt_c: float) -> dict:
+    """
+    Generates a bilingual (English + Hindi) public health advisory text
+    calibrated to the current risk level and WBGT.
+
+    Used both by the HAP API response and the trigger-initiatives receipt.
+    """
+    level = risk_level.upper()
+    wbgt_str = f"{wbgt_c:.1f}" if wbgt_c else "—"
+
+    if level == "EXTREME":
+        en = (
+            f"EXTREME HEAT ALERT — WBGT {wbgt_str}°C. Life-threatening heat conditions. "
+            "Stay indoors with cooling. Drink water every 30 minutes. Seek immediate "
+            "medical help if you feel dizzy, confused, or stop sweating."
+        )
+        hi = (
+            f"अत्यंत गर्मी चेतावनी — WBGT {wbgt_str}°C. जानलेवा गर्मी की स्थिति। "
+            "ठंडी जगह पर रहें। हर 30 मिनट में पानी पिएं। चक्कर, भ्रम या पसीना बंद होने पर "
+            "तुरंत चिकित्सा सहायता लें।"
+        )
+    elif level == "HIGH":
+        en = (
+            f"HIGH HEAT WARNING — WBGT {wbgt_str}°C. Dangerous heat stress likely. "
+            "Avoid outdoor activity 12 PM–4 PM. Stay hydrated. Check on elderly "
+            "neighbours and outdoor workers."
+        )
+        hi = (
+            f"उच्च गर्मी चेतावनी — WBGT {wbgt_str}°C. खतरनाक ताप तनाव संभव। "
+            "दोपहर 12–4 बजे बाहर न जाएं। पर्याप्त पानी पिएं। बुजुर्गों और बाहरी "
+            "कामगारों का ध्यान रखें।"
+        )
+    elif level == "MODERATE":
+        en = (
+            f"MODERATE HEAT ADVISORY — WBGT {wbgt_str}°C. Elevated heat stress. "
+            "Limit strenuous outdoor activity. Drink water regularly. "
+            "Watch for heat exhaustion symptoms."
+        )
+        hi = (
+            f"मध्यम गर्मी सलाह — WBGT {wbgt_str}°C. बढ़ा हुआ ताप तनाव। "
+            "कठिन बाहरी गतिविधि सीमित करें। नियमित रूप से पानी पिएं। "
+            "लू के लक्षणों पर नज़र रखें।"
+        )
+    else:
+        en = (
+            f"LOW HEAT RISK — WBGT {wbgt_str}°C. Normal conditions. "
+            "Stay hydrated and take shade during peak afternoon hours."
+        )
+        hi = (
+            f"कम गर्मी जोखिम — WBGT {wbgt_str}°C. सामान्य स्थिति। "
+            "पानी पिते रहें और दोपहर में छाया में रहें।"
+        )
+
+    return {"en": en, "hi": hi}
+
+
+def initiate_municipal_hap_triggers(
+    area_id: str,
+    triggers: list,
+    officer_id: str,
+    risk_level: str = "HIGH",
+    wbgt_c: float = 30.0,
+    notes: str = "",
+) -> dict:
+    """
+    Initiates one or more concrete municipal Heat Action Plan triggers.
+
+    Each trigger generates a dispatch receipt with the responsible agency,
+    contact details, action description, and a UTC timestamp.
+
+    Args:
+        area_id:    Ward or city area identifier
+        triggers:   List of trigger IDs from: cooling_centers,
+                    grid_peak_load_balance, outdoor_work_halt, emergency_108_staging
+        officer_id: Account ID of the authorising officer
+        risk_level: Current heat risk level (LOW / MODERATE / HIGH / EXTREME)
+        wbgt_c:     Current WBGT (°C) at the area
+        notes:      Optional free-text justification from the officer
+
+    Returns:
+        dict with receipts per trigger, bilingual advisory, and summary counts
+    """
+    from datetime import datetime, timezone
+
+    initiated_at = datetime.now(timezone.utc).isoformat()
+    receipts = []
+    unrecognised = []
+
+    for trigger_id in triggers:
+        agency_info = _TRIGGER_AGENCIES.get(trigger_id)
+        if agency_info is None:
+            unrecognised.append(trigger_id)
+            continue
+        receipts.append({
+            **agency_info,
+            "area_id": area_id,
+            "initiated_by": officer_id,
+            "initiated_at": initiated_at,
+            "risk_level": risk_level,
+            "wbgt_c": round(wbgt_c, 1),
+            "officer_notes": notes or None,
+            "status": "DISPATCHED",
+        })
+
+    advisory = bilingual_advisory_for_risk(risk_level, wbgt_c)
+
+    return {
+        "area_id": area_id,
+        "officer_id": officer_id,
+        "initiated_at": initiated_at,
+        "triggers_requested": len(triggers),
+        "triggers_dispatched": len(receipts),
+        "triggers_unrecognised": unrecognised,
+        "receipts": receipts,
+        "bilingual_advisory": advisory,
+    }
+

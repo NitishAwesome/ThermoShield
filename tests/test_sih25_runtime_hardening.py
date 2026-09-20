@@ -173,6 +173,8 @@ class TestSIH25RuntimeHardening(unittest.IsolatedAsyncioTestCase):
                 }
             }
 
+        from backend.app.services.health_forecast import clear_wards_forecast_cache
+        clear_wards_forecast_cache()
         with patch("backend.app.services.health_forecast.get_weather", side_effect=mock_get_weather):
             results = await get_all_wards_forecast_summary()
             self.assertEqual(len(results), 24)

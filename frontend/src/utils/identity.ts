@@ -105,18 +105,8 @@ export function getRoleBadgeLabel(role?: string | null): string {
   }
 }
 
-const AUTHORIZED_GOV_ROLES = [
-  'state_coordinator',
-  'municipal_hap_officer',
-  'district_authority',
-  'ward_officer',
-  'national_analyst',
-  'system_admin',
-  'official',
-  'responder',
-  'analyst',
-  'admin',
-];
+import { AUTHORIZED_GOV_ROLES, isGovUser, isGovRole } from './authRoles';
+export { AUTHORIZED_GOV_ROLES, isGovRole };
 
 /**
  * Resolves complete standardized identity information combining both
@@ -126,12 +116,8 @@ export function getEffectiveIdentity(
   profile?: Partial<UserProfile> | null,
   user?: Partial<User> | null
 ): EffectiveIdentity {
-  // Canonical rule: If user is authenticated, user.role and user.portal_type ALWAYS take precedence
-  const userRoleLower = (user?.role || '').toLowerCase();
-  const isAuthority =
-    user?.portal_type === 'AUTHORITY' ||
-    AUTHORIZED_GOV_ROLES.includes(userRoleLower) ||
-    Boolean(user?.organization || user?.jurisdiction_id);
+  // Canonical rule: Check consolidated authority user status
+  const isAuthority = isGovUser(user, profile);
 
   const role = isAuthority
     ? (user?.role || profile?.role || 'state_coordinator').toLowerCase()

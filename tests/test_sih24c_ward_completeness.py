@@ -102,6 +102,8 @@ def test_single_ward_failure_resilience_and_accounting():
                 }
             }
 
+        from backend.app.services.health_forecast import clear_wards_forecast_cache
+        clear_wards_forecast_cache()
         with patch("backend.app.services.health_forecast.get_weather", side_effect=mock_selective_weather), \
              patch("app.services.health_forecast.get_weather", side_effect=mock_selective_weather):
             results = await get_all_wards_forecast_summary()

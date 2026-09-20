@@ -14,6 +14,7 @@ Scientific & Operational Principles:
 
 import math
 import asyncio
+import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional, Tuple
 import logging
@@ -454,21 +455,48 @@ async def generate_health_impact_forecast(
     }
 
 
-async def get_all_wards_forecast_summary() -> List[Dict[str, Any]]:
+_WARDS_FORECAST_CACHE: Dict[str, Any] = {"timestamp": 0.0, "data": []}
+WARDS_FORECAST_CACHE_TTL = 900.0  # 15 minutes
+_WARDS_CACHE_LOCK: Optional[asyncio.Lock] = None
+
+def _get_wards_cache_lock() -> asyncio.Lock:
+    global _WARDS_CACHE_LOCK
+    if _WARDS_CACHE_LOCK is None:
+        _WARDS_CACHE_LOCK = asyncio.Lock()
+    return _WARDS_CACHE_LOCK
+
+
+def clear_wards_forecast_cache() -> None:
+    """Clears the in-memory 15-minute ward forecast cache (used for test isolation)."""
+    global _WARDS_FORECAST_CACHE
+    _WARDS_FORECAST_CACHE["data"] = []
+    _WARDS_FORECAST_CACHE["timestamp"] = 0.0
+
+
+async def get_all_wards_forecast_summary(force_refresh: bool = False) -> List[Dict[str, Any]]:
     """
     Generates 5-day risk level projections across all 24 Mumbai administrative ward references
     using representative ward coordinates derived from the current administrative ward geometry dataset.
-    Uses REAL per-ward Open-Meteo forecasts and hourly biometeorological modeling.
-    Fires asynchronous requests across all ward coordinates in parallel.
+    Leverages 15-minute in-memory caching for near-instantaneous (<1ms) response times.
     """
-    ward_items = list(MUNICIPAL_WARD_REGISTRY.items())
+    now = time.time()
+    if not force_refresh and _WARDS_FORECAST_CACHE["data"] and (now - _WARDS_FORECAST_CACHE["timestamp"]) < WARDS_FORECAST_CACHE_TTL:
+        return _WARDS_FORECAST_CACHE["data"]
 
-    # Bounded concurrency limiter to protect upstream APIs and prevent socket exhaustion
-    sem = asyncio.Semaphore(10)
+    lock = _get_wards_cache_lock()
+    async with lock:
+        # Double-check cache inside lock
+        if not force_refresh and _WARDS_FORECAST_CACHE["data"] and (time.time() - _WARDS_FORECAST_CACHE["timestamp"]) < WARDS_FORECAST_CACHE_TTL:
+            return _WARDS_FORECAST_CACHE["data"]
 
-    async def _fetch_ward_weather(lat: float, lon: float):
-        async with sem:
-            return await get_weather(lat, lon)
+        ward_items = list(MUNICIPAL_WARD_REGISTRY.items())
+
+        # Bounded concurrency limiter to protect upstream APIs and prevent socket exhaustion
+        sem = asyncio.Semaphore(10)
+
+        async def _fetch_ward_weather(lat: float, lon: float):
+            async with sem:
+                return await get_weather(lat, lon)
 
     # Fire async weather fetches with bounded concurrency for all 24 Mumbai administrative ward references
     tasks = [
@@ -639,6 +667,10 @@ async def get_all_wards_forecast_summary() -> List[Dict[str, Any]]:
                 "data_timestamp": datetime.utcnow().isoformat() + "Z",
                 "cache_age_seconds": 0.0,
             })
+
+    if results:
+        _WARDS_FORECAST_CACHE["data"] = results
+        _WARDS_FORECAST_CACHE["timestamp"] = time.time()
 
     return results
 

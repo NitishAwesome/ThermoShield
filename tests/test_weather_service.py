@@ -57,6 +57,12 @@ class FakeAsyncClient:
 class TestWeatherService(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         _CACHE.clear()
+        import backend.app.services.weather as ws
+        ws._WEATHER_CLIENT = None
+
+    def tearDown(self):
+        import backend.app.services.weather as ws
+        ws._WEATHER_CLIENT = None
 
     async def test_get_weather_returns_canonical_contract(self):
         payload = {

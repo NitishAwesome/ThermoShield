@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
-import { ThermalResponse, RiskLevel } from '../types';
+import { ThermalResponse, RiskLevel, StateHeatAlertProperties } from '../types';
 import { LocationSearch } from '../components/LocationSearch';
 import { LoadingState } from '../components/LoadingState';
 import {
@@ -20,7 +20,13 @@ import { Card, CardHeader, CardContent, Button, EmptyState } from '../components
 import { useTranslation } from '../context/LanguageContext';
 import { translateCivicAdvisory } from '../utils/translationHelpers';
 import { DataRealityBadge, FallbackModeBanner } from '../components/provenance';
-import { ALL_STATE_HEAT_ALERTS, getStateCategoryStyle, getNationalAlertStatistics } from '../data/stateHeatAlerts';
+import {
+  getLiveAllStateHeatAlerts,
+  getStateCategoryStyle,
+  getNationalAlertStatistics,
+  subscribeStateAlerts,
+  fetchLiveNationalStateAlerts,
+} from '../data/stateHeatAlerts';
 
 // Focused Citizen Alert Components
 import { CurrentAlertStatus } from '../components/alerts/CurrentAlertStatus';
@@ -41,10 +47,21 @@ export const Alerts: React.FC = () => {
 
   const [selectedStateCategoryFilter, setSelectedStateCategoryFilter] = useState<'ALL' | 'RED' | 'ORANGE' | 'YELLOW' | 'GREEN'>('ALL');
   const [stateSearchText, setStateSearchText] = useState<string>('');
-  const nationalAlertStats = useMemo(() => getNationalAlertStatistics(), []);
+  const [liveStateAlerts, setLiveStateAlerts] = useState<StateHeatAlertProperties[]>(() => getLiveAllStateHeatAlerts());
+  const [nationalAlertStats, setNationalAlertStats] = useState(() => getNationalAlertStatistics(getLiveAllStateHeatAlerts()));
+
+  useEffect(() => {
+    fetchLiveNationalStateAlerts().catch(() => {});
+    const unsub = subscribeStateAlerts(() => {
+      const updated = getLiveAllStateHeatAlerts();
+      setLiveStateAlerts(updated);
+      setNationalAlertStats(getNationalAlertStatistics(updated));
+    });
+    return unsub;
+  }, []);
 
   const filteredStates = useMemo(() => {
-    return ALL_STATE_HEAT_ALERTS.filter((s) => {
+    return liveStateAlerts.filter((s) => {
       const matchCat = selectedStateCategoryFilter === 'ALL' || s.alertCategory === selectedStateCategoryFilter;
       const matchSearch =
         !stateSearchText ||
@@ -53,7 +70,7 @@ export const Alerts: React.FC = () => {
         s.affectedDistricts.some((d) => d.toLowerCase().includes(stateSearchText.toLowerCase()));
       return matchCat && matchSearch;
     });
-  }, [selectedStateCategoryFilter, stateSearchText]);
+  }, [liveStateAlerts, selectedStateCategoryFilter, stateSearchText]);
 
   const fetchAlerts = async () => {
     const cached = getCachedData(coords.lat, coords.lon);
