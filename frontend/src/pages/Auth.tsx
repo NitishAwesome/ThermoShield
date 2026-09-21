@@ -124,6 +124,43 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
   const [designation, setDesignation] = useState('');
   const [officialId, setOfficialId] = useState('');
   const [jurisdictionId, setJurisdictionId] = useState('IN-MH-MCGM');
+  const [registrationPending, setRegistrationPending] = useState(false);
+
+  const getJurisdictionLabel = (id: string) => {
+    const labels: Record<string, string> = {
+      'IN': 'India Subcontinent (IN - 36 States/UTs)',
+      'IN-MH': 'Maharashtra (IN-MH - 36 Districts)',
+      'IN-GJ': 'Gujarat (IN-GJ - 33 Districts)',
+      'IN-RJ': 'Rajasthan (IN-RJ - 50 Districts)',
+      'IN-UP': 'Uttar Pradesh (IN-UP - 75 Districts)',
+      'IN-DL': 'Delhi NCR (IN-DL)',
+      'IN-TN': 'Tamil Nadu (IN-TN - 38 Districts)',
+      'IN-KA': 'Karnataka (IN-KA - 31 Districts)',
+      'IN-AP': 'Andhra Pradesh (IN-AP - 26 Districts)',
+      'IN-TG': 'Telangana (IN-TG - 33 Districts)',
+      'IN-MP': 'Madhya Pradesh (IN-MP - 55 Districts)',
+      'IN-WB': 'West Bengal (IN-WB - 23 Districts)',
+      'IN-OD': 'Odisha (IN-OD - 30 Districts)',
+      'IN-BR': 'Bihar (IN-BR - 38 Districts)',
+      'IN-PB': 'Punjab (IN-PB - 23 Districts)',
+      'IN-HR': 'Haryana (IN-HR - 22 Districts)',
+      'IN-JH': 'Jharkhand (IN-JH - 24 Districts)',
+      'IN-CG': 'Chhattisgarh (IN-CG - 33 Districts)',
+      'IN-MH-MCGM': 'Greater Mumbai MCGM (IN-MH-MCGM - 24 BMC Wards)',
+      'IN-GJ-AMC': 'Ahmedabad AMC (IN-GJ-AMC)',
+      'IN-DL-MCD': 'Delhi MCD (IN-DL-MCD)',
+      'IN-KA-BBMP': 'Bengaluru BBMP (IN-KA-BBMP)',
+      'IN-TN-GCC': 'Chennai GCC (IN-TN-GCC)',
+      'IN-TG-GHMC': 'Hyderabad GHMC (IN-TG-GHMC)',
+      'IN-WB-KMC': 'Kolkata KMC (IN-WB-KMC)',
+      'IN-MH-PMC': 'Pune PMC (IN-MH-PMC)',
+      'IN-MH-DIST-NAGPUR': 'Nagpur District (IN-MH-DIST-NAGPUR)',
+      'IN-RJ-DIST-JAIPUR': 'Jaipur District (IN-RJ-DIST-JAIPUR)',
+      'IN-UP-DIST-LKO': 'Lucknow District (IN-UP-DIST-LKO)',
+      'IN-MH-MCGM-KE': 'BMC Ward K/East Andheri East (IN-MH-MCGM-KE)',
+    };
+    return labels[id] || id;
+  };
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -298,8 +335,13 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
         setLocalError('Please provide a valid email address.');
         return;
       }
-      if (!phoneNumber.trim()) {
+      const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
+      if (!cleanPhone) {
         setLocalError('Please provide a contact phone number.');
+        return;
+      }
+      if (!/^\+[1-9]\d{7,14}$/.test(cleanPhone)) {
+        setLocalError('Phone must be in international format: +919876543210 (no spaces or dashes)');
         return;
       }
       if (!password || password.length < 8) {
@@ -312,7 +354,7 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
         await register({
           name: name.trim(),
           email: email.trim().toLowerCase(),
-          phone_number: phoneNumber.trim(),
+          phone_number: cleanPhone,
           password,
           role,
           organization: role !== 'user' ? organization.trim() : undefined,
@@ -321,11 +363,12 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
           official_id: role !== 'user' ? officialId.trim() : undefined,
           jurisdiction_id: role !== 'user' ? jurisdictionId.trim() : undefined,
         });
-        setSuccessMsg(
-          role !== 'user'
-            ? 'Official registration submitted! Account placed in PENDING_VERIFICATION until authorized.'
-            : 'Account registered successfully! Welcome to ThermoShield.'
-        );
+        if (role !== 'user') {
+          setRegistrationPending(true);
+          return;
+        }
+
+        setSuccessMsg('Account registered successfully! Welcome to ThermoShield.');
         setTimeout(() => navigate(targetUrl), 600);
       } catch (err: any) {
         setLocalError(err.message || 'Registration failed. Please check your details.');
@@ -677,8 +720,51 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
                 </div>
               </div>
 
-              {/* Form */}
-              <form onSubmit={handleSubmit} className="space-y-3.5">
+              {/* Form or Pending Verification Panel */}
+              {registrationPending ? (
+                <div className="p-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-5 animate-fadeIn">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+                  </div>
+                  <div className="space-y-2">
+                    <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30 font-mono">
+                      Status: PENDING_VERIFICATION
+                    </span>
+                    <h3 className="text-lg sm:text-xl font-black ts-text-primary">
+                      Registration Submitted Successfully
+                    </h3>
+                    <p className="text-xs ts-text-muted leading-relaxed max-w-sm mx-auto">
+                      Your official account is under verification (PENDING_VERIFICATION status). An administrator will review your government credentials. You will be notified by email when your account is approved and activated.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl ts-card-subtle border ts-border text-left text-xs space-y-1.5">
+                    <div className="font-bold ts-text-primary flex items-center gap-1.5">
+                      <Building2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Your jurisdiction request: <strong className="text-amber-400">{getJurisdictionLabel(jurisdictionId)}</strong></span>
+                    </div>
+                    <p className="text-[11px] ts-text-muted leading-relaxed">
+                      Organization: <strong className="ts-text-primary">{organization || 'Government Authority'}</strong> ({designation || 'Official'})
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                    <Link
+                      to="/auth/authority/login"
+                      className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 flex items-center justify-center space-x-1.5 transition-all"
+                    >
+                      <span>Go to Login →</span>
+                    </Link>
+                    <Link
+                      to="/"
+                      className="w-full sm:w-auto px-5 py-2.5 rounded-xl border ts-border ts-card-subtle hover:bg-slate-500/10 text-xs font-bold ts-text-primary transition-all flex items-center justify-center"
+                    >
+                      <span>Return to Home</span>
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-3.5">
                 {/* Full Name (Register Mode only) */}
                 {mode === 'register' && (
                   <div>
@@ -747,11 +833,12 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
                         type="tel"
                         required
                         value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        onChange={(e) => setPhoneNumber(e.target.value.replace(/\s/g, ''))}
                         placeholder="+91 98765 43210"
                         className="w-full ts-input pl-10 pr-4 py-2.5 text-xs sm:text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all rounded-xl"
                       />
                     </div>
+                    <p className="text-[10px] ts-text-muted mt-1">International format required: +91XXXXXXXXXX</p>
                   </div>
                 )}
 
@@ -917,13 +1004,48 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
                           <select
                             value={jurisdictionId}
                             onChange={(e) => setJurisdictionId(e.target.value)}
-                            className="w-full ts-input px-2.5 py-1.5 text-xs rounded-lg"
+                            className="w-full ts-input px-2.5 py-1.5 text-xs rounded-lg bg-slate-900 text-white"
                           >
-                            <option value="IN-MH-MCGM">Municipal: Greater Mumbai (IN-MH-MCGM - 24 BMC Wards)</option>
-                            <option value="IN-MH">State: Maharashtra (IN-MH - 36 Districts)</option>
-                            <option value="IN-MH-DIST-NAGPUR">District: Nagpur District (IN-MH-DIST-NAGPUR)</option>
-                            <option value="IN-MH-MCGM-KE">Ward: BMC Ward K/East (Andheri East)</option>
-                            <option value="IN">National: India Subcontinent (IN - 36 States/UTs)</option>
+                            <optgroup label="National">
+                              <option value="IN">India (IN)</option>
+                            </optgroup>
+                            <optgroup label="States">
+                              <option value="IN-MH">Maharashtra (IN-MH)</option>
+                              <option value="IN-GJ">Gujarat (IN-GJ)</option>
+                              <option value="IN-RJ">Rajasthan (IN-RJ)</option>
+                              <option value="IN-UP">Uttar Pradesh (IN-UP)</option>
+                              <option value="IN-DL">Delhi (IN-DL)</option>
+                              <option value="IN-TN">Tamil Nadu (IN-TN)</option>
+                              <option value="IN-KA">Karnataka (IN-KA)</option>
+                              <option value="IN-AP">Andhra Pradesh (IN-AP)</option>
+                              <option value="IN-TG">Telangana (IN-TG)</option>
+                              <option value="IN-MP">Madhya Pradesh (IN-MP)</option>
+                              <option value="IN-WB">West Bengal (IN-WB)</option>
+                              <option value="IN-OD">Odisha (IN-OD)</option>
+                              <option value="IN-BR">Bihar (IN-BR)</option>
+                              <option value="IN-PB">Punjab (IN-PB)</option>
+                              <option value="IN-HR">Haryana (IN-HR)</option>
+                              <option value="IN-JH">Jharkhand (IN-JH)</option>
+                              <option value="IN-CG">Chhattisgarh (IN-CG)</option>
+                            </optgroup>
+                            <optgroup label="Municipal Corporations">
+                              <option value="IN-MH-MCGM">Greater Mumbai MCGM (IN-MH-MCGM)</option>
+                              <option value="IN-GJ-AMC">Ahmedabad AMC (IN-GJ-AMC)</option>
+                              <option value="IN-DL-MCD">Delhi MCD (IN-DL-MCD)</option>
+                              <option value="IN-KA-BBMP">Bengaluru BBMP (IN-KA-BBMP)</option>
+                              <option value="IN-TN-GCC">Chennai GCC (IN-TN-GCC)</option>
+                              <option value="IN-TG-GHMC">Hyderabad GHMC (IN-TG-GHMC)</option>
+                              <option value="IN-WB-KMC">Kolkata KMC (IN-WB-KMC)</option>
+                              <option value="IN-MH-PMC">Pune PMC (IN-MH-PMC)</option>
+                            </optgroup>
+                            <optgroup label="Districts">
+                              <option value="IN-MH-DIST-NAGPUR">Nagpur (IN-MH-DIST-NAGPUR)</option>
+                              <option value="IN-RJ-DIST-JAIPUR">Jaipur (IN-RJ-DIST-JAIPUR)</option>
+                              <option value="IN-UP-DIST-LKO">Lucknow (IN-UP-DIST-LKO)</option>
+                            </optgroup>
+                            <optgroup label="Ward Level">
+                              <option value="IN-MH-MCGM-KE">BMC Ward K/East Andheri East (IN-MH-MCGM-KE)</option>
+                            </optgroup>
                           </select>
                         </div>
                       </div>
@@ -952,6 +1074,7 @@ export const Auth: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
                   </button>
                 </div>
               </form>
+              )}
 
               {/* Organized & Intentional Evaluation / Demo Access */}
               <div className="mt-6 pt-4 border-t ts-border">

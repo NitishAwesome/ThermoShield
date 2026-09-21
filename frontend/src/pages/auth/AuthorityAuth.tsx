@@ -588,8 +588,13 @@ export const AuthorityAuth: React.FC<{ initialMode?: 'login' | 'register' }> = (
       setLocalError('Official email address is required.');
       return;
     }
-    if (!phoneNumber.trim()) {
+    const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
+    if (!cleanPhone) {
       setLocalError('Official phone number is required.');
+      return;
+    }
+    if (!/^\+[1-9]\d{7,14}$/.test(cleanPhone)) {
+      setLocalError('Phone must be in international format: +919876543210 (no spaces or dashes)');
       return;
     }
     if (!regPassword || regPassword.length < 8) {
@@ -642,11 +647,12 @@ export const AuthorityAuth: React.FC<{ initialMode?: 'login' | 'register' }> = (
       return;
     }
 
+    const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
     try {
       await register({
         name: fullName.trim(),
         email: officialEmail.trim(),
-        phone_number: phoneNumber.trim(),
+        phone_number: cleanPhone,
         password: regPassword,
         role: validation.normalizedRole,
         organization: currentOrg.name,
@@ -657,22 +663,7 @@ export const AuthorityAuth: React.FC<{ initialMode?: 'login' | 'register' }> = (
       });
 
       setIsReviewOpen(false);
-      setIsVerifyingTransition(true);
-
-      // Lightweight ~1 second verification transition screen (Section 5 & 6)
-      setTimeout(async () => {
-        try {
-          await api.autoApproveAuthority().catch(() => null);
-        } catch {
-          // Ignore if already approved
-        }
-        await refreshUser().catch(() => null);
-        setIsVerificationReady(true);
-
-        setTimeout(() => {
-          navigate('/gov/dashboard');
-        }, 500);
-      }, 1000);
+      setIsRegisteredPending(true);
     } catch (err: any) {
       setLocalError(err.message || 'Registration request failed. Please verify inputs.');
       setIsReviewOpen(false);
@@ -748,13 +739,13 @@ export const AuthorityAuth: React.FC<{ initialMode?: 'login' | 'register' }> = (
     );
   }
 
-  // Screen for newly registered pending accounts (fallback if auto-approval is disabled in production)
+  // Screen for newly registered pending accounts
   if (isRegisteredPending) {
     return (
       <div className="min-h-[85vh] flex items-center justify-center py-12 px-4 animate-fadeIn">
-        <Card variant="elevated" className="max-w-xl w-full p-6 sm:p-8 border border-amber-500/40 text-center space-y-6 shadow-2xl">
-          <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-500 flex items-center justify-center mx-auto shadow-lg shadow-amber-500/10">
-            <Clock className="w-8 h-8" />
+        <Card variant="elevated" className="max-w-xl w-full p-6 sm:p-8 border border-emerald-500/40 text-center space-y-6 shadow-2xl">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
+            <CheckCircle2 className="w-8 h-8 text-emerald-400" />
           </div>
 
           <div className="space-y-2">
@@ -762,17 +753,17 @@ export const AuthorityAuth: React.FC<{ initialMode?: 'login' | 'register' }> = (
               Status: PENDING_VERIFICATION
             </span>
             <h2 className="text-xl sm:text-2xl font-black ts-text-primary">
-              Access Request Submitted
+              Registration Submitted Successfully
             </h2>
             <p className="text-xs sm:text-sm ts-text-muted max-w-md mx-auto leading-relaxed">
-              Your official access request for <strong className="ts-text-primary">{selectedDesignation}</strong> at <strong className="ts-text-primary">{currentOrg.name}</strong> has been registered.
+              Your official account is under verification (PENDING_VERIFICATION status). An administrator will review your government credentials. You will be notified by email when your account is approved and activated.
             </p>
           </div>
 
           <div className="p-4 rounded-xl ts-card-subtle border ts-border text-left text-xs space-y-2">
             <div className="font-bold ts-text-primary flex items-center gap-1.5">
-              <Building2 className="w-4 h-4 text-amber-500 shrink-0" />
-              <span>Requested Scope: {effectiveJurisdictionName}</span>
+              <Building2 className="w-4 h-4 text-emerald-500 shrink-0" />
+              <span>Your jurisdiction request: <strong className="text-amber-400">{effectiveJurisdictionName} ({effectiveJurisdictionId})</strong></span>
             </div>
             <p className="ts-text-muted leading-relaxed">
               Submitting an access request does not grant operational authority. Your account remains in verification until authorized for operational heat action plan deployment.
@@ -781,10 +772,16 @@ export const AuthorityAuth: React.FC<{ initialMode?: 'login' | 'register' }> = (
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <Link
+              to="/auth/authority/login"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs shadow-lg shadow-amber-600/20 flex items-center justify-center space-x-1.5 transition-all"
+            >
+              <span>Go to Login →</span>
+            </Link>
+            <Link
               to="/"
               className="w-full sm:w-auto px-5 py-2.5 rounded-xl border ts-border ts-card-subtle hover:bg-slate-500/10 text-xs font-bold ts-text-primary transition-all flex items-center justify-center space-x-1.5"
             >
-              <span>Citizen Safety View</span>
+              <span>Return to Home</span>
             </Link>
           </div>
         </Card>
@@ -1075,11 +1072,12 @@ export const AuthorityAuth: React.FC<{ initialMode?: 'login' | 'register' }> = (
                       <input
                         type="tel"
                         value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                        placeholder="+91 98200 12345"
+                        onChange={(e) => setPhoneNumber(e.target.value.replace(/\s/g, ''))}
+                        placeholder="+91 98765 43210"
                         required
                         className="w-full text-xs font-medium px-3 py-2 rounded-xl bg-slate-900/60 border ts-border ts-text-primary focus:outline-none focus:border-amber-500"
                       />
+                      <p className="text-[10px] ts-text-muted mt-1">International format required: +91XXXXXXXXXX</p>
                     </div>
 
                     <div>

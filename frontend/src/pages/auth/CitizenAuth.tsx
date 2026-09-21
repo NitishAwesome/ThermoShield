@@ -126,8 +126,13 @@ export const CitizenAuth: React.FC<{ initialMode?: 'login' | 'register' }> = ({
         setLocalError('Please provide a valid email address.');
         return;
       }
-      if (!phoneNumber.trim()) {
+      const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
+      if (!cleanPhone) {
         setLocalError('Please provide a contact phone number.');
+        return;
+      }
+      if (!/^\+[1-9]\d{7,14}$/.test(cleanPhone)) {
+        setLocalError('Phone must be in international format: +919876543210 (no spaces or dashes)');
         return;
       }
       if (!password || password.length < 8) {
@@ -140,7 +145,7 @@ export const CitizenAuth: React.FC<{ initialMode?: 'login' | 'register' }> = ({
         await register({
           name: name.trim(),
           email: email.trim().toLowerCase(),
-          phone_number: phoneNumber.trim(),
+          phone_number: cleanPhone,
           password,
           role: 'user',
         });
@@ -355,12 +360,13 @@ export const CitizenAuth: React.FC<{ initialMode?: 'login' | 'register' }> = ({
                     <input
                       type="tel"
                       value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      onChange={(e) => setPhoneNumber(e.target.value.replace(/\s/g, ''))}
                       placeholder="+91 98765 43210"
                       required
                       className="w-full text-xs font-medium pl-9 pr-3 py-2.5 rounded-xl bg-slate-900/60 border ts-border ts-text-primary focus:outline-none focus:border-orange-500"
                     />
                   </div>
+                  <p className="text-[10px] ts-text-muted mt-1">International format required: +91XXXXXXXXXX</p>
                 </div>
               )}
 
